@@ -1,0 +1,6 @@
+---
+ansible_install_version: "2.16"     # pip package version prefix — update as needed
+vault_password_file: /root/.ansible/vault_pass.txt
+collections_requirements_file: /opt/network-ansible/requirements.yml
+repo_dest: /opt/network-ansible
+repo_url: "git@github.com:ptchuitio84/network-ansible.git"

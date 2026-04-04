@@ -1,0 +1,21 @@
+---
+timezone: America/New_York
+dns_servers:
+  - 10.10.0.10
+  - 10.10.0.12
+ntp_servers:
+  - 10.10.0.10
+  - 129.146.193.200
+
+base_packages:
+  - vim
+  - curl
+  - wget
+  - git
+  - net-tools
+  - bind-utils
+  - tcpdump
+  - lsof
+  - unzip
+  - python3
+  - python3-pip

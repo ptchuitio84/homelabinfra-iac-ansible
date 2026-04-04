@@ -1,0 +1,88 @@
+---
+- name: Install pip dependencies for Ansible
+  ansible.builtin.dnf:
+    name:
+      - python3-pip
+      - python3-devel
+      - sshpass
+      - git
+    state: present
+
+- name: Install Ansible via pip
+  ansible.builtin.pip:
+    name: "ansible~={{ ansible_install_version }}"
+    executable: pip3
+    state: present
+
+- name: Install paramiko (needed for network device SSH connections)
+  ansible.builtin.pip:
+    name: paramiko
+    executable: pip3
+    state: present
+
+- name: Create .ansible directory for root
+  ansible.builtin.file:
+    path: /root/.ansible
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Create vault password file (populate manually after provisioning)
+  ansible.builtin.copy:
+    content: "REPLACE_WITH_VAULT_PASSWORD\n"
+    dest: "{{ vault_password_file }}"
+    owner: root
+    group: root
+    mode: '0600'
+    force: false     # don't overwrite if already set
+
+- name: Create ansible.cfg for root user
+  ansible.builtin.copy:
+    dest: /root/.ansible.cfg
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [defaults]
+      vault_password_file = {{ vault_password_file }}
+
+- name: Create repo directory
+  ansible.builtin.file:
+    path: "{{ repo_dest }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Clone network-ansible repo
+  ansible.builtin.git:
+    repo: "{{ repo_url }}"
+    dest: "{{ repo_dest }}"
+    version: main
+    accept_hostkey: true
+  ignore_errors: true     # may fail on first run if SSH key not deployed yet
+
+- name: Copy requirements.yml if repo clone failed
+  ansible.builtin.copy:
+    src: requirements.yml
+    dest: "{{ repo_dest }}/requirements.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  when: not (repo_dest + '/requirements.yml') is file
+
+- name: Install Ansible collections
+  community.general.ansible_galaxy_install:
+    type: collection
+    requirements_file: "{{ repo_dest }}/requirements.yml"
+  ignore_errors: true
+
+- name: Verify ansible is in PATH
+  ansible.builtin.command: ansible --version
+  register: ansible_version_output
+  changed_when: false
+
+- name: Show installed Ansible version
+  ansible.builtin.debug:
+    msg: "{{ ansible_version_output.stdout_lines[0] }}"

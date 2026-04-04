@@ -1,0 +1,32 @@
+---
+# setup_ansible_node.yml — Bootstrap the Ansible control node (hmvlapans001)
+#
+# Run this FROM YOUR MAC against hmvlapans001 to fully configure the control node.
+# After this runs, all future playbooks execute FROM the control node.
+#
+# Prerequisites:
+#   - SSH access to hmvlapans001 (10.10.1.31) working from your Mac
+#   - Root or sudo access
+#
+# Usage:
+#   ansible-playbook playbooks/setup_ansible_node.yml -k -K
+#     -k  = prompt for SSH password
+#     -K  = prompt for sudo password
+#
+#   Or if SSH key already deployed:
+#   ansible-playbook playbooks/setup_ansible_node.yml
+#
+# After this playbook completes:
+#   1. SSH into hmvlapans001
+#   2. Set the vault password:  echo 'your_vault_password' > /root/.ansible/vault_pass.txt
+#   3. cd /opt/network-ansible
+#   4. Run: ansible-playbook playbooks/network_backup.yml --limit cisco_switches
+
+- name: Bootstrap Ansible control node
+  hosts: ansible_nodes
+  become: true
+  gather_facts: true
+
+  roles:
+    - common
+    - ansible_node
