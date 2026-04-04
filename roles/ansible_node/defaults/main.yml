@@ -1,6 +1,38 @@
+# =============================================================================
+# roles/ansible_node/defaults/main.yml — Ansible Node Role Default Variables
+# =============================================================================
+# Default values for the "ansible_node" role.
+# Override any of these in group_vars or host_vars if needed.
+#
+# WHAT THIS ROLE DOES:
+# Turns a fresh OL10 VM into a fully operational Ansible control node by:
+#   1. Installing Ansible via pip
+#   2. Installing paramiko (SSH library for network device connections)
+#   3. Creating the vault password file location
+#   4. Cloning this repo to /opt/homelabinfra-iac-ansible
+#   5. Installing all Ansible collections from requirements.yml
+# =============================================================================
+
 ---
-ansible_install_version: "2.16"     # pip package version prefix — update as needed
+# Ansible version to install via pip.
+# "~=" means "compatible with" — installs 2.16.x but not 2.17+.
+# Update this when ready to upgrade. Test in staging first.
+ansible_install_version: "2.16"
+
+# Path where the vault password file is stored on the control node.
+# This file must be created manually after provisioning (not automated — security).
+# It is owned by root with 0600 permissions so only root can read it.
 vault_password_file: /root/.ansible/vault_pass.txt
+
+# Full path to requirements.yml once the repo is cloned.
+# Used to install all Ansible collections after cloning.
 collections_requirements_file: /opt/homelabinfra-iac-ansible/requirements.yml
+
+# Where to clone the repo on the control node.
+# All playbooks are run from this directory.
 repo_dest: /opt/homelabinfra-iac-ansible
+
+# Git SSH URL for the repo.
+# Requires an SSH key deployed on the control node with access to GitHub.
+# If the clone fails (no SSH key yet), requirements.yml is copied manually instead.
 repo_url: "git@github.com:ptchuitio84/homelabinfra-iac-ansible.git"

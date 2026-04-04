@@ -1,20 +1,50 @@
----
-# Ansible collection requirements
-# Install all:
+# =============================================================================
+# requirements.yml — Ansible Collection Dependencies
+# =============================================================================
+# This file lists all external Ansible "collections" this repo depends on.
+# Collections are vendor-provided modules that let Ansible talk to specific
+# platforms (Cisco switches, Arista switches, VMware, etc.).
+#
+# Think of this like a package.json or requirements.txt — it declares what
+# needs to be installed before any playbook can run.
+#
+# HOW TO INSTALL (run once on the Ansible control node or your Mac):
 #   ansible-galaxy collection install -r requirements.yml
 #
-# Install on Ansible control node (hmvlapans001.nnt.com) before running any playbooks.
+# WHERE COLLECTIONS ARE INSTALLED:
+#   ~/.ansible/collections/  (set in ansible.cfg)
+# =============================================================================
 
+---
 collections:
+
+  # Cisco IOS — for managing Cisco Catalyst switches (swplnet251 / 3750G)
+  # Provides modules like: ios_config, ios_command, ios_facts
   - name: cisco.ios
     version: ">=4.0.0"
+
+  # Arista EOS — for managing Arista switches (swplnet252 / 7050SX, 7048T-A)
+  # Provides modules like: eos_config, eos_command, eos_facts
+  # Uses eAPI (HTTPS) transport — faster and more reliable than SSH for EOS
   - name: arista.eos
     version: ">=9.0.0"
+
+  # Ansible Network Common — shared transport libraries used by cisco.ios and arista.eos
+  # Required by both network collections above — must be installed alongside them
   - name: ansible.netcommon
     version: ">=5.0.0"
+
+  # Cisco Meraki — for managing the Meraki MX edge router via the Meraki Dashboard API
+  # Provides modules like: meraki_static_route, meraki_network
   - name: cisco.meraki
     version: ">=2.0.0"
+
+  # VMware Community Collection — for managing vCenter, ESXi hosts, and VMs
+  # Provides modules like: vmware_guest, vmware_host, vmware_dvswitch
   - name: community.vmware
     version: ">=4.0.0"
+
+  # Ansible Utils — helper modules used internally by other collections
+  # Required by ansible.netcommon for things like IP address parsing
   - name: ansible.utils
     version: ">=2.0.0"

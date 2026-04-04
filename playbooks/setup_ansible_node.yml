@@ -1,32 +1,49 @@
----
-# setup_ansible_node.yml — Bootstrap the Ansible control node (hmvlapans001)
+# =============================================================================
+# playbooks/setup_ansible_node.yml — Bootstrap the Ansible Control Node
+# =============================================================================
+# PURPOSE:
+# Turns a fresh Oracle Linux 10 VM (hmvlapans001) into a fully operational
+# Ansible control node in a single playbook run.
 #
-# Run this FROM YOUR MAC against hmvlapans001 to fully configure the control node.
-# After this runs, all future playbooks execute FROM the control node.
+# WHEN TO RUN THIS:
+# Once — when setting up the control node for the first time.
+# Can be safely re-run if something fails partway through (idempotent).
 #
-# Prerequisites:
-#   - SSH access to hmvlapans001 (10.10.1.31) working from your Mac
-#   - Root or sudo access
+# WHERE TO RUN THIS FROM:
+# Your Mac (or any machine with SSH access to hmvlapans001).
+# After this playbook completes, all future playbooks run FROM hmvlapans001.
 #
-# Usage:
-#   ansible-playbook playbooks/setup_ansible_node.yml -k -K
-#     -k  = prompt for SSH password
-#     -K  = prompt for sudo password
+# PREREQUISITES:
+#   1. SSH access to 10.10.1.31 (hmvlapans001) from the machine running this
+#   2. Root access on the VM (or sudo — pass -K if using sudo)
+#   3. Ansible installed on YOUR machine (the one running this playbook):
+#        pip3 install ansible
 #
-#   Or if SSH key already deployed:
+# USAGE:
+#   # If using password auth (most common on first setup):
+#   ansible-playbook playbooks/setup_ansible_node.yml -k
+#     -k = prompt for SSH password
+#
+#   # If SSH key is already deployed:
 #   ansible-playbook playbooks/setup_ansible_node.yml
 #
-# After this playbook completes:
-#   1. SSH into hmvlapans001
-#   2. Set the vault password:  echo 'your_vault_password' > /root/.ansible/vault_pass.txt
-#   3. cd /opt/network-ansible
-#   4. Run: ansible-playbook playbooks/network_backup.yml --limit cisco_switches
+# WHAT HAPPENS:
+#   1. common role  — sets timezone, NTP, base packages, SELinux permissive
+#   2. ansible_node role — installs Ansible, collections, clones this repo
+#
+# AFTER THIS COMPLETES:
+#   1. SSH into hmvlapans001:  ssh root@10.10.1.31
+#   2. Set the vault password: echo 'your_password' > /root/.ansible/vault_pass.txt
+#   3. cd /opt/homelabinfra-iac-ansible
+#   4. First live test:  ansible-playbook playbooks/network_backup.yml --limit cisco_switches
+# =============================================================================
 
-- name: Bootstrap Ansible control node
+---
+- name: Bootstrap Ansible control node (hmvlapans001)
   hosts: ansible_nodes
-  become: true
-  gather_facts: true
+  become: true       # run tasks as root (required for package installs, service config)
+  gather_facts: true # collect OS/hardware info — used by some role tasks
 
   roles:
-    - common
-    - ansible_node
+    - common         # baseline OS config (timezone, NTP, packages, SELinux)
+    - ansible_node   # install Ansible, clone repo, install collections

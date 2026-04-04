@@ -1,11 +1,43 @@
+# =============================================================================
+# host_vars/swplnet252.nnt.com/vars.yml — Per-Host Config: swplnet252
+# =============================================================================
+# Host-specific variables for swplnet252 — the primary L3 switch.
+#
+# DEVICE: Arista 7050SX-64
+# STATUS: Active — VRRP master, all production traffic flows through this switch
+#
+# PORTS:
+#   Ethernet1-48   — 10GbE SFP+ (fiber/DAC)
+#   Ethernet49-52  — 40GbE QSFP+ (available for future spine/router uplinks)
+#   Port-Channel1  — Ethernet47-48 (DAC to swplnet251, core inter-switch uplink)
+#   Port-Channel2-5 — ESXi infrastructure uplinks (dual 10GbE LAG per host)
+#   Port-Channel6  — Plex server uplinks (Ethernet17-18)
+#   Ethernet45     — Internet gateway uplink (Meraki MX)
+#
+# IMPORTANT — TRANSCEIVER COMPATIBILITY:
+# The 7050SX SFP+ ports do NOT support 1000BASE-T copper SFPs (RJ45 modules).
+# Only fiber SFPs, DAC cables, and AOC cables work in these ports.
+# All 1GbE RJ45 server connections must go through swplnet251 (7048T-A).
+# =============================================================================
+
 ---
-# swplnet252 — Arista 7050SX-64
-# Role: VRRP master L3, 10GbE ESXi uplinks, internet gateway uplink
-# Platform: Arista EOS 4.28.12M — eAPI enabled
+# What automation platform this switch runs.
 switch_platform: arista_eos
+
+# Hardware model and EOS version.
 switch_model: 7050SX-64
+eos_version: 4.28.12M
+
+# VRRP role: "master" — this switch handles all traffic under normal conditions.
 vrrp_role: master
+
+# VRRP priority: 110 (higher than swplnet251's 90 — wins the election).
 vrrp_priority: 110
+
+# Management VLAN and IP.
 mgmt_vlan: 100
 mgmt_ip: 10.100.100.252
+
+# Path to the EOS config file for this switch (relative to repo root).
+# Used by playbooks/arista_push.yml to know which file to push.
 config_file: network/arista_7050sx_swplnet005.eos

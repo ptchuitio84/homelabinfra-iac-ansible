@@ -1,9 +1,33 @@
+# =============================================================================
+# host_vars/hmvlapans001.nnt.com/vars.yml — Per-Host Config: hmvlapans001
+# =============================================================================
+# Host-specific variables for the Ansible control node VM.
+#
+# NAMING CONVENTION:
+#   hm  = home lab
+#   vl  = virtual (VM)
+#   ap  = application tier
+#   ans = ansible
+#   001 = instance 1
+#
+# This VM is the brain of all lab automation. Once bootstrapped, every
+# playbook in this repo runs FROM this host against everything else.
+# It clones this repo to /opt/homelabinfra-iac-ansible and runs from there.
+#
+# NETWORK:
+# Lives on VLAN 10 (INFRACORENET, 10.10.0.0/23). This VLAN has access to
+# all other VLANs via the L3 switches, which is required for Ansible to
+# reach every device in the lab.
+# =============================================================================
+
 ---
-# hmvlapans001 — Ansible control node
-# OL10 VM on INFRACORENET (VLAN 10)
-# This host runs all automation from /opt/homelabinfra-iac-ansible
+# Functional role — used by provisioning playbooks to apply the right role.
 vm_role: ansible_control_node
+
+# VM resource allocation (used when provisioning via Terraform/vCenter).
 vm_vcpus: 2
 vm_memory_mb: 4096
+
+# Network placement.
 vm_network: INFRACORENET
 vm_vlan: 10

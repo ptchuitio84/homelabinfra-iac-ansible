@@ -1,5 +1,30 @@
+# =============================================================================
+# inventory/network/meraki.yml — Meraki Edge Router Inventory
+# =============================================================================
+# Defines the Meraki MX appliance Ansible can manage.
+#
+# IMPORTANT: Meraki is NOT managed via direct SSH.
+# Meraki devices are cloud-managed — all configuration changes go through
+# the Meraki Dashboard REST API (api.meraki.com), NOT the device directly.
+#
+# That means Ansible connects to the internet (Meraki cloud), not to
+# the device itself. The ansible_host below is the LAN IP, used only
+# for reference and reachability checks — not for API calls.
+#
+# GROUP: meraki
+# API credentials are defined in:
+#   inventory/group_vars/meraki/vars.yml  (API URL, org/network IDs)
+#   inventory/group_vars/meraki/vault.yml (encrypted API key)
+# =============================================================================
+
 ---
 meraki:
   hosts:
+
+    # meraki_mx — Meraki MX Internet Gateway (edge router)
+    # Role:     Internet uplink, DHCP for isolated subnets, static routes to VRRP VIP (.1)
+    # LAN IP:   10.100.100.254 (VLAN 100 — COREMGMTNET)
+    # WAN:      Connected to ISP — provides internet to all VLANs via routing
+    # Note:     All internal static routes must point to VRRP VIP (.1), not switch IPs
     meraki_mx:
       ansible_host: 10.100.100.254

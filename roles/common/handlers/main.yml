@@ -1,4 +1,17 @@
+# =============================================================================
+# roles/common/handlers/main.yml — Common Role Handlers
+# =============================================================================
+# Handlers are tasks that only run when "notified" by another task.
+# They run ONCE at the end of the play, regardless of how many tasks notified them.
+#
+# Example: if the NTP config file changes, the "Restart chrony" handler fires.
+# If the file does NOT change (already correct), the handler does NOT fire.
+# This prevents unnecessary service restarts on re-runs.
+# =============================================================================
+
 ---
+# Triggered by: "Configure NTP (chrony)" task when chrony.conf changes.
+# Restarts the chrony time sync daemon to pick up the new NTP server list.
 - name: Restart chrony
   ansible.builtin.systemd:
     name: chronyd

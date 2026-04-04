@@ -1,5 +1,39 @@
+# =============================================================================
+# inventory/compute/vcenter.yml — VMware vCenter Server Inventory
+# =============================================================================
+# Defines the vCenter Server Appliance (VCSA) that manages all ESXi hosts.
+#
+# WHAT IS VCENTER?
+# vCenter is VMware's central management platform. Rather than managing
+# each ESXi host individually, vCenter provides a single control plane for:
+#   - Deploying and managing VMs across all hosts
+#   - Live migration of VMs between hosts (vMotion)
+#   - High availability (HA) and distributed resource scheduling (DRS)
+#   - Distributed virtual switching (dvSwitch)
+#
+# HOW ANSIBLE MANAGES VCENTER:
+# The community.vmware collection connects to vCenter's HTTPS API (not SSH).
+# All VM provisioning, template cloning, and cluster management goes through
+# vCenter — not directly to ESXi hosts.
+#
+# connection = local means Ansible runs the API calls FROM the control node
+# itself (no SSH to vCenter needed).
+#
+# GROUP: vcenter
+# API credentials defined in:
+#   inventory/group_vars/vcenter/vars.yml
+#   inventory/group_vars/vcenter/vault.yml (encrypted admin credentials)
+# =============================================================================
+
 ---
 vcenter:
   hosts:
+
+    # hmvlapvc001 — VMware vCenter Server Appliance (VCSA)
+    # Mgmt IP:   10.10.0.5 (VLAN 10 — INFRACORENET)
+    # Datacenter: HomeLab
+    # Cluster:    HomeLab-Cluster (all 4 ESXi hosts)
+    # Version:    vSphere 7.x
+    # Status:     Active — manages hmvlesxi001 and hmvlesxi002 today
     hmvlapvc001.nnt.com:
       ansible_host: 10.10.0.5

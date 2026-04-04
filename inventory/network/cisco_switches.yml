@@ -1,5 +1,29 @@
+# =============================================================================
+# inventory/network/cisco_switches.yml — Cisco Switch Inventory
+# =============================================================================
+# Defines the Cisco switches Ansible can manage.
+#
+# WHAT IS AN INVENTORY FILE?
+# Ansible needs to know which machines it manages and how to reach them.
+# This file is the "address book" for Cisco switches in this lab.
+#
+# GROUP: cisco_switches
+# All hosts listed here inherit the connection settings defined in:
+#   inventory/group_vars/cisco_switches/vars.yml  (how to connect)
+#   inventory/group_vars/cisco_switches/vault.yml (encrypted credentials)
+#
+# Per-device details (role, model, VLAN) are in:
+#   inventory/host_vars/<hostname>/vars.yml
+# =============================================================================
+
 ---
 cisco_switches:
   hosts:
+
+    # swplnet251 — Cisco Catalyst 3750G-48TS
+    # Location: Home lab network rack
+    # Role:     VRRP backup L3 switch (priority 90), DHCP server, OOB + AP uplinks
+    # Mgmt IP:  10.100.100.251 (VLAN 100 — COREMGMTNET)
+    # Status:   Active — to be replaced by Arista 7048T-A (same IP will be reused)
     swplnet251.nnt.com:
       ansible_host: 10.100.100.251

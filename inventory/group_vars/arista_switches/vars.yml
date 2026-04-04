@@ -1,16 +1,49 @@
----
-# Arista EOS — connection vars
-# Collection: arista.eos
-# Transport: eAPI (httpapi) — preferred over SSH for EOS automation
-# eAPI is already enabled in both switch configs: management api http-commands / no shutdown
+# =============================================================================
+# group_vars/arista_switches/vars.yml — Arista Switch Connection Settings
+# =============================================================================
+# These variables apply to EVERY host in the "arista_switches" group.
+#
+# TRANSPORT: eAPI (HTTPS), NOT SSH
+# Arista EOS exposes a REST API called eAPI over HTTPS. Ansible talks to it
+# using the "httpapi" connection plugin — no terminal session, no CLI parsing.
+# This is Arista's recommended automation method: faster, more reliable,
+# and returns structured JSON instead of raw text.
+#
+# eAPI is already enabled on both switches in the EOS config:
+#   management api http-commands
+#     no shutdown
+#     protocol https
+#
+# ENCRYPTED CREDENTIALS:
+# Passwords are stored in vault.yml (encrypted with ansible-vault).
+# Never hardcode passwords here — this file is committed to git.
+# =============================================================================
 
+---
+# Which network platform this is — loads the EOS command syntax and eAPI handler.
 ansible_network_os: arista.eos.eos
+
+# Connection method: httpapi sends HTTPS requests to eAPI instead of SSH.
+# The switch's web API receives the request and applies the configuration.
 ansible_connection: ansible.netcommon.httpapi
+
+# Use HTTPS (not plain HTTP) to encrypt all API communication.
 ansible_httpapi_use_ssl: true
+
+# The switches use self-signed TLS certificates. Disable cert validation
+# since there is no internal CA yet. Will tighten when AD CS is deployed.
 ansible_httpapi_validate_certs: false
+
+# eAPI listens on port 443 (standard HTTPS).
 ansible_httpapi_port: 443
+
+# Login username (must exist on the switch with network-admin role).
 ansible_user: ptchuitio
+
+# Login password — decrypted at runtime from vault.yml.
 ansible_password: "{{ vault_arista_password }}"
+
+# Privilege escalation: on EOS, "become" enters enable mode for config changes.
 ansible_become: true
 ansible_become_method: enable
 ansible_become_password: "{{ vault_arista_enable_password }}"

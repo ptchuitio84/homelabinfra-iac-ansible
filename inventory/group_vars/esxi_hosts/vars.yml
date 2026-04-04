@@ -1,7 +1,31 @@
+# =============================================================================
+# group_vars/esxi_hosts/vars.yml — ESXi Host Connection Settings
+# =============================================================================
+# These variables apply to EVERY host in the "esxi_hosts" group.
+#
+# HOW ANSIBLE MANAGES ESXi HOSTS DIRECTLY:
+# For host-level tasks (post-PXE config, adding to vCenter, setting hostname,
+# configuring management networking), Ansible SSHes directly into ESXi as root.
+# This is different from VM management, which goes through vCenter.
+#
+# NOTE: ESXi uses a minimal BusyBox shell, not bash. Keep tasks simple —
+# avoid complex shell scripting. Use the community.vmware collection via
+# vCenter for anything beyond basic host configuration.
+#
+# ENCRYPTED CREDENTIALS:
+# The root password is stored in vault.yml (encrypted with ansible-vault).
+# Never hardcode it here — this file is committed to git.
+# =============================================================================
+
 ---
-# ESXi hosts — direct SSH connection
-# Note: for VMware provisioning tasks use vcenter group + community.vmware collection
+# Login as root — ESXi requires root for all direct host-level changes.
 ansible_user: root
+
+# Root password — decrypted at runtime from vault.yml.
 ansible_password: "{{ vault_esxi_password }}"
+
+# Standard SSH connection (not network_cli — ESXi is Linux-based, not a network OS).
 ansible_connection: ssh
+
+# Do not prompt about unknown SSH host keys — acceptable for a private lab.
 ansible_ssh_common_args: -o StrictHostKeyChecking=no

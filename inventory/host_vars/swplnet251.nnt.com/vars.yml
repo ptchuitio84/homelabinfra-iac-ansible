@@ -1,10 +1,38 @@
+# =============================================================================
+# host_vars/swplnet251.nnt.com/vars.yml — Per-Host Config: swplnet251
+# =============================================================================
+# Host-specific variables for swplnet251 — override group_vars where needed.
+#
+# DEVICE: Cisco Catalyst 3750G-48TS
+# STATUS: Active — scheduled for replacement by Arista 7048T-A
+#         When the 7048T-A is cabled and validated, this host entry moves
+#         to group arista_switches and this file gets updated accordingly.
+#
+# VRRP ROLE EXPLANATION:
+# VRRP (Virtual Router Redundancy Protocol) provides a shared virtual IP (.1)
+# that all hosts use as their default gateway. The "master" switch handles all
+# traffic; the "backup" takes over automatically if the master goes down.
+# Priority determines who wins — higher number = preferred master.
+# =============================================================================
+
 ---
-# swplnet251 — Cisco Catalyst 3750G (to be replaced by Arista 7048T-A)
-# Role: VRRP backup L3, DHCP server, OOB + AP + 1GbE server uplinks
-# Platform: Cisco IOS 12.2 — legacy SSH ciphers required (set in group_vars)
+# What automation platform this switch runs (used by playbooks to select modules).
 switch_platform: cisco_ios
+
+# Hardware model — for documentation and conditional task logic.
 switch_model: Catalyst 3750G-48TS
+
+# VRRP role for this device: "backup" means it only handles traffic
+# if swplnet252 (the master) becomes unreachable.
 vrrp_role: backup
+
+# VRRP priority: 90 (lower than swplnet252's 110 — loses the election intentionally).
+# All VLANs: swplnet252 = master (110), swplnet251 = backup (90).
 vrrp_priority: 90
+
+# Management VLAN — all switch management traffic uses VLAN 100 (COREMGMTNET).
 mgmt_vlan: 100
+
+# Management IP — the switch's SVI address on VLAN 100.
+# Large subnets (/23, /24): Cisco/backup switch = .251
 mgmt_ip: 10.100.100.251

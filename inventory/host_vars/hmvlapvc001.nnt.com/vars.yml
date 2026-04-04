@@ -1,7 +1,35 @@
+# =============================================================================
+# host_vars/hmvlapvc001.nnt.com/vars.yml — Per-Host Config: hmvlapvc001
+# =============================================================================
+# Host-specific variables for the VMware vCenter Server Appliance (VCSA).
+#
+# NAMING CONVENTION:
+#   hm  = home lab
+#   vl  = virtual (VM)
+#   ap  = application tier
+#   vc  = vCenter
+#   001 = instance 1
+#
+# WHAT VCENTER MANAGES:
+#   - All 4 ESXi hosts (hmvlesxi001-004)
+#   - The HomeLab-Cluster (HA + DRS)
+#   - The distributed virtual switch (dvSwitch) — uplinks to Arista 7050SX
+#   - VM templates, snapshots, and lifecycle management
+#
+# These values are used by community.vmware playbooks (vm_provision, esxi_deploy).
+# =============================================================================
+
 ---
-# hmvlapvc001 — VMware vCenter Server Appliance
-# Manages all ESXi hosts in the lab
+# Functional role.
 vm_role: vcenter
+
+# vCenter management IP (also set as ansible_host in vcenter.yml, duplicated here
+# for use in vmware module calls that need it as a named variable).
 mgmt_ip: 10.10.0.5
+
+# VMware datacenter name as configured in vCenter.
+# All cluster, host, and VM objects live under this datacenter.
 datacenter_name: HomeLab
+
+# Cluster name — the HA/DRS cluster containing all ESXi hosts.
 cluster_name: HomeLab-Cluster

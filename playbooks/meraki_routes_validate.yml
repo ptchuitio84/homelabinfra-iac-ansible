@@ -1,24 +1,51 @@
----
-# meraki_routes_validate.yml — Confirm Meraki static routes point to VRRP VIPs (.1)
+# =============================================================================
+# playbooks/meraki_routes_validate.yml — Verify Meraki Static Routes
+# =============================================================================
+# PURPOSE:
+# Confirms that all static routes configured on the Meraki MX use the VRRP
+# virtual IP (.1 on each subnet) as their next-hop — NOT a physical switch IP.
 #
-# Checks that all static routes use the VRRP VIP as next-hop, not a physical switch IP.
-# Run this before and after VRRP cutover.
+# WHY THIS MATTERS:
+# If Meraki static routes point to a physical switch IP (.251 or .252) instead
+# of the VRRP VIP (.1), traffic will fail when that specific switch goes down.
+# The VRRP VIP floats between switches automatically — it is always available.
+# Physical IPs are tied to one specific switch and go down with it.
 #
-# Usage:
+# CORRECT:   10.10.0.0/23  →  10.10.0.1    (VRRP VIP — survives failover)
+# INCORRECT: 10.10.0.0/23  →  10.10.0.252  (physical IP — fails if 7050SX goes down)
+#
+# This playbook runs against "localhost" because Meraki is cloud-managed —
+# Ansible calls the Meraki Dashboard API from the control node itself.
+# No SSH connection to the Meraki device is made.
+#
+# This playbook is READ-ONLY — it makes no changes to any device or the API.
+#
+# USAGE:
 #   ansible-playbook playbooks/meraki_routes_validate.yml
 #
-# Requires: vault_meraki_api_key, vault_meraki_network_id set in meraki vault.yml
+# PREREQUISITES:
+#   - Meraki API key, org ID, and network ID set in group_vars/meraki/vault.yml
+#   - API access enabled in Meraki Dashboard:
+#       Organization → API & Webhooks → Enable access to the Cisco Meraki Dashboard API
+#
+# VAULT REQUIRED: yes — API key is encrypted in group_vars/meraki/vault.yml
+# =============================================================================
 
-- name: Validate Meraki static routes
-  hosts: localhost
+---
+- name: Validate Meraki MX static routes point to VRRP VIPs
+  hosts: localhost      # runs locally on the control node — no SSH to Meraki
   gather_facts: false
 
+  # Load Meraki API vars and encrypted credentials directly.
+  # These are read from the meraki group_vars since this play targets localhost.
   vars_files:
     - "{{ playbook_dir }}/../inventory/group_vars/meraki/vars.yml"
     - "{{ playbook_dir }}/../inventory/group_vars/meraki/vault.yml"
 
   tasks:
-    - name: Get static routes from Meraki API
+    # Call the Meraki Dashboard API to retrieve all static routes for the network.
+    # The API returns a JSON list of route objects with subnet and gatewayIp fields.
+    - name: Retrieve static routes from Meraki Dashboard API
       ansible.builtin.uri:
         url: "{{ meraki_api_base_url }}/networks/{{ meraki_network_id }}/appliance/staticRoutes"
         method: GET
@@ -29,17 +56,28 @@
         status_code: 200
       register: routes_response
 
-    - name: Show all static routes
+    # Print all static routes so you can review them in the playbook output.
+    # Format: <name>: <subnet> → <next-hop>
+    - name: Display all configured static routes
       ansible.builtin.debug:
         msg: |
+          ============================================================
+          Meraki MX Static Routes
+          ============================================================
           {% for route in routes_response.json %}
           {{ route.name | default('(unnamed)') }}: {{ route.subnet }} → {{ route.gatewayIp }}
           {% endfor %}
 
-    - name: Flag routes NOT pointing to a .1 next-hop
+    # Flag any route whose next-hop does NOT end in ".1".
+    # All VRRP virtual IPs use .1 as the last octet (design standard for this lab).
+    # A route pointing to anything other than .1 is likely pointing to a physical
+    # switch IP and will fail during a failover event.
+    - name: Flag routes not using VRRP VIP (.1) as next-hop
       ansible.builtin.debug:
-        msg: "WARNING: Route {{ item.subnet }} uses next-hop {{ item.gatewayIp }} — expected *.1"
+        msg: >
+          WARNING: {{ item.subnet }} uses next-hop {{ item.gatewayIp }}.
+          Expected a .1 address (VRRP VIP). This route will fail during switch failover.
       when: not item.gatewayIp.endswith('.1')
       loop: "{{ routes_response.json }}"
       loop_control:
-        label: "{{ item.subnet }}"
+        label: "{{ item.subnet }}"   # cleaner loop output — shows subnet instead of full object

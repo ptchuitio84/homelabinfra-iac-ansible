@@ -1,58 +1,83 @@
----
-# cisco_push.yml — Push full running config to Cisco Catalyst 3750G (swplnet251)
+# =============================================================================
+# playbooks/cisco_push.yml — Push Configuration to Cisco Catalyst 3750G
+# =============================================================================
+# PURPOSE:
+# Applies the contents of the Cisco config file to swplnet251, then saves the
+# result to startup-config so it survives a reboot.
 #
-# Usage:
+# HOW IOS CONFIG PUSH WORKS:
+# The ios_config module with "src:" merges the file into the running config.
+# This is ADDITIVE — it adds/updates lines but does not automatically remove
+# lines that exist on the switch but not in the file.
+# To remove a line, it must appear in the file with a "no" prefix.
+#
+# ALWAYS run with --check first to preview changes before applying:
+#   ansible-playbook playbooks/cisco_push.yml --check
+#
+# USAGE:
+#   # Dry run — show what would change, make no changes:
+#   ansible-playbook playbooks/cisco_push.yml --check
+#
+#   # Live push:
 #   ansible-playbook playbooks/cisco_push.yml
-#   ansible-playbook playbooks/cisco_push.yml --check     # dry run (shows diff only)
 #
-# What it does:
-#   1. Backs up current running config before making changes
-#   2. Pushes config sections from network/cisco_catalyst_3750g_swplnet001.txt
-#   3. Saves to startup-config
+# CONFIG FILE:
+#   network/cisco_catalyst_3750g_swplnet001.txt
 #
-# NOTE: This pushes the FULL config file as a src. IOS ios_config with src
-# will merge the file into the running config (additive). To remove stale
-# lines, use the individual task sections below or run targeted fix commands.
-#
-# Vault required for credentials.
+# VAULT REQUIRED: yes — credentials in group_vars/cisco_switches/vault.yml
+# =============================================================================
 
-- name: Push Cisco 3750G config (swplnet251)
-  hosts: swplnet251
+---
+- name: Push Cisco 3750G config to swplnet251
+  hosts: swplnet251.nnt.com
   gather_facts: false
 
   vars:
+    # Path to the source config file, relative to repo root.
     config_file: "{{ playbook_dir }}/../network/cisco_catalyst_3750g_swplnet001.txt"
+    # Directory where pre-push backups are saved.
     backup_dir: "{{ playbook_dir }}/../network/backups"
 
   tasks:
-    - name: Verify config file exists
+    # Safety check: confirm the config file actually exists before doing anything.
+    # Prevents pushing an empty or missing file by accident.
+    - name: Verify config file exists on control node
       ansible.builtin.stat:
         path: "{{ config_file }}"
       register: config_stat
       delegate_to: localhost
 
-    - name: Fail if config file missing
+    - name: Abort if config file is missing
       ansible.builtin.fail:
-        msg: "Config file not found: {{ config_file }}"
+        msg: "Config file not found: {{ config_file }} — aborting push."
       when: not config_stat.stat.exists
 
-    - name: Backup running config before push
+    # Always take a backup BEFORE making changes.
+    # If something goes wrong after the push, this file is your rollback reference.
+    - name: Capture running config before making changes
       cisco.ios.ios_command:
         commands: show running-config
       register: pre_backup
 
-    - name: Save pre-push backup
+    - name: Save pre-push backup to disk
       ansible.builtin.copy:
         content: "{{ pre_backup.stdout[0] }}"
         dest: "{{ backup_dir }}/{{ inventory_hostname }}_pre-push_{{ lookup('pipe', 'date +%Y-%m-%d_%H%M') }}.txt"
       delegate_to: localhost
 
-    - name: Push config from file
+    # Push the config file to the switch.
+    # IOS merges the file line by line into the running config.
+    # If a line already matches what's on the switch, it is skipped (idempotent).
+    # "notify" triggers the "Save running config" handler if any change is made.
+    - name: Push config file to switch
       cisco.ios.ios_config:
         src: "{{ config_file }}"
       notify: Save running config
 
   handlers:
+    # Only fires if the "Push config" task reported a change.
+    # "write memory" saves the running config to startup-config (NVRAM),
+    # so the config survives a reload. Without this, changes are lost on reboot.
     - name: Save running config
       cisco.ios.ios_command:
         commands:

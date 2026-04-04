@@ -1,5 +1,34 @@
+# =============================================================================
+# inventory/linux/ansible_nodes.yml — Ansible Control Node Inventory
+# =============================================================================
+# Defines the Linux VM that serves as the Ansible control node.
+#
+# WHAT IS AN ANSIBLE CONTROL NODE?
+# This is the machine that runs all playbooks. Every "ansible-playbook" command
+# executes FROM this VM — it SSH's out to switches, ESXi hosts, and other VMs
+# to make configuration changes. Nothing runs on the target devices themselves.
+#
+# During initial setup (bootstrap), playbooks are run FROM your Mac to configure
+# this VM. After that, this VM takes over and runs all future automation.
+#
+# OS: Oracle Linux 10 (OL10) — RHEL-compatible, free, enterprise-grade.
+#
+# GROUP: ansible_nodes
+# Connection settings defined in:
+#   inventory/group_vars/ansible_nodes/vars.yml
+#   inventory/group_vars/ansible_nodes/vault.yml (encrypted root password)
+# =============================================================================
+
 ---
 ansible_nodes:
   hosts:
+
+    # hmvlapans001 — Ansible Control Node
+    # Mgmt IP:  10.10.1.31 (VLAN 10 — INFRACORENET, /23 subnet)
+    # OS:       Oracle Linux 10 (OL10)
+    # Role:     Runs all Ansible playbooks for the lab
+    #           Repo cloned to: /opt/homelabinfra-iac-ansible
+    #           Vault password: /root/.ansible/vault_pass.txt (set manually post-deploy)
+    # Status:   Active — SSH access being confirmed
     hmvlapans001.nnt.com:
       ansible_host: 10.10.1.31

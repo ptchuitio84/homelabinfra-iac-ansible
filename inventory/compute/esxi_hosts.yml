@@ -1,11 +1,52 @@
+# =============================================================================
+# inventory/compute/esxi_hosts.yml — VMware ESXi Hypervisor Inventory
+# =============================================================================
+# Defines all ESXi bare-metal hypervisor hosts Ansible can manage.
+#
+# WHAT IS AN ESXi HOST?
+# ESXi is VMware's bare-metal hypervisor — it runs directly on the server
+# hardware and hosts all virtual machines (VMs). Each physical server in
+# the lab runs ESXi and is managed from a central vCenter server.
+#
+# HOW ANSIBLE MANAGES ESXi:
+# Ansible connects via SSH directly to each ESXi host for host-level tasks
+# (post-PXE config, adding to vCenter, applying host profiles).
+# For VM and cluster management, use the vcenter.yml group instead.
+#
+# GROUP: esxi_hosts
+# Connection settings (SSH, root credentials) defined in:
+#   inventory/group_vars/esxi_hosts/vars.yml
+#   inventory/group_vars/esxi_hosts/vault.yml (encrypted root password)
+# =============================================================================
+
 ---
 esxi_hosts:
   hosts:
+
+    # hmvlesxi001 — Dell PowerEdge R710 (ESXi Host 1)
+    # Mgmt IP:  10.10.1.211 (VLAN 10 — INFRACORENET)
+    # Role:     Primary compute host — runs most infrastructure VMs
+    # Status:   Active
     hmvlesxi001.nnt.com:
       ansible_host: 10.10.1.211
+
+    # hmvlesxi002 — Dell PowerEdge R710 (ESXi Host 2)
+    # Mgmt IP:  10.10.1.22 (VLAN 10 — INFRACORENET)
+    # Role:     Secondary compute host — HA pair with hmvlesxi001
+    # Status:   Active
     hmvlesxi002.nnt.com:
       ansible_host: 10.10.1.22
-    hmvlesxi003.nnt.com:        # T710 — uncomment when deployed via PXE
+
+    # hmvlesxi003 — Dell PowerEdge T710 (ESXi Host 3)
+    # Mgmt IP:  10.10.0.33 (VLAN 10 — INFRACORENET)
+    # Role:     Third compute host — expands cluster for Kubernetes nodes
+    # Status:   Pending — deploy via PXE kickstart (pxe_server role, Phase 2)
+    hmvlesxi003.nnt.com:
       ansible_host: 10.10.0.33
-    hmvlesxi034.nnt.com:        # R310 — uncomment when deployed via PXE
+
+    # hmvlesxi034 — Dell PowerEdge R310 (ESXi Host 4)
+    # Mgmt IP:  10.10.0.34 (VLAN 10 — INFRACORENET)
+    # Role:     Lightweight compute host — development / test workloads
+    # Status:   Pending — deploy via PXE kickstart
+    hmvlesxi034.nnt.com:
       ansible_host: 10.10.0.34

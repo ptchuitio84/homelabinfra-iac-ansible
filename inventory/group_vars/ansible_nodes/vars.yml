@@ -1,4 +1,30 @@
+# =============================================================================
+# group_vars/ansible_nodes/vars.yml — Ansible Control Node Connection Settings
+# =============================================================================
+# These variables apply to every host in the "ansible_nodes" group.
+#
+# During initial bootstrap, this VM is the TARGET — your Mac SSHes into it
+# to install Ansible and set it up. After bootstrap, this VM becomes the
+# SOURCE that runs all future playbooks against everything else in the lab.
+#
+# OS: Oracle Linux 10 (OL10) — fully RHEL-compatible, no license cost.
+#
+# ENCRYPTED CREDENTIALS:
+# The root password is stored in vault.yml (encrypted with ansible-vault).
+# After bootstrap, SSH key authentication should replace password auth.
+# =============================================================================
+
 ---
+# Login as root for full system access during provisioning.
 ansible_user: root
+
+# Root password — decrypted at runtime from vault.yml.
+# Long-term: replace with SSH key auth and remove this.
+ansible_password: "{{ vault_ansible_node_password }}"
+
+# Standard SSH connection — this is a Linux VM, not a network device.
 ansible_connection: ssh
+
+# Use the system Python 3 interpreter (pre-installed on OL10).
+# Ansible needs Python on the target host to run most modules.
 ansible_python_interpreter: /usr/bin/python3

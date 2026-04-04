@@ -1,17 +1,47 @@
----
-# Cisco Catalyst 3750G — IOS connection vars
-# Collection: cisco.ios
-# Transport: SSH with legacy cipher workaround (3750G runs old IOS)
+# =============================================================================
+# group_vars/cisco_switches/vars.yml — Cisco Switch Connection Settings
+# =============================================================================
+# These variables apply to EVERY host in the "cisco_switches" group.
+# They tell Ansible HOW to connect to and authenticate with Cisco IOS devices.
+#
+# ENCRYPTED CREDENTIALS:
+# Passwords are stored in vault.yml (encrypted with ansible-vault).
+# The {{ vault_* }} references below pull from that file at runtime.
+# Never hardcode passwords here — this file is committed to git.
+#
+# LEGACY CIPHER NOTE:
+# The Catalyst 3750G runs IOS 12.2, which only supports older SSH encryption
+# algorithms that modern clients disable by default. The ssh_common_args below
+# re-enables them scoped to this group only.
+# =============================================================================
 
+---
+# Which network platform this is — loads the correct IOS command syntax and parser.
 ansible_network_os: cisco.ios.ios
+
+# Connection method: network_cli opens an SSH terminal session to the switch,
+# just like a human typing at the CLI prompt.
 ansible_connection: ansible.netcommon.network_cli
+
+# SSH login username (must have privilege 15 on the switch).
 ansible_user: ptchuitio
+
+# SSH password — decrypted at runtime from vault.yml.
 ansible_password: "{{ vault_cisco_password }}"
+
+# Privilege escalation: on Cisco IOS, "become" means entering "enable" mode
+# (required to make any configuration changes beyond show commands).
 ansible_become: true
 ansible_become_method: enable
 ansible_become_password: "{{ vault_cisco_enable_password }}"
 
-# Legacy cipher workaround — 3750G does not offer modern kex/ciphers
+# Legacy SSH cipher flags required for IOS 12.2 compatibility.
+# Modern OpenSSH drops these algorithms by default — this re-enables them
+# only for this group so other hosts are unaffected.
+#
+#   KexAlgorithms    — how the shared session key is negotiated
+#   HostKeyAlgorithms — the format of the switch's public host key
+#   Ciphers          — encryption algorithm for session data
 ansible_ssh_common_args: >-
   -o KexAlgorithms=+diffie-hellman-group14-sha1,diffie-hellman-group1-sha1
   -o HostKeyAlgorithms=+ssh-rsa

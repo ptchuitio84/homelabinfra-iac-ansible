@@ -1,13 +1,31 @@
+# =============================================================================
+# roles/common/tasks/main.yml — Common Role Tasks
+# =============================================================================
+# Tasks executed on every Linux VM that includes the "common" role.
+# These run in order, top to bottom.
+#
+# Ansible tasks are idempotent — running this role twice produces the same
+# result as running it once. It is safe to re-run at any time.
+# =============================================================================
+
 ---
+# Set the system timezone. Uses the "timezone" variable from defaults/main.yml.
+# Equivalent to: timedatectl set-timezone America/New_York
 - name: Set timezone
   community.general.timezone:
     name: "{{ timezone }}"
 
+# Install all packages in the base_packages list using DNF (OL10 / RHEL package manager).
+# "state: present" means install if missing, leave alone if already installed.
 - name: Install base packages
   ansible.builtin.dnf:
     name: "{{ base_packages }}"
     state: present
 
+# Deploy the chrony NTP configuration from the template file.
+# The template (chrony.conf.j2) loops through the ntp_servers list and writes
+# one "server <ip> iburst" line per entry.
+# "notify" triggers the "Restart chrony" handler if this file changes.
 - name: Configure NTP (chrony)
   ansible.builtin.template:
     src: chrony.conf.j2
@@ -17,30 +35,43 @@
     mode: '0644'
   notify: Restart chrony
 
+# Make sure chrony is running and set to start automatically on reboot.
 - name: Enable and start chronyd
   ansible.builtin.systemd:
     name: chronyd
     enabled: true
     state: started
 
-- name: Disable firewalld (internal VMs — network layer handles security)
+# Disable the OS-level firewall on internal VMs.
+# Network segmentation is handled at the switch layer (VLANs) and by the Meraki MX.
+# Running firewalld inside VMs adds complexity without meaningful security benefit
+# in this architecture. "ignore_errors: true" prevents failure if firewalld is
+# not installed (some minimal OL10 images omit it).
+- name: Disable firewalld (network layer handles segmentation)
   ansible.builtin.systemd:
     name: firewalld
     enabled: false
     state: stopped
   ignore_errors: true
 
+# Set SELinux to permissive mode — logs violations but does not block them.
+# This allows applications to run without SELinux policy tuning during initial
+# lab setup. A future hardening role will move this to "enforcing" with proper policy.
 - name: Set SELinux to permissive
   ansible.posix.selinux:
     policy: targeted
     state: permissive
 
-- name: Ensure /etc/hosts has correct loopback
+# Ensure the loopback line in /etc/hosts is correct.
+# Some OL10 cloud-init images ship with variations that break hostname resolution.
+- name: Ensure /etc/hosts has correct loopback entry
   ansible.builtin.lineinfile:
     path: /etc/hosts
     regexp: '^127\.0\.0\.1'
     line: '127.0.0.1   localhost localhost.localdomain'
 
-- name: Set hostname
+# Set the system hostname to match the Ansible inventory name.
+# "inventory_hostname" is the key used in the inventory file (e.g., hmvlapans001.nnt.com).
+- name: Set hostname from inventory
   ansible.builtin.hostname:
     name: "{{ inventory_hostname }}"

@@ -1,7 +1,38 @@
+# =============================================================================
+# group_vars/vcenter/vars.yml — vCenter API Connection Settings
+# =============================================================================
+# These variables apply to every host in the "vcenter" group.
+#
+# HOW ANSIBLE MANAGES VCENTER:
+# The community.vmware collection talks to vCenter's HTTPS API (vSphere API).
+# Ansible does NOT SSH into vCenter — it sends API calls from the control node.
+# "ansible_connection: local" means the API calls run locally on the control
+# node itself and are sent over HTTPS to vCenter.
+#
+# This approach manages VMs, clusters, dvSwitches, templates, and snapshots
+# without ever touching the vCenter CLI or GUI.
+#
+# ENCRYPTED CREDENTIALS:
+# The vCenter admin username and password are stored in vault.yml (encrypted).
+# Never hardcode them here — this file is committed to git.
+# =============================================================================
+
 ---
-# vCenter — community.vmware collection vars
+# The vCenter FQDN or IP used for API calls — pulled from the inventory host entry.
 vcenter_hostname: "{{ ansible_host }}"
+
+# vCenter administrator account.
+# Default format: administrator@vsphere.local
+# Decrypted at runtime from vault.yml.
 vcenter_username: "{{ vault_vcenter_username }}"
+
+# vCenter administrator password — decrypted at runtime from vault.yml.
 vcenter_password: "{{ vault_vcenter_password }}"
+
+# vCenter uses a self-signed TLS certificate — disable validation.
+# Will tighten when a proper CA cert is in place (AD CS, Phase 8).
 vcenter_validate_certs: false
+
+# "local" means Ansible runs the vSphere API calls from the control node itself
+# rather than SSHing into vCenter. Required for all community.vmware modules.
 ansible_connection: local

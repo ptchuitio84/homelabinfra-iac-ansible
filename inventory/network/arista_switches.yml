@@ -1,7 +1,34 @@
+# =============================================================================
+# inventory/network/arista_switches.yml — Arista Switch Inventory
+# =============================================================================
+# Defines the Arista switches Ansible can manage.
+#
+# GROUP: arista_switches
+# All hosts listed here inherit the connection settings defined in:
+#   inventory/group_vars/arista_switches/vars.yml  (eAPI connection settings)
+#   inventory/group_vars/arista_switches/vault.yml (encrypted credentials)
+#
+# Arista switches are managed via eAPI (HTTPS REST API) — NOT SSH.
+# This is faster, more reliable, and the Arista-recommended method.
+# eAPI is already enabled on both switches under: management api http-commands
+# =============================================================================
+
 ---
 arista_switches:
   hosts:
+
+    # swplnet252 — Arista 7050SX-64
+    # Location: Home lab network rack
+    # Role:     VRRP master L3 switch (priority 110), all traffic flows through here
+    # Ports:    48x 10GbE SFP+ (Ethernet1-48), 4x 40GbE QSFP+ (Ethernet49-52)
+    # Mgmt IP:  10.100.100.252 (VLAN 100 — COREMGMTNET)
+    # eAPI:     https://10.100.100.252  (HTTPS, self-signed cert, validation disabled)
     swplnet252.nnt.com:
       ansible_host: 10.100.100.252
-    # swplnet251.nnt.com:              # uncomment after 7048T-A replaces Cisco
-    #   ansible_host: 10.100.100.251  # same IP — Cisco decommissioned at that point
+
+    # swplnet251 (Arista 7048T-A) — uncomment after Cisco 3750G is decommissioned
+    # The 7048T-A takes over swplnet251's IP and role as VRRP backup
+    # Role:     VRRP backup L3 switch (priority 90), DHCP server, 1GbE server uplinks
+    # Ports:    48x 1GbE RJ45 (Ethernet1-48), 4x 10GbE SFP+ (Ethernet49-52)
+    # swplnet251.nnt.com:
+    #   ansible_host: 10.100.100.251

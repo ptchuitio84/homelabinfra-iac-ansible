@@ -1,6 +1,26 @@
+# =============================================================================
+# inventory/linux/plex_servers.yml — Plex Media Server Inventory
+# =============================================================================
+# Defines the Plex media server managed by the plex-ansible repo.
+#
+# NOTE: The full Plex deployment role lives in a separate repo:
+#   ~/git_prt84/plex-ansible
+# This entry exists here so network-level tasks (VLAN access, firewall,
+# connectivity checks) can reference the Plex server alongside other hosts.
+#
+# GROUP: plex_servers
+# No dedicated group_vars — uses the ansible_user set per host below.
+# =============================================================================
+
 ---
 plex_servers:
   hosts:
+
+    # plex01 — Plex Media Server
+    # IP:      10.100.7.10 (VLAN 7 — TVNET)
+    # OS:      Linux (managed separately via plex-ansible repo)
+    # Role:    Streams media to all TVs and devices on TVNET
+    # Uplink:  Port-Channel 6 on swplnet252 (Ethernet17-18, dual 10GbE LAG)
     plex01.nnt.com:
       ansible_host: 10.100.7.10
       ansible_user: root

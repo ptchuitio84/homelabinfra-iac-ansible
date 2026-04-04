@@ -1,15 +1,41 @@
----
-# Meraki MX — REST API vars
-# Collection: cisco.meraki (or direct uri module)
-# Auth: Meraki Dashboard API key (enable at Dashboard → Organization → API)
+# =============================================================================
+# group_vars/meraki/vars.yml — Meraki API Connection Settings
+# =============================================================================
+# These variables apply to every host in the "meraki" group.
 #
-# To get org/network IDs:
-#   curl -s -H "X-Cisco-Meraki-API-Key: <key>" \
-#     https://api.meraki.com/api/v1/organizations
-#   curl -s -H "X-Cisco-Meraki-API-Key: <key>" \
-#     https://api.meraki.com/api/v1/organizations/<orgId>/networks
+# HOW MERAKI AUTOMATION WORKS:
+# Meraki devices are cloud-managed. You cannot SSH into them and type commands.
+# All configuration changes go through the Meraki Dashboard REST API
+# hosted at api.meraki.com — Ansible sends HTTPS requests to the cloud,
+# and Meraki pushes the changes down to the physical device.
+#
+# PREREQUISITES:
+# 1. Enable API access in Meraki Dashboard:
+#      Organization → API & Webhooks → Enable access to the Cisco Meraki Dashboard API
+# 2. Generate an API key under your user profile in the Dashboard.
+# 3. Find your Organization ID and Network ID:
+#      curl -s -H "X-Cisco-Meraki-API-Key: <key>" \
+#        https://api.meraki.com/api/v1/organizations
+#      curl -s -H "X-Cisco-Meraki-API-Key: <key>" \
+#        https://api.meraki.com/api/v1/organizations/<orgId>/networks
+#
+# ENCRYPTED CREDENTIALS:
+# The API key, org ID, and network ID are stored in vault.yml (encrypted).
+# Never hardcode them here — this file is committed to git.
+# =============================================================================
 
+---
+# Base URL for all Meraki Dashboard API calls.
 meraki_api_base_url: https://api.meraki.com/api/v1
+
+# API key used in the HTTP header: X-Cisco-Meraki-API-Key
+# Decrypted at runtime from vault.yml.
 meraki_api_key: "{{ vault_meraki_api_key }}"
+
+# Organization ID — identifies your Meraki organization in the cloud.
+# Found by querying /organizations (see instructions above).
 meraki_org_id: "{{ vault_meraki_org_id }}"
+
+# Network ID — identifies the specific Meraki network (MX appliance group).
+# Found by querying /organizations/<orgId>/networks.
 meraki_network_id: "{{ vault_meraki_network_id }}"

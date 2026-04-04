@@ -1,5 +1,30 @@
+# =============================================================================
+# inventory/network/tp_link_poe.yml — TP-Link PoE Switch Inventory
+# =============================================================================
+# Defines the TP-Link PoE switch used for cameras and wireless APs.
+#
+# AUTOMATION LIMITATION:
+# The TP-Link TL-SG2210P (swplnet253) has limited API support.
+# Full automation is only possible if an Omada controller VM is running —
+# it exposes a REST API that Ansible can talk to via the "uri" module.
+#
+# Without the Omada controller, this switch can only be managed manually
+# through its web UI. It is included here for future automation readiness.
+#
+# LONG-TERM PLAN: Replace with a Ubiquiti switch for full automation coverage.
+#
+# GROUP: tp_link_poe
+# No group_vars defined yet — placeholder until Omada controller is deployed.
+# =============================================================================
+
 ---
 tp_link_poe:
   hosts:
+
+    # swplnet253 — TP-Link TL-SG2210P PoE Switch
+    # Role:     Access layer — powers and connects security cameras and wireless APs
+    # Uplink:   Connected to swplnet251 (Cisco/Arista) via Gi2/0/45 or Et45
+    # Mgmt IP:  10.100.100.253 (VLAN 100 — COREMGMTNET)
+    # Automation: Partial — requires Omada controller for API access
     swplnet253.nnt.com:
       ansible_host: 10.100.100.253

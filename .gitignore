@@ -1,16 +1,52 @@
+# =============================================================================
+# .gitignore — Files Excluded from Git Version Control
+# =============================================================================
+# This file tells git which files and directories to ignore.
+# Anything listed here will NOT be committed to the repo — even if it exists
+# locally. This protects secrets, generated files, and large artifacts from
+# accidentally being pushed to GitHub.
+# =============================================================================
+
+# Ansible retry files — created when a playbook fails mid-run.
+# Not useful for version control — they're transient debugging artifacts.
 *.retry
+
+# Python compiled bytecode — generated automatically when Python runs.
+# Committing these causes unnecessary noise in diffs.
 *.pyc
 __pycache__/
+
+# Ansible hidden directory — stores temporary connection state.
 .ansible/
 
-# Vault files — must be encrypted before committing
-# Encrypt with: ansible-vault encrypt <path>
-# Verify: head -1 <path>  (should start with $ANSIBLE_VAULT;...)
+# =============================================================================
+# VAULT FILES — MOST IMPORTANT
+# =============================================================================
+# vault.yml files contain encrypted secrets (passwords, API keys).
+# They MUST be encrypted with ansible-vault before committing.
+# To be safe, they are excluded entirely — encrypt manually if you want to
+# commit them, and verify encryption first:
+#   head -1 inventory/group_vars/<group>/vault.yml
+#   (should start with: $ANSIBLE_VAULT;1.1;AES256)
+#
+# To encrypt:  ansible-vault encrypt inventory/group_vars/<group>/vault.yml
+# To edit:     ansible-vault edit inventory/group_vars/<group>/vault.yml
+# To decrypt:  ansible-vault decrypt inventory/group_vars/<group>/vault.yml
 inventory/group_vars/*/vault.yml
 
-# Backup configs
+# =============================================================================
+# BACKUP FILES
+# =============================================================================
+# Network config backups are saved here by network_backup.yml.
+# They can be large and change frequently — not suitable for this repo.
+# Consider a separate "config-backups" repo or an S3 bucket for long-term storage.
+# The .gitkeep file is kept so the directory exists in the repo even when empty.
 network/backups/*
 !network/backups/.gitkeep
 
-# Ansible fact cache
+# =============================================================================
+# FACT CACHE
+# =============================================================================
+# Ansible caches collected host facts here (set in ansible.cfg).
+# These are temporary, machine-specific, and should never be committed.
 /tmp/ansible_facts/

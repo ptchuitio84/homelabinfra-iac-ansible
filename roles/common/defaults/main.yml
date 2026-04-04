@@ -1,21 +1,57 @@
----
-timezone: America/New_York
-dns_servers:
-  - 10.10.0.10
-  - 10.10.0.12
-ntp_servers:
-  - 10.10.0.10
-  - 129.146.193.200
+# =============================================================================
+# roles/common/defaults/main.yml — Common Role Default Variables
+# =============================================================================
+# Default values for the "common" role — applied to every Linux VM in the lab.
+# These are the lowest-priority variables. Any value set in group_vars, host_vars,
+# or passed at runtime (-e flag) will override these.
+#
+# WHAT THE COMMON ROLE DOES:
+# Sets a consistent baseline on every OL10 VM before any app role runs:
+#   - Correct timezone and NTP sync
+#   - Required base packages
+#   - SELinux in permissive mode (tighten in a future hardening pass)
+#   - Firewalld disabled (the network layer — switches and Meraki — handles segmentation)
+#   - Correct hostname set from inventory
+# =============================================================================
 
+---
+# Timezone — all lab VMs use Eastern Time to match the physical location.
+# Format: IANA timezone name.
+timezone: America/New_York
+
+# DNS servers for hostname resolution.
+# These will be the Active Directory domain controllers when AD is deployed (Phase 8).
+# Until then, point at whatever internal DNS is available.
+dns_servers:
+  - 10.10.0.10    # Primary DNS / future AD DC 1
+  - 10.10.0.12    # Secondary DNS / future AD DC 2
+
+# NTP servers — all VMs must stay in sync for certificate validity, logs, and Kerberos.
+# Internal NTP server first; external as fallback if internal is unreachable.
+ntp_servers:
+  - 10.10.0.10          # Internal NTP source (future AD DC acts as NTP master)
+  - 129.146.193.200     # External fallback — Oracle public NTP
+
+# Base packages installed on every VM.
+# Grouped by function for readability.
 base_packages:
+  # Text editing and file management
   - vim
+  - unzip
+
+  # Network and HTTP tools — essential for troubleshooting and bootstrapping
   - curl
   - wget
+  - net-tools     # ifconfig, netstat, route
+  - bind-utils    # dig, nslookup — DNS debugging
+  - tcpdump       # Packet capture at the OS level
+
+  # Process and system inspection
+  - lsof          # Show open files and network sockets by process
+
+  # Version control — needed to clone repos on the VM itself
   - git
-  - net-tools
-  - bind-utils
-  - tcpdump
-  - lsof
-  - unzip
+
+  # Python — required by Ansible modules running on the target host
   - python3
   - python3-pip

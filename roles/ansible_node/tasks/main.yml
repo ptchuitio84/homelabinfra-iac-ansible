@@ -1,5 +1,20 @@
+# =============================================================================
+# roles/ansible_node/tasks/main.yml — Ansible Control Node Setup Tasks
+# =============================================================================
+# Configures a fresh OL10 VM as the Ansible control node.
+# Run via: ansible-playbook playbooks/setup_ansible_node.yml
+#
+# These tasks are idempotent — safe to re-run without side effects.
+# =============================================================================
+
 ---
-- name: Install pip dependencies for Ansible
+# Install system packages required before Ansible itself can be installed.
+#   python3-pip   — pip package manager (needed to install Ansible via pip)
+#   python3-devel — Python headers (required to build some pip packages)
+#   sshpass       — allows Ansible to pass SSH passwords non-interactively
+#                   (used until SSH key auth is in place)
+#   git           — needed to clone this repo onto the control node
+- name: Install pip and system dependencies
   ansible.builtin.dnf:
     name:
       - python3-pip
@@ -8,19 +23,29 @@
       - git
     state: present
 
+# Install Ansible itself via pip.
+# We use pip instead of the OS package manager (dnf) because the dnf version
+# is often several releases behind. Pip gives us version pinning and fast updates.
 - name: Install Ansible via pip
   ansible.builtin.pip:
     name: "ansible~={{ ansible_install_version }}"
     executable: pip3
     state: present
 
-- name: Install paramiko (needed for network device SSH connections)
+# Paramiko is a pure-Python SSH library.
+# The cisco.ios and arista.eos collections use it for network device connections
+# when operating over SSH (as opposed to eAPI). Required even for Arista eAPI
+# hosts as a fallback transport.
+- name: Install paramiko (SSH library for network device connections)
   ansible.builtin.pip:
     name: paramiko
     executable: pip3
     state: present
 
-- name: Create .ansible directory for root
+# Create the hidden .ansible directory for root.
+# This is where Ansible stores the vault password file and user-level config.
+# mode 0700 = only root can read or write this directory.
+- name: Create /root/.ansible directory
   ansible.builtin.file:
     path: /root/.ansible
     state: directory
@@ -28,16 +53,23 @@
     group: root
     mode: '0700'
 
-- name: Create vault password file (populate manually after provisioning)
+# Create the vault password file with a placeholder value.
+# IMPORTANT: After provisioning, SSH in and replace the placeholder:
+#   echo 'your_actual_vault_password' > /root/.ansible/vault_pass.txt
+# "force: false" means Ansible will NOT overwrite this file if it already exists,
+# protecting a real password that was set manually.
+- name: Create vault password file (set real password manually after provisioning)
   ansible.builtin.copy:
     content: "REPLACE_WITH_VAULT_PASSWORD\n"
     dest: "{{ vault_password_file }}"
     owner: root
     group: root
     mode: '0600'
-    force: false     # don't overwrite if already set
+    force: false
 
-- name: Create ansible.cfg for root user
+# Write a user-level ansible.cfg for root that points at the vault password file.
+# This means you don't need to specify --vault-password-file on every command.
+- name: Write /root/.ansible.cfg (points at vault password file)
   ansible.builtin.copy:
     dest: /root/.ansible.cfg
     owner: root
@@ -47,7 +79,8 @@
       [defaults]
       vault_password_file = {{ vault_password_file }}
 
-- name: Create repo directory
+# Create the directory that will hold the cloned repo.
+- name: Create repo directory ({{ repo_dest }})
   ansible.builtin.file:
     path: "{{ repo_dest }}"
     state: directory
@@ -55,15 +88,21 @@
     group: root
     mode: '0755'
 
-- name: Clone network-ansible repo
+# Clone this repo onto the control node.
+# Requires an SSH deploy key to be set up on GitHub and the public key added
+# to the control node's root SSH agent or ~/.ssh/.
+# "ignore_errors: true" prevents failure on first run before the key is in place.
+- name: Clone homelabinfra-iac-ansible repo to {{ repo_dest }}
   ansible.builtin.git:
     repo: "{{ repo_url }}"
     dest: "{{ repo_dest }}"
     version: main
     accept_hostkey: true
-  ignore_errors: true     # may fail on first run if SSH key not deployed yet
+  ignore_errors: true
 
-- name: Copy requirements.yml if repo clone failed
+# Fallback: if the clone failed (no SSH key yet), copy requirements.yml manually
+# so collection installation can still proceed.
+- name: Copy requirements.yml as fallback if clone failed
   ansible.builtin.copy:
     src: requirements.yml
     dest: "{{ repo_dest }}/requirements.yml"
@@ -72,17 +111,25 @@
     mode: '0644'
   when: not (repo_dest + '/requirements.yml') is file
 
-- name: Install Ansible collections
+# Install all Ansible collections listed in requirements.yml.
+# This includes cisco.ios, arista.eos, community.vmware, and others.
+# "ignore_errors: true" allows the playbook to finish even if a collection
+# install fails due to a network issue — can be re-run manually.
+- name: Install Ansible collections from requirements.yml
   community.general.ansible_galaxy_install:
     type: collection
     requirements_file: "{{ repo_dest }}/requirements.yml"
   ignore_errors: true
 
-- name: Verify ansible is in PATH
+# Sanity check — confirm Ansible is installed and in PATH.
+# "changed_when: false" tells Ansible this task never modifies anything,
+# so it won't be counted as a change in the play summary.
+- name: Verify Ansible installation
   ansible.builtin.command: ansible --version
   register: ansible_version_output
   changed_when: false
 
-- name: Show installed Ansible version
+# Print the installed version to the Ansible output for confirmation.
+- name: Display installed Ansible version
   ansible.builtin.debug:
     msg: "{{ ansible_version_output.stdout_lines[0] }}"
