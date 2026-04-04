@@ -1,0 +1,11 @@
+---
+# swplnet252 — Arista 7050SX-64
+# Role: VRRP master L3, 10GbE ESXi uplinks, internet gateway uplink
+# Platform: Arista EOS 4.28.12M — eAPI enabled
+switch_platform: arista_eos
+switch_model: 7050SX-64
+vrrp_role: master
+vrrp_priority: 110
+mgmt_vlan: 100
+mgmt_ip: 10.100.100.252
+config_file: network/arista_7050sx_swplnet005.eos

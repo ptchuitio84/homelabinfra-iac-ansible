@@ -1,0 +1,10 @@
+---
+# swplnet251 — Cisco Catalyst 3750G (to be replaced by Arista 7048T-A)
+# Role: VRRP backup L3, DHCP server, OOB + AP + 1GbE server uplinks
+# Platform: Cisco IOS 12.2 — legacy SSH ciphers required (set in group_vars)
+switch_platform: cisco_ios
+switch_model: Catalyst 3750G-48TS
+vrrp_role: backup
+vrrp_priority: 90
+mgmt_vlan: 100
+mgmt_ip: 10.100.100.251

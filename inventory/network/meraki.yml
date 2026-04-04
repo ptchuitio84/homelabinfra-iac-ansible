@@ -1,0 +1,5 @@
+---
+meraki:
+  hosts:
+    meraki_mx:
+      ansible_host: 10.100.100.254

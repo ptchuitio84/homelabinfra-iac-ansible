@@ -1,0 +1,5 @@
+---
+cisco_switches:
+  hosts:
+    swplnet251.nnt.com:
+      ansible_host: 10.100.100.251

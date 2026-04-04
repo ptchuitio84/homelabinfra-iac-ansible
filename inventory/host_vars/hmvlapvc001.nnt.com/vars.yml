@@ -1,0 +1,7 @@
+---
+# hmvlapvc001 — VMware vCenter Server Appliance
+# Manages all ESXi hosts in the lab
+vm_role: vcenter
+mgmt_ip: 10.10.0.5
+datacenter_name: HomeLab
+cluster_name: HomeLab-Cluster

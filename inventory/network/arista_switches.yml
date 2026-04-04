@@ -1,0 +1,7 @@
+---
+arista_switches:
+  hosts:
+    swplnet252.nnt.com:
+      ansible_host: 10.100.100.252
+    # swplnet251.nnt.com:              # uncomment after 7048T-A replaces Cisco
+    #   ansible_host: 10.100.100.251  # same IP — Cisco decommissioned at that point

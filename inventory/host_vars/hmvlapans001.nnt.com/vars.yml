@@ -1,0 +1,9 @@
+---
+# hmvlapans001 — Ansible control node
+# OL10 VM on INFRACORENET (VLAN 10)
+# This host runs all automation from /opt/homelabinfra-iac-ansible
+vm_role: ansible_control_node
+vm_vcpus: 2
+vm_memory_mb: 4096
+vm_network: INFRACORENET
+vm_vlan: 10

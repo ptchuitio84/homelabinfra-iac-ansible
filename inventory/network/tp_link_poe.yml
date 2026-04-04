@@ -1,0 +1,5 @@
+---
+tp_link_poe:
+  hosts:
+    swplnet253.nnt.com:
+      ansible_host: 10.100.100.253

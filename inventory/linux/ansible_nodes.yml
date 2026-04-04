@@ -1,0 +1,5 @@
+---
+ansible_nodes:
+  hosts:
+    hmvlapans001.nnt.com:
+      ansible_host: 10.10.1.31
