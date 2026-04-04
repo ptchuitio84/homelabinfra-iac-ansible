@@ -17,7 +17,7 @@
 # Ansible version to install via pip.
 # "~=" means "compatible with" — installs 2.16.x but not 2.17+.
 # Update this when ready to upgrade. Test in staging first.
-ansible_install_version: "2.16"
+ansible_install_version: "2.16"   # ansible-core version — use ansible-core package, not ansible
 
 # Path where the vault password file is stored on the control node.
 # This file must be created manually after provisioning (not automated — security).

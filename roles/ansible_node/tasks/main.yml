@@ -23,12 +23,23 @@
       - git
     state: present
 
-# Install Ansible itself via pip.
-# We use pip instead of the OS package manager (dnf) because the dnf version
-# is often several releases behind. Pip gives us version pinning and fast updates.
-- name: Install Ansible via pip
+# Upgrade pip itself before installing Ansible.
+# OL10 ships with an older pip that doesn't index modern package versions.
+# This must run before any pip install tasks.
+- name: Upgrade pip to latest version
   ansible.builtin.pip:
-    name: "ansible~={{ ansible_install_version }}"
+    name: pip
+    executable: pip3
+    state: latest
+
+# Install ansible-core via pip.
+# NOTE: "ansible" and "ansible-core" are different pip packages:
+#   ansible-core — the core engine, version matches 2.x (e.g. 2.16)
+#   ansible      — the community bundle, uses a different version scheme (e.g. 9.x for core 2.16)
+# We install ansible-core for a lean, version-pinned install.
+- name: Install ansible-core via pip
+  ansible.builtin.pip:
+    name: "ansible-core~={{ ansible_install_version }}"
     executable: pip3
     state: present
 
