@@ -31,4 +31,4 @@ ansible_nodes:
     #           Vault password: /root/.ansible/vault_pass.txt (set manually post-deploy)
     # Status:   Active — SSH access being confirmed
     hmvlapans001.nnt.com:
-      ansible_host: 10.10.1.31
+      ansible_host: 10.10.0.41

@@ -24,11 +24,11 @@ esxi_hosts:
   hosts:
 
     # hmvlesxi001 — Dell PowerEdge R710 (ESXi Host 1)
-    # Mgmt IP:  10.10.1.211 (VLAN 10 — INFRACORENET)
+    # Mgmt IP:  10.10.1.21 (VLAN 10 — INFRACORENET)
     # Role:     Primary compute host — runs most infrastructure VMs
     # Status:   Active
     hmvlesxi001.nnt.com:
-      ansible_host: 10.10.1.211
+      ansible_host: 10.10.1.21
 
     # hmvlesxi002 — Dell PowerEdge R710 (ESXi Host 2)
     # Mgmt IP:  10.10.1.22 (VLAN 10 — INFRACORENET)
@@ -41,7 +41,7 @@ esxi_hosts:
     # Mgmt IP:  10.10.0.33 (VLAN 10 — INFRACORENET)
     # Role:     Third compute host — expands cluster for Kubernetes nodes
     # Status:   Pending — deploy via PXE kickstart (pxe_server role, Phase 2)
-    hmvlesxi003.nnt.com:
+    hmvlesxi033.nnt.com:
       ansible_host: 10.10.0.33
 
     # hmvlesxi034 — Dell PowerEdge R310 (ESXi Host 4)

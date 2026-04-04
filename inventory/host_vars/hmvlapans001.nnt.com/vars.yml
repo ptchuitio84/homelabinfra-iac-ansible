@@ -31,3 +31,4 @@ vm_memory_mb: 4096
 # Network placement.
 vm_network: INFRACORENET
 vm_vlan: 10
+mgmt_ip: 10.10.0.41
