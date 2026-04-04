@@ -1,0 +1,18 @@
+---
+# Cisco Catalyst 3750G — IOS connection vars
+# Collection: cisco.ios
+# Transport: SSH with legacy cipher workaround (3750G runs old IOS)
+
+ansible_network_os: cisco.ios.ios
+ansible_connection: ansible.netcommon.network_cli
+ansible_user: ptchuitio
+ansible_password: "{{ vault_cisco_password }}"
+ansible_become: true
+ansible_become_method: enable
+ansible_become_password: "{{ vault_cisco_enable_password }}"
+
+# Legacy cipher workaround — 3750G does not offer modern kex/ciphers
+ansible_ssh_common_args: >-
+  -o KexAlgorithms=+diffie-hellman-group14-sha1,diffie-hellman-group1-sha1
+  -o HostKeyAlgorithms=+ssh-rsa
+  -o Ciphers=+aes128-cbc,3des-cbc,aes192-cbc,aes256-cbc

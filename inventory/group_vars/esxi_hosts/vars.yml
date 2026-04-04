@@ -1,0 +1,7 @@
+---
+# ESXi hosts — direct SSH connection
+# Note: for VMware provisioning tasks use vcenter group + community.vmware collection
+ansible_user: root
+ansible_password: "{{ vault_esxi_password }}"
+ansible_connection: ssh
+ansible_ssh_common_args: -o StrictHostKeyChecking=no

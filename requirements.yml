@@ -1,0 +1,20 @@
+---
+# Ansible collection requirements
+# Install all:
+#   ansible-galaxy collection install -r requirements.yml
+#
+# Install on Ansible control node (hmvlapans001.nnt.com) before running any playbooks.
+
+collections:
+  - name: cisco.ios
+    version: ">=4.0.0"
+  - name: arista.eos
+    version: ">=9.0.0"
+  - name: ansible.netcommon
+    version: ">=5.0.0"
+  - name: cisco.meraki
+    version: ">=2.0.0"
+  - name: community.vmware
+    version: ">=4.0.0"
+  - name: ansible.utils
+    version: ">=2.0.0"

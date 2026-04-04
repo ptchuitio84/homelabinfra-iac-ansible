@@ -1,0 +1,68 @@
+---
+# arista_push.yml — Push full config to Arista switches
+#
+# Usage:
+#   ansible-playbook playbooks/arista_push.yml
+#   ansible-playbook playbooks/arista_push.yml --limit swplnet252
+#   ansible-playbook playbooks/arista_push.yml --limit swplnet251_arista
+#
+# Config file mapping (set per host in vars below or host_vars):
+#   swplnet252  → network/arista_7050sx_swplnet005.eos
+#   swplnet251  → network/arista_7048t_swplnet251.eos  (after 7048T-A replaces Cisco)
+#
+# What it does:
+#   1. Backs up current running config
+#   2. Pushes EOS config via eAPI using eos_config src
+#   3. Saves to startup-config (copy run start)
+#
+# Vault required for credentials.
+
+- name: Push Arista EOS configs
+  hosts: arista_switches
+  gather_facts: false
+
+  vars:
+    backup_dir: "{{ playbook_dir }}/../network/backups"
+    config_map:
+      swplnet252: "{{ playbook_dir }}/../network/arista_7050sx_swplnet005.eos"
+      swplnet251_arista: "{{ playbook_dir }}/../network/arista_7048t_swplnet251.eos"
+
+  tasks:
+    - name: Set config file path for this host
+      ansible.builtin.set_fact:
+        config_file: "{{ config_map[inventory_hostname] }}"
+
+    - name: Verify config file exists
+      ansible.builtin.stat:
+        path: "{{ config_file }}"
+      register: config_stat
+      delegate_to: localhost
+
+    - name: Fail if config file missing
+      ansible.builtin.fail:
+        msg: "Config file not found: {{ config_file }}"
+      when: not config_stat.stat.exists
+
+    - name: Backup running config before push
+      arista.eos.eos_command:
+        commands: show running-config
+      register: pre_backup
+
+    - name: Save pre-push backup
+      ansible.builtin.copy:
+        content: "{{ pre_backup.stdout[0] }}"
+        dest: "{{ backup_dir }}/{{ inventory_hostname }}_pre-push_{{ lookup('pipe', 'date +%Y-%m-%d_%H%M') }}.txt"
+      delegate_to: localhost
+
+    - name: Push config from file
+      arista.eos.eos_config:
+        src: "{{ config_file }}"
+      notify: Save startup config
+
+  handlers:
+    - name: Save startup config
+      arista.eos.eos_command:
+        commands:
+          - command: copy running-config startup-config
+            prompt: '\[startup-config\]'
+            answer: ''

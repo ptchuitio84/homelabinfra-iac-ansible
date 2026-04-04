@@ -1,0 +1,15 @@
+---
+# Meraki MX — REST API vars
+# Collection: cisco.meraki (or direct uri module)
+# Auth: Meraki Dashboard API key (enable at Dashboard → Organization → API)
+#
+# To get org/network IDs:
+#   curl -s -H "X-Cisco-Meraki-API-Key: <key>" \
+#     https://api.meraki.com/api/v1/organizations
+#   curl -s -H "X-Cisco-Meraki-API-Key: <key>" \
+#     https://api.meraki.com/api/v1/organizations/<orgId>/networks
+
+meraki_api_base_url: https://api.meraki.com/api/v1
+meraki_api_key: "{{ vault_meraki_api_key }}"
+meraki_org_id: "{{ vault_meraki_org_id }}"
+meraki_network_id: "{{ vault_meraki_network_id }}"

@@ -1,0 +1,16 @@
+*.retry
+*.pyc
+__pycache__/
+.ansible/
+
+# Vault files — must be encrypted before committing
+# Encrypt with: ansible-vault encrypt <path>
+# Verify: head -1 <path>  (should start with $ANSIBLE_VAULT;...)
+inventory/group_vars/*/vault.yml
+
+# Backup configs
+network/backups/*
+!network/backups/.gitkeep
+
+# Ansible fact cache
+/tmp/ansible_facts/

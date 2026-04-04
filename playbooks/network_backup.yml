@@ -1,0 +1,42 @@
+---
+# network_backup.yml — Back up running configs from all network devices
+#
+# Usage:
+#   ansible-playbook playbooks/network_backup.yml
+#   ansible-playbook playbooks/network_backup.yml --limit cisco_switches
+#   ansible-playbook playbooks/network_backup.yml --limit arista_switches
+#
+# Output: network/backups/<hostname>_<YYYY-MM-DD>.txt
+# Vault required for credentials.
+
+- name: Backup Cisco IOS configs
+  hosts: cisco_switches
+  gather_facts: false
+
+  tasks:
+    - name: Get running config
+      cisco.ios.ios_command:
+        commands: show running-config
+      register: ios_config
+
+    - name: Save backup to file
+      ansible.builtin.copy:
+        content: "{{ ios_config.stdout[0] }}"
+        dest: "{{ playbook_dir }}/../network/backups/{{ inventory_hostname }}_{{ lookup('pipe', 'date +%Y-%m-%d') }}.txt"
+      delegate_to: localhost
+
+- name: Backup Arista EOS configs
+  hosts: arista_switches
+  gather_facts: false
+
+  tasks:
+    - name: Get running config
+      arista.eos.eos_command:
+        commands: show running-config
+      register: eos_config
+
+    - name: Save backup to file
+      ansible.builtin.copy:
+        content: "{{ eos_config.stdout[0] }}"
+        dest: "{{ playbook_dir }}/../network/backups/{{ inventory_hostname }}_{{ lookup('pipe', 'date +%Y-%m-%d') }}.txt"
+      delegate_to: localhost

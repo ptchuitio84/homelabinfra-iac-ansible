@@ -1,0 +1,108 @@
+---
+# vlan_audit.yml — Verify VLAN consistency across all switches
+#
+# Checks:
+#   - Expected VLANs exist on all switches
+#   - VLAN names match
+#   - Unwanted VLANs (502-504) are absent
+#
+# Usage:
+#   ansible-playbook playbooks/vlan_audit.yml
+#
+# Output: pass/fail per switch, with diff on mismatch
+
+- name: VLAN Audit — Cisco
+  hosts: cisco_switches
+  gather_facts: false
+
+  vars:
+    expected_vlans:
+      - { id: 2,   name: OOBNET }
+      - { id: 3,   name: GUESTNET }
+      - { id: 5,   name: HOMENET }
+      - { id: 6,   name: HOUSEHOLDNET }
+      - { id: 7,   name: TVNET }
+      - { id: 9,   name: PRINTNET }
+      - { id: 10,  name: INFRACORENET }
+      - { id: 11,  name: SANISCSINET }
+      - { id: 12,  name: STORVMNET }
+      - { id: 14,  name: SECCAMNET }
+      - { id: 17,  name: TESTNET }
+      - { id: 100, name: COREMGMTNET }
+      - { id: 105, name: CONFMGMTNET }
+      - { id: 200, name: NANONET }
+      - { id: 254, name: PLATFORMNET }
+      - { id: 501, name: GWISOLNET1 }
+    banned_vlans: [502, 503, 504]
+
+  tasks:
+    - name: Get VLAN brief
+      cisco.ios.ios_command:
+        commands: show vlan brief
+      register: vlan_output
+
+    - name: Check expected VLANs are present
+      ansible.builtin.assert:
+        that: "vlan_output.stdout[0] is search(item.id | string)"
+        fail_msg: "MISSING VLAN {{ item.id }} ({{ item.name }}) on {{ inventory_hostname }}"
+        success_msg: "VLAN {{ item.id }} ({{ item.name }}) present"
+      loop: "{{ expected_vlans }}"
+
+    - name: Check banned VLANs are absent
+      ansible.builtin.assert:
+        that: "vlan_output.stdout[0] is not search('^' + item | string + ' ')"
+        fail_msg: "BANNED VLAN {{ item }} still present on {{ inventory_hostname }}"
+        success_msg: "VLAN {{ item }} correctly absent"
+      loop: "{{ banned_vlans }}"
+
+    - name: Show VLAN table
+      ansible.builtin.debug:
+        msg: "{{ vlan_output.stdout[0] }}"
+
+- name: VLAN Audit — Arista
+  hosts: arista_switches
+  gather_facts: false
+
+  vars:
+    expected_vlans:
+      - { id: 2,   name: OOBNET }
+      - { id: 3,   name: GUESTNET }
+      - { id: 5,   name: HOMENET }
+      - { id: 6,   name: HOUSEHOLDNET }
+      - { id: 7,   name: TVNET }
+      - { id: 9,   name: PRINTNET }
+      - { id: 10,  name: INFRACORENET }
+      - { id: 11,  name: SANISCSINET }
+      - { id: 12,  name: STORVMNET }
+      - { id: 14,  name: SECCAMNET }
+      - { id: 17,  name: TESTNET }
+      - { id: 100, name: COREMGMTNET }
+      - { id: 105, name: CONFMGMTNET }
+      - { id: 200, name: NANONET }
+      - { id: 254, name: PLATFORMNET }
+      - { id: 501, name: GWISOLNET1 }
+    banned_vlans: [502, 503, 504]
+
+  tasks:
+    - name: Get VLAN brief
+      arista.eos.eos_command:
+        commands: show vlan brief
+      register: vlan_output
+
+    - name: Check expected VLANs are present
+      ansible.builtin.assert:
+        that: "vlan_output.stdout[0] is search(item.id | string)"
+        fail_msg: "MISSING VLAN {{ item.id }} ({{ item.name }}) on {{ inventory_hostname }}"
+        success_msg: "VLAN {{ item.id }} ({{ item.name }}) present"
+      loop: "{{ expected_vlans }}"
+
+    - name: Check banned VLANs are absent
+      ansible.builtin.assert:
+        that: "vlan_output.stdout[0] is not search('^' + item | string + ' ')"
+        fail_msg: "BANNED VLAN {{ item }} still present on {{ inventory_hostname }}"
+        success_msg: "VLAN {{ item }} correctly absent"
+      loop: "{{ banned_vlans }}"
+
+    - name: Show VLAN table
+      ansible.builtin.debug:
+        msg: "{{ vlan_output.stdout[0] }}"

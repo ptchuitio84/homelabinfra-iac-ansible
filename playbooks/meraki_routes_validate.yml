@@ -1,0 +1,45 @@
+---
+# meraki_routes_validate.yml — Confirm Meraki static routes point to VRRP VIPs (.1)
+#
+# Checks that all static routes use the VRRP VIP as next-hop, not a physical switch IP.
+# Run this before and after VRRP cutover.
+#
+# Usage:
+#   ansible-playbook playbooks/meraki_routes_validate.yml
+#
+# Requires: vault_meraki_api_key, vault_meraki_network_id set in meraki vault.yml
+
+- name: Validate Meraki static routes
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "{{ playbook_dir }}/../inventory/group_vars/meraki/vars.yml"
+    - "{{ playbook_dir }}/../inventory/group_vars/meraki/vault.yml"
+
+  tasks:
+    - name: Get static routes from Meraki API
+      ansible.builtin.uri:
+        url: "{{ meraki_api_base_url }}/networks/{{ meraki_network_id }}/appliance/staticRoutes"
+        method: GET
+        headers:
+          X-Cisco-Meraki-API-Key: "{{ meraki_api_key }}"
+          Content-Type: application/json
+        return_content: true
+        status_code: 200
+      register: routes_response
+
+    - name: Show all static routes
+      ansible.builtin.debug:
+        msg: |
+          {% for route in routes_response.json %}
+          {{ route.name | default('(unnamed)') }}: {{ route.subnet }} → {{ route.gatewayIp }}
+          {% endfor %}
+
+    - name: Flag routes NOT pointing to a .1 next-hop
+      ansible.builtin.debug:
+        msg: "WARNING: Route {{ item.subnet }} uses next-hop {{ item.gatewayIp }} — expected *.1"
+      when: not item.gatewayIp.endswith('.1')
+      loop: "{{ routes_response.json }}"
+      loop_control:
+        label: "{{ item.subnet }}"

@@ -1,0 +1,7 @@
+---
+# vCenter — community.vmware collection vars
+vcenter_hostname: "{{ ansible_host }}"
+vcenter_username: "{{ vault_vcenter_username }}"
+vcenter_password: "{{ vault_vcenter_password }}"
+vcenter_validate_certs: false
+ansible_connection: local

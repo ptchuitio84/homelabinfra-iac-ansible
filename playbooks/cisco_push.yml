@@ -1,0 +1,59 @@
+---
+# cisco_push.yml — Push full running config to Cisco Catalyst 3750G (swplnet251)
+#
+# Usage:
+#   ansible-playbook playbooks/cisco_push.yml
+#   ansible-playbook playbooks/cisco_push.yml --check     # dry run (shows diff only)
+#
+# What it does:
+#   1. Backs up current running config before making changes
+#   2. Pushes config sections from network/cisco_catalyst_3750g_swplnet001.txt
+#   3. Saves to startup-config
+#
+# NOTE: This pushes the FULL config file as a src. IOS ios_config with src
+# will merge the file into the running config (additive). To remove stale
+# lines, use the individual task sections below or run targeted fix commands.
+#
+# Vault required for credentials.
+
+- name: Push Cisco 3750G config (swplnet251)
+  hosts: swplnet251
+  gather_facts: false
+
+  vars:
+    config_file: "{{ playbook_dir }}/../network/cisco_catalyst_3750g_swplnet001.txt"
+    backup_dir: "{{ playbook_dir }}/../network/backups"
+
+  tasks:
+    - name: Verify config file exists
+      ansible.builtin.stat:
+        path: "{{ config_file }}"
+      register: config_stat
+      delegate_to: localhost
+
+    - name: Fail if config file missing
+      ansible.builtin.fail:
+        msg: "Config file not found: {{ config_file }}"
+      when: not config_stat.stat.exists
+
+    - name: Backup running config before push
+      cisco.ios.ios_command:
+        commands: show running-config
+      register: pre_backup
+
+    - name: Save pre-push backup
+      ansible.builtin.copy:
+        content: "{{ pre_backup.stdout[0] }}"
+        dest: "{{ backup_dir }}/{{ inventory_hostname }}_pre-push_{{ lookup('pipe', 'date +%Y-%m-%d_%H%M') }}.txt"
+      delegate_to: localhost
+
+    - name: Push config from file
+      cisco.ios.ios_config:
+        src: "{{ config_file }}"
+      notify: Save running config
+
+  handlers:
+    - name: Save running config
+      cisco.ios.ios_command:
+        commands:
+          - command: write memory
