@@ -7,7 +7,7 @@
 # to install Ansible and set it up. After bootstrap, this VM becomes the
 # SOURCE that runs all future playbooks against everything else in the lab.
 #
-# OS: Oracle Linux 10 (OL10) — fully RHEL-compatible, no license cost.
+# OS: Oracle Linux 9 (OL9) — fully RHEL-compatible, no license cost.
 #
 # ENCRYPTED CREDENTIALS:
 # The root password is stored in vault.yml (encrypted with ansible-vault).
@@ -25,6 +25,6 @@ ansible_password: "{{ vault_ansible_node_password }}"
 # Standard SSH connection — this is a Linux VM, not a network device.
 ansible_connection: ssh
 
-# Use the system Python 3 interpreter (pre-installed on OL10).
+# Use the system Python 3 interpreter (pre-installed on OL9).
 # Ansible needs Python on the target host to run most modules.
 ansible_python_interpreter: /usr/bin/python3

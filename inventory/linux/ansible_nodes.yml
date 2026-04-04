@@ -11,7 +11,7 @@
 # During initial setup (bootstrap), playbooks are run FROM your Mac to configure
 # this VM. After that, this VM takes over and runs all future automation.
 #
-# OS: Oracle Linux 10 (OL10) — RHEL-compatible, free, enterprise-grade.
+# OS: Oracle Linux 9 (OL9) — RHEL-compatible, free, enterprise-grade.
 #
 # GROUP: ansible_nodes
 # Connection settings defined in:
@@ -25,7 +25,7 @@ ansible_nodes:
 
     # hmvlapans001 — Ansible Control Node
     # Mgmt IP:  10.10.1.31 (VLAN 10 — INFRACORENET, /23 subnet)
-    # OS:       Oracle Linux 10 (OL10)
+    # OS:       Oracle Linux 9 (OL9)
     # Role:     Runs all Ansible playbooks for the lab
     #           Repo cloned to: /opt/homelabinfra-iac-ansible
     #           Vault password: /root/.ansible/vault_pass.txt (set manually post-deploy)

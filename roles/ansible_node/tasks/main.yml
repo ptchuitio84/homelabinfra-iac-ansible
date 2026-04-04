@@ -1,7 +1,7 @@
 # =============================================================================
 # roles/ansible_node/tasks/main.yml — Ansible Control Node Setup Tasks
 # =============================================================================
-# Configures a fresh OL10 VM as the Ansible control node.
+# Configures a fresh OL9 VM as the Ansible control node.
 # Run via: ansible-playbook playbooks/setup_ansible_node.yml
 #
 # These tasks are idempotent — safe to re-run without side effects.
@@ -24,7 +24,7 @@
     state: present
 
 # Upgrade pip itself before installing Ansible.
-# OL10 ships with an older pip that doesn't index modern package versions.
+# OL9 ships with an older pip that doesn't index modern package versions.
 # This must run before any pip install tasks.
 - name: Upgrade pip to latest version
   ansible.builtin.pip:

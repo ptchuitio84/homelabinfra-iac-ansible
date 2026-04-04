@@ -6,7 +6,7 @@
 # or passed at runtime (-e flag) will override these.
 #
 # WHAT THE COMMON ROLE DOES:
-# Sets a consistent baseline on every OL10 VM before any app role runs:
+# Sets a consistent baseline on every OL9 VM before any app role runs:
 #   - Correct timezone and NTP sync
 #   - Required base packages
 #   - SELinux in permissive mode (tighten in a future hardening pass)

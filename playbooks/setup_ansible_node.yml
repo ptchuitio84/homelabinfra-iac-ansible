@@ -2,7 +2,7 @@
 # playbooks/setup_ansible_node.yml — Bootstrap the Ansible Control Node
 # =============================================================================
 # PURPOSE:
-# Turns a fresh Oracle Linux 10 VM (hmvlapans001) into a fully operational
+# Turns a fresh Oracle Linux 9 VM (hmvlapans001) into a fully operational
 # Ansible control node in a single playbook run.
 #
 # WHEN TO RUN THIS:

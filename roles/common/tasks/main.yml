@@ -15,7 +15,7 @@
   community.general.timezone:
     name: "{{ timezone }}"
 
-# Install all packages in the base_packages list using DNF (OL10 / RHEL package manager).
+# Install all packages in the base_packages list using DNF (OL9 / RHEL package manager).
 # "state: present" means install if missing, leave alone if already installed.
 - name: Install base packages
   ansible.builtin.dnf:
@@ -46,7 +46,7 @@
 # Network segmentation is handled at the switch layer (VLANs) and by the Meraki MX.
 # Running firewalld inside VMs adds complexity without meaningful security benefit
 # in this architecture. "ignore_errors: true" prevents failure if firewalld is
-# not installed (some minimal OL10 images omit it).
+# not installed (some minimal OL9 images omit it).
 - name: Disable firewalld (network layer handles segmentation)
   ansible.builtin.systemd:
     name: firewalld
@@ -63,7 +63,7 @@
     state: permissive
 
 # Ensure the loopback line in /etc/hosts is correct.
-# Some OL10 cloud-init images ship with variations that break hostname resolution.
+# Some OL9 cloud-init images ship with variations that break hostname resolution.
 - name: Ensure /etc/hosts has correct loopback entry
   ansible.builtin.lineinfile:
     path: /etc/hosts
