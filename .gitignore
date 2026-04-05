@@ -20,19 +20,23 @@ __pycache__/
 .ansible/
 
 # =============================================================================
-# VAULT FILES — MOST IMPORTANT
+# VAULT FILES
 # =============================================================================
-# vault.yml files contain encrypted secrets (passwords, API keys).
-# They MUST be encrypted with ansible-vault before committing.
-# To be safe, they are excluded entirely — encrypt manually if you want to
-# commit them, and verify encryption first:
-#   head -1 inventory/group_vars/<group>/vault.yml
-#   (should start with: $ANSIBLE_VAULT;1.1;AES256)
+# vault.yml files contain ansible-vault encrypted secrets (passwords, API keys).
+# They are safe to commit ONLY when encrypted — the first line must be:
+#   $ANSIBLE_VAULT;1.1;AES256
 #
-# To encrypt:  ansible-vault encrypt inventory/group_vars/<group>/vault.yml
-# To edit:     ansible-vault edit inventory/group_vars/<group>/vault.yml
-# To decrypt:  ansible-vault decrypt inventory/group_vars/<group>/vault.yml
-inventory/group_vars/*/vault.yml
+# Verify before committing:
+#   head -1 inventory/group_vars/<group>/vault.yml
+#
+# To encrypt a plaintext vault file:
+#   ansible-vault encrypt inventory/group_vars/<group>/vault.yml
+# To edit an encrypted vault file:
+#   ansible-vault edit inventory/group_vars/<group>/vault.yml
+#
+# NEVER commit plaintext vault.yml files (CHANGE_ME = not encrypted yet).
+# If you accidentally stage a plaintext file, unstage immediately:
+#   git reset HEAD inventory/group_vars/<group>/vault.yml
 
 # =============================================================================
 # BACKUP FILES
