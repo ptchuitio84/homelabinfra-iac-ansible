@@ -1,0 +1,47 @@
+# =============================================================================
+# roles/grafana/defaults/main.yml — Grafana Role Default Variables
+# =============================================================================
+# Default values for the "grafana" role.
+# Override any of these in group_vars or host_vars if needed.
+#
+# WHAT THIS ROLE DOES:
+# Deploys Grafana on OL9 as a systemd service. Grafana queries Prometheus
+# for metrics and serves dashboards on port 3000.
+#
+# ARCHITECTURE:
+#   Browser → Grafana (hmvlapmon001:3000) → queries → Prometheus (hmvlapmon002:9090)
+#
+# DISK LAYOUT:
+#   sda (60GB) — mounted at /var/lib/grafana (dashboards, plugins, sessions)
+#   sdb (30GB) — OS only (/boot on sdb1, LVM root+swap on sdb2)
+# =============================================================================
+
+---
+# Data disk — 60GB, blank on fresh clone (VMware assigns sda=data, sdb=OS)
+grafana_data_device: /dev/sda
+grafana_data_fstype: xfs
+
+# System user/group Grafana runs as.
+grafana_user: grafana
+grafana_group: grafana
+
+# Directories
+grafana_data_dir: /var/lib/grafana
+grafana_config_dir: /etc/grafana
+grafana_log_dir: /var/log/grafana
+grafana_plugins_dir: /var/lib/grafana/plugins
+
+# Port Grafana listens on.
+grafana_port: 3000
+
+# Admin credentials — override via vault in production.
+# Set grafana_admin_password in group_vars/monitoring/vault.yml.
+grafana_admin_user: admin
+grafana_admin_password: "{{ vault_grafana_admin_password }}"
+
+# Prometheus datasource — auto-provisioned on deploy.
+grafana_prometheus_url: "http://hmvlapmon002.nnt.com:9090"
+
+# Grafana version — installed from official OSS RPM repo (no version pin needed,
+# repo always serves latest stable).
+grafana_repo_url: "https://rpm.grafana.com"

@@ -1,0 +1,19 @@
+# =============================================================================
+# playbooks/setup_grafana.yml — Deploy Grafana
+# =============================================================================
+# Deploys Grafana to hmvlapmon001 (10.10.1.51).
+# Run after provisioning the VM with: ./scripts/provision-hmvlapmon001.sh
+#
+# USAGE:
+#   ansible-playbook playbooks/setup_grafana.yml
+# =============================================================================
+
+---
+- name: Deploy Grafana (hmvlapmon001)
+  hosts: hmvlapmon001.nnt.com
+  become: true
+  gather_facts: true
+
+  roles:
+    - common    # timezone, NTP, SELinux, base packages
+    - grafana   # install and configure Grafana

@@ -1,0 +1,154 @@
+# =============================================================================
+# roles/grafana/tasks/main.yml — Grafana Deployment Tasks
+# =============================================================================
+# Deploys Grafana on OL9 as a systemd service with Prometheus auto-provisioned
+# as a datasource.
+# Run via: ansible-playbook playbooks/setup_grafana.yml
+#
+# These tasks are idempotent — safe to re-run without side effects.
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: DATA DISK
+# Mount /dev/sda at /var/lib/grafana so all dashboard/plugin data lives on its
+# own disk, separate from the OS.
+# =============================================================================
+
+- name: Check if {{ grafana_data_device }} already has a filesystem
+  ansible.builtin.command: blkid {{ grafana_data_device }}
+  register: grafana_sda_blkid
+  changed_when: false
+  failed_when: false
+
+- name: Format {{ grafana_data_device }} as XFS (only if blank)
+  community.general.filesystem:
+    fstype: "{{ grafana_data_fstype }}"
+    dev: "{{ grafana_data_device }}"
+  when: grafana_sda_blkid.rc != 0
+
+- name: Create Grafana data directory ({{ grafana_data_dir }})
+  ansible.builtin.file:
+    path: "{{ grafana_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Check if {{ grafana_data_dir }} is already a mount point
+  ansible.builtin.command: mountpoint -q {{ grafana_data_dir }}
+  register: grafana_data_mounted
+  changed_when: false
+  failed_when: false
+
+- name: Mount {{ grafana_data_device }} at {{ grafana_data_dir }} and add to fstab
+  ansible.posix.mount:
+    path: "{{ grafana_data_dir }}"
+    src: "{{ grafana_data_device }}"
+    fstype: "{{ grafana_data_fstype }}"
+    opts: defaults
+    state: mounted
+  when: grafana_data_mounted.rc != 0
+
+# =============================================================================
+# SECTION 2: INSTALL
+# Add Grafana OSS repo and install via dnf.
+# =============================================================================
+
+- name: Add Grafana OSS repo
+  ansible.builtin.yum_repository:
+    name: grafana
+    description: Grafana OSS
+    baseurl: "{{ grafana_repo_url }}/oss/rpm"
+    repo_gpgcheck: true
+    gpgcheck: true
+    gpgkey: "{{ grafana_repo_url }}/gpg.key"
+    sslverify: true
+    sslcacert: /etc/pki/tls/certs/ca-bundle.crt
+    enabled: true
+
+- name: Install Grafana
+  ansible.builtin.dnf:
+    name: grafana
+    state: present
+
+# =============================================================================
+# SECTION 3: DIRECTORIES AND PERMISSIONS
+# =============================================================================
+
+- name: Create Grafana directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0755'
+  loop:
+    - "{{ grafana_log_dir }}"
+    - "{{ grafana_plugins_dir }}"
+
+- name: Set ownership of Grafana data directory
+  ansible.builtin.file:
+    path: "{{ grafana_data_dir }}"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0755'
+
+# =============================================================================
+# SECTION 4: CONFIGURATION
+# Deploy grafana.ini and the Prometheus datasource provisioning file.
+# =============================================================================
+
+- name: Deploy Grafana configuration (grafana.ini)
+  ansible.builtin.template:
+    src: grafana.ini.j2
+    dest: "{{ grafana_config_dir }}/grafana.ini"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0640'
+  notify: Restart Grafana
+
+- name: Create Grafana provisioning directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0755'
+  loop:
+    - "{{ grafana_config_dir }}/provisioning/datasources"
+    - "{{ grafana_config_dir }}/provisioning/dashboards"
+
+- name: Deploy Prometheus datasource provisioning
+  ansible.builtin.template:
+    src: datasource_prometheus.yml.j2
+    dest: "{{ grafana_config_dir }}/provisioning/datasources/prometheus.yml"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0640'
+  notify: Restart Grafana
+
+# =============================================================================
+# SECTION 5: SYSTEMD SERVICE
+# =============================================================================
+
+- name: Enable and start Grafana
+  ansible.builtin.systemd:
+    name: grafana-server
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# =============================================================================
+# SECTION 6: VERIFY
+# =============================================================================
+
+- name: Wait for Grafana to be reachable
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ grafana_port }}"
+    timeout: 30
+
+- name: Display Grafana access URL
+  ansible.builtin.debug:
+    msg: "Grafana is up — http://{{ ansible_host }}:{{ grafana_port }} (admin / {{ grafana_admin_password }})"
