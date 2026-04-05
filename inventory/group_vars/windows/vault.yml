@@ -1,0 +1,6 @@
+---
+# ansible-vault encrypted — encrypt before committing:
+#   ansible-vault encrypt inventory/group_vars/windows/vault.yml
+
+vault_windows_admin_user: CHANGEME
+vault_windows_admin_password: CHANGEME

@@ -1,0 +1,15 @@
+# =============================================================================
+# inventory/windows/veeam.yml — Veeam Backup Server (T710, bare metal)
+# =============================================================================
+# FC direct attach to TrueNAS SAN for direct SAN backup.
+# Management IP: 10.10.0.33 (NIC team)
+# iDRAC: 10.2.0.33
+# Connection: WinRM
+# =============================================================================
+
+---
+veeam:
+  hosts:
+
+    veeam01.nanonetech.com:
+      ansible_host: 10.10.0.33

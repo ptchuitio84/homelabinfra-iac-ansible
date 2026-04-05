@@ -1,0 +1,93 @@
+# =============================================================================
+# roles/windows_dc/tasks/main.yml — Windows DC Promotion Tasks
+# =============================================================================
+# Promotes a Windows Server 2016+ to an additional DC in nanonetech.com.
+# Run via: ansible-playbook playbooks/promote_dc.yml --limit dc02.nanonetech.com
+#
+# PREREQUISITES:
+#   - WinRM enabled on target host
+#   - Target host reachable on WinRM port 5985
+#   - DC01 is healthy and replicating
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: PRE-FLIGHT CHECKS
+# =============================================================================
+
+- name: Check if host is already a Domain Controller
+  ansible.windows.win_shell: |
+    (Get-WmiObject -Class Win32_ComputerSystem).DomainRole
+  register: domain_role
+  changed_when: false
+
+# DomainRole: 0=Standalone, 1=Member, 4=BDC, 5=PDC
+- name: Display current domain role
+  ansible.builtin.debug:
+    msg: "Current domain role: {{ domain_role.stdout | trim }} (4 or 5 = already a DC)"
+
+- name: Abort if already a Domain Controller
+  ansible.builtin.meta: end_host
+  when: domain_role.stdout | trim in ['4', '5']
+
+# =============================================================================
+# SECTION 2: CONFIGURE DNS
+# Point at DC01 before promotion so AD can be found
+# =============================================================================
+
+- name: Set DNS to point at DC01
+  ansible.windows.win_dns_client:
+    adapter_names: "*"
+    dns_servers:
+      - "{{ ad_dns_server }}"
+
+# =============================================================================
+# SECTION 3: INSTALL AD DS FEATURE
+# =============================================================================
+
+- name: Install AD DS Windows feature
+  ansible.windows.win_feature:
+    name:
+      - AD-Domain-Services
+      - RSAT-AD-Tools
+      - RSAT-AD-PowerShell
+    state: present
+    include_management_tools: true
+  notify: Reboot DC
+
+- name: Flush handlers (reboot if needed after feature install)
+  ansible.builtin.meta: flush_handlers
+
+# =============================================================================
+# SECTION 4: PROMOTE TO DOMAIN CONTROLLER
+# =============================================================================
+
+- name: Promote server to additional Domain Controller in {{ ad_domain }}
+  microsoft.ad.domain_controller:
+    dns_domain_name: "{{ ad_domain }}"
+    domain_admin_user: "{{ ad_join_user }}"
+    domain_admin_password: "{{ ad_join_password }}"
+    safe_mode_password: "{{ ad_dsrm_password }}"
+    database_path: "{{ ad_database_path }}"
+    log_path: "{{ ad_log_path }}"
+    sysvol_path: "{{ ad_sysvol_path }}"
+    site_name: "{{ ad_site }}"
+    state: domain_controller
+  register: dc_promotion
+  notify: Reboot DC
+
+- name: Flush handlers (reboot after promotion)
+  ansible.builtin.meta: flush_handlers
+
+# =============================================================================
+# SECTION 5: VERIFY REPLICATION
+# =============================================================================
+
+- name: Check AD replication status
+  ansible.windows.win_shell: repadmin /replsummary
+  register: repl_summary
+  changed_when: false
+
+- name: Display replication summary
+  ansible.builtin.debug:
+    msg: "{{ repl_summary.stdout_lines }}"

@@ -1,0 +1,32 @@
+# =============================================================================
+# playbooks/cisco_port36_vlan10.yml — Configure port 36 on VLAN 10
+# =============================================================================
+# Configures Gi1/0/36 as an access port on VLAN 10 (INFRACORENET, 10.10.0.0/23)
+# matching all other VLAN 10 access interfaces on swplnet251.
+#
+# USAGE (run from control node):
+#   ansible-playbook playbooks/cisco_port36_vlan10.yml --check
+#   ansible-playbook playbooks/cisco_port36_vlan10.yml
+# =============================================================================
+
+---
+- name: Configure Gi1/0/36 as VLAN 10 access port
+  hosts: swplnet251.nnt.com
+  gather_facts: false
+
+  tasks:
+    - name: Configure Gi1/0/36 — VLAN 10 access
+      cisco.ios.ios_config:
+        lines:
+          - switchport mode access
+          - switchport access vlan 10
+          - spanning-tree portfast
+          - no shutdown
+        parents: interface GigabitEthernet1/0/36
+      notify: Save running config
+
+  handlers:
+    - name: Save running config
+      cisco.ios.ios_command:
+        commands:
+          - command: write memory

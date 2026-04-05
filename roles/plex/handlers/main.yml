@@ -1,0 +1,9 @@
+# =============================================================================
+# roles/plex/handlers/main.yml
+# =============================================================================
+
+---
+- name: Restart Plex
+  ansible.builtin.service:
+    name: plexmediaserver
+    state: restarted

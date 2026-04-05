@@ -1,0 +1,78 @@
+# =============================================================================
+# roles/mailcleaner/tasks/main.yml — Mailcleaner Validation and Config
+# =============================================================================
+# Validates Mailcleaner appliance health and relay configuration.
+# Run via: ansible-playbook playbooks/configure_mailcleaner.yml
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: SERVICE HEALTH CHECK
+# =============================================================================
+
+- name: Check Mailcleaner services are running
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: started
+  loop: "{{ mailcleaner_services }}"
+  register: service_status
+  failed_when: false
+
+- name: Report any stopped services
+  ansible.builtin.debug:
+    msg: "WARNING: {{ item.name }} is not running"
+  loop: "{{ service_status.results }}"
+  when: item.state is defined and item.state != 'started'
+
+# =============================================================================
+# SECTION 2: POSTFIX RELAY CONFIGURATION
+# Ensure Mailcleaner relays clean mail to Exchange
+# =============================================================================
+
+- name: Check postfix relayhost configuration
+  ansible.builtin.command: postconf relayhost
+  register: postfix_relay
+  changed_when: false
+
+- name: Display current relay host
+  ansible.builtin.debug:
+    msg: "Current relayhost: {{ postfix_relay.stdout }}"
+
+- name: Set postfix relayhost to Exchange
+  ansible.builtin.command: >
+    postconf -e "relayhost=[{{ mailcleaner_relay_host }}]:{{ mailcleaner_relay_port }}"
+  when: mailcleaner_relay_host not in postfix_relay.stdout
+  notify: Reload postfix
+
+# =============================================================================
+# SECTION 3: VERIFY SMTP FLOW
+# Test that Mailcleaner can reach Exchange on port 25
+# =============================================================================
+
+- name: Test SMTP connectivity to Exchange relay
+  ansible.builtin.wait_for:
+    host: "{{ mailcleaner_relay_host }}"
+    port: "{{ mailcleaner_relay_port }}"
+    timeout: 10
+  register: smtp_test
+  failed_when: false
+
+- name: Report SMTP relay connectivity
+  ansible.builtin.debug:
+    msg: >
+      SMTP relay to {{ mailcleaner_relay_host }}:{{ mailcleaner_relay_port }}
+      — {{ 'REACHABLE' if smtp_test.elapsed is defined else 'UNREACHABLE - check Exchange receive connector' }}
+
+# =============================================================================
+# SECTION 4: VERIFY DOMAIN IS CONFIGURED
+# =============================================================================
+
+- name: Check domain is in Mailcleaner config
+  ansible.builtin.command: grep -r "{{ mailcleaner_domain }}" /etc/mailcleaner/
+  register: domain_check
+  changed_when: false
+  failed_when: false
+
+- name: Report domain configuration status
+  ansible.builtin.debug:
+    msg: "{{ mailcleaner_domain }} {{ 'found in config' if domain_check.rc == 0 else 'NOT found — add via Mailcleaner admin UI' }}"

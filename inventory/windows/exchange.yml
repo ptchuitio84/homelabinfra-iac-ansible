@@ -1,0 +1,13 @@
+# =============================================================================
+# inventory/windows/exchange.yml — Exchange Server
+# =============================================================================
+# Exchange config management only — server already deployed manually.
+# Connection: WinRM
+# =============================================================================
+
+---
+exchange:
+  hosts:
+
+    exchange01.nanonetech.com:
+      ansible_host: CHANGEME        # Set to Exchange server IP

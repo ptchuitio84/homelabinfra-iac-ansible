@@ -1,0 +1,33 @@
+# =============================================================================
+# roles/mailcleaner/defaults/main.yml — Mailcleaner Role Default Variables
+# =============================================================================
+# Mailcleaner is a standard Debian-based appliance — already deployed.
+# This role manages configuration and validates functionality.
+#
+# WHAT THIS ROLE DOES:
+# - Validates Mailcleaner services are running
+# - Ensures relay configuration to Exchange is correct
+# - Verifies inbound MX flow is functional
+# =============================================================================
+
+---
+# Mailcleaner SMTP relay target — deliver clean mail to Exchange
+mailcleaner_relay_host: exchange01.nanonetech.com
+mailcleaner_relay_port: 25
+
+# Domain handled by Mailcleaner
+mailcleaner_domain: nanonetech.com
+
+# Mailcleaner services to verify
+mailcleaner_services:
+  - mailscanner
+  - postfix
+  - apache2
+  - mysqld
+
+# Mailcleaner admin interface port
+mailcleaner_admin_port: 443
+
+# Mailcleaner SSH connection (Debian-based appliance)
+# Override ansible_user/ansible_ssh_private_key_file in host_vars if needed
+mailcleaner_admin_user: root

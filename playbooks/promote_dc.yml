@@ -1,0 +1,17 @@
+# =============================================================================
+# playbooks/promote_dc.yml — Promote Windows Server to Domain Controller
+# =============================================================================
+# Promotes dc02.nanonetech.com (10.10.0.12) to additional DC in nanonetech.com.
+# Run AFTER dc02 is provisioned and WinRM is reachable.
+#
+# USAGE:
+#   ansible-playbook playbooks/promote_dc.yml --limit dc02.nanonetech.com
+# =============================================================================
+
+---
+- name: Promote DC02 to Domain Controller (nanonetech.com)
+  hosts: dc02.nanonetech.com
+  gather_facts: true
+
+  roles:
+    - windows_dc

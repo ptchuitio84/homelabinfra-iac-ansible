@@ -1,0 +1,15 @@
+# =============================================================================
+# inventory/linux/mailcleaner.yml — Mailcleaner Mail Filtering Appliance
+# =============================================================================
+# Standard Mailcleaner appliance (Debian-based).
+# Handles inbound mail filtering for nanonetech.com before delivery to Exchange.
+# Already deployed and configured — this role manages config and validates health.
+# =============================================================================
+
+---
+mailcleaner:
+  hosts:
+
+    mailcleaner01.nanonetech.com:
+      ansible_host: CHANGEME          # Set to Mailcleaner appliance IP
+      ansible_user: root

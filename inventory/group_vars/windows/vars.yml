@@ -1,0 +1,14 @@
+# =============================================================================
+# group_vars/windows/vars.yml — Common Windows Host Connection Settings
+# =============================================================================
+# Applies to all Windows hosts (active_directory, exchange, veeam groups).
+# Credentials in vault.yml.
+# =============================================================================
+
+---
+ansible_connection: winrm
+ansible_winrm_transport: ntlm
+ansible_winrm_server_cert_validation: ignore
+ansible_winrm_port: 5985
+ansible_user: "{{ vault_windows_admin_user }}"
+ansible_password: "{{ vault_windows_admin_password }}"

@@ -1,0 +1,35 @@
+# =============================================================================
+# roles/windows_dc/defaults/main.yml — Windows DC Role Default Variables
+# =============================================================================
+# Promotes a Windows Server to an additional Domain Controller in an existing
+# AD forest. Does NOT create a new forest — DC01 is already running.
+#
+# REQUIRES:
+#   - WinRM enabled on target host
+#   - collections: microsoft.ad, ansible.windows
+#   - Target host already joined to domain OR run join + promote together
+# =============================================================================
+
+---
+# Domain settings — nanonetech.com
+ad_domain: nanonetech.com
+ad_netbios_name: NNT
+ad_domain_functional_level: WinThreshold   # Windows Server 2016
+
+# Safe Mode Administrator Password (DSRM) — stored in vault
+ad_dsrm_password: "{{ vault_ad_dsrm_password }}"
+
+# Domain join credentials — used to promote the server to DC
+ad_join_user: "Administrator@{{ ad_domain }}"
+ad_join_password: "{{ vault_ad_join_password }}"
+
+# DNS — point at existing DC01 during promotion
+ad_dns_server: CHANGEME     # Set to DC01 IP
+
+# AD Sites and Services — which site this DC belongs to
+ad_site: Default-First-Site-Name
+
+# Database, log, and SYSVOL paths (defaults are fine for homelab)
+ad_database_path: "C:\\Windows\\NTDS"
+ad_log_path: "C:\\Windows\\NTDS"
+ad_sysvol_path: "C:\\Windows\\SYSVOL"

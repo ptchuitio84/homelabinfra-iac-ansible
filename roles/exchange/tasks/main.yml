@@ -1,0 +1,84 @@
+# =============================================================================
+# roles/exchange/tasks/main.yml — Exchange Configuration Management
+# =============================================================================
+# Manages Exchange configuration via remote PowerShell.
+# Run via: ansible-playbook playbooks/configure_exchange.yml
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: VERIFY EXCHANGE IS RUNNING
+# =============================================================================
+
+- name: Check Exchange services are running
+  ansible.windows.win_service:
+    name: "{{ item }}"
+  register: exchange_services
+  loop:
+    - MSExchangeTransport
+    - MSExchangeFrontEndTransport
+    - W3Svc
+  failed_when: false
+
+- name: Display Exchange service status
+  ansible.builtin.debug:
+    msg: "{{ item.name }}: {{ item.state }}"
+  loop: "{{ exchange_services.results }}"
+
+# =============================================================================
+# SECTION 2: ACCEPTED DOMAINS
+# =============================================================================
+
+- name: Ensure accepted domains are configured
+  community.windows.win_shell: |
+    Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn -ErrorAction SilentlyContinue
+    $domain = Get-AcceptedDomain -Identity "{{ item.name }}" -ErrorAction SilentlyContinue
+    if (-not $domain) {
+        New-AcceptedDomain -Name "{{ item.name }}" -DomainName "{{ item.name }}" -DomainType {{ item.domain_type }}
+    }
+  loop: "{{ exchange_accepted_domains }}"
+  changed_when: false
+
+# =============================================================================
+# SECTION 3: INTERNAL SMTP RELAY CONNECTOR
+# Allows lab hosts (monitoring, Jenkins, etc.) to relay mail via Exchange
+# =============================================================================
+
+- name: Configure internal SMTP relay receive connector
+  community.windows.win_shell: |
+    Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn -ErrorAction SilentlyContinue
+    $connector = Get-ReceiveConnector -Identity "*{{ exchange_relay_connector_name }}*" -ErrorAction SilentlyContinue
+    if (-not $connector) {
+        New-ReceiveConnector `
+            -Name "{{ exchange_relay_connector_name }}" `
+            -TransportRole FrontendTransport `
+            -RemoteIPRanges {{ exchange_relay_permitted_networks | join(',') }} `
+            -PermissionGroups AnonymousUsers `
+            -Bindings "0.0.0.0:25"
+    }
+  changed_when: false
+
+# =============================================================================
+# SECTION 4: TRANSPORT SETTINGS
+# =============================================================================
+
+- name: Set max message size
+  community.windows.win_shell: |
+    Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn -ErrorAction SilentlyContinue
+    Set-TransportConfig -MaxSendSize {{ exchange_max_message_size_mb }}MB -MaxReceiveSize {{ exchange_max_message_size_mb }}MB
+  changed_when: false
+
+# =============================================================================
+# SECTION 5: VERIFY
+# =============================================================================
+
+- name: Display Exchange organization config
+  community.windows.win_shell: |
+    Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn -ErrorAction SilentlyContinue
+    Get-OrganizationConfig | Select-Object Name, MaxSendSize, MaxReceiveSize | Format-List
+  register: org_config
+  changed_when: false
+
+- name: Show Exchange org config
+  ansible.builtin.debug:
+    msg: "{{ org_config.stdout_lines }}"

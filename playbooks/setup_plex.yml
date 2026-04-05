@@ -1,0 +1,20 @@
+# =============================================================================
+# playbooks/setup_plex.yml — Deploy Plex Media Server
+# =============================================================================
+# Deploys Plex Media Server on plex01 (OL7.6, R510 bare metal).
+#
+# BLOCKED: Requires Arista 7048T-A port-channel (Ethernet17-18, LAG to VLAN 7)
+# to be in service before this playbook can run.
+#
+# USAGE (once Arista is up):
+#   ansible-playbook playbooks/setup_plex.yml
+# =============================================================================
+
+---
+- name: Deploy Plex Media Server (plex01)
+  hosts: plex01.nnt.com
+  become: true
+  gather_facts: true
+
+  roles:
+    - plex

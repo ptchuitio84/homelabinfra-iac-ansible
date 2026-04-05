@@ -1,0 +1,30 @@
+# =============================================================================
+# roles/exchange/defaults/main.yml — Exchange Role Default Variables
+# =============================================================================
+# Config management only — Exchange is already deployed manually.
+# Manages: receive connectors, accepted domains, transport settings.
+#
+# REQUIRES:
+#   - WinRM enabled on Exchange server
+#   - collections: ansible.windows, community.windows
+# =============================================================================
+
+---
+# Organization settings
+exchange_org_name: NNT
+exchange_domain: nanonetech.com
+
+# Internal relay — allow lab hosts to send mail via Exchange
+exchange_relay_connector_name: "Internal SMTP Relay"
+exchange_relay_permitted_networks:
+  - "10.10.0.0/23"    # INFRACORENET
+  - "10.2.0.0/23"     # OOB network
+  - "127.0.0.1/32"
+
+# Accepted domains
+exchange_accepted_domains:
+  - name: "{{ exchange_domain }}"
+    domain_type: Authoritative
+
+# Max message size (MB)
+exchange_max_message_size_mb: 25

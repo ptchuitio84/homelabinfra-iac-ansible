@@ -1,0 +1,22 @@
+# =============================================================================
+# inventory/windows/active_directory.yml — Active Directory Domain Controllers
+# =============================================================================
+# Domain: nanonetech.com | Functional Level: 2016
+#
+# Connection: WinRM (not SSH). Requires WinRM enabled on each DC.
+# Enable via GPO or run on each host:
+#   winrm quickconfig -q
+#   winrm set winrm/config/service/auth @{Basic="true"}
+# =============================================================================
+
+---
+active_directory:
+  hosts:
+
+    # DC01 — Primary Domain Controller
+    dc01.nanonetech.com:
+      ansible_host: CHANGEME        # Set to DC01 IP
+
+    # DC02 — Secondary Domain Controller (pending promotion)
+    dc02.nanonetech.com:
+      ansible_host: 10.10.0.12

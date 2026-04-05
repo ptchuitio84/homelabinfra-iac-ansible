@@ -1,0 +1,9 @@
+# =============================================================================
+# roles/windows_dc/handlers/main.yml
+# =============================================================================
+
+---
+- name: Reboot DC
+  ansible.windows.win_reboot:
+    reboot_timeout: 600
+    post_reboot_delay: 60

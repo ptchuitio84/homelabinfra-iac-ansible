@@ -1,0 +1,17 @@
+# =============================================================================
+# playbooks/configure_mailcleaner.yml — Mailcleaner Validation and Config
+# =============================================================================
+# Validates Mailcleaner health and relay configuration to Exchange.
+#
+# USAGE:
+#   ansible-playbook playbooks/configure_mailcleaner.yml
+# =============================================================================
+
+---
+- name: Configure Mailcleaner (mailcleaner01.nanonetech.com)
+  hosts: mailcleaner01.nanonetech.com
+  become: true
+  gather_facts: true
+
+  roles:
+    - mailcleaner
