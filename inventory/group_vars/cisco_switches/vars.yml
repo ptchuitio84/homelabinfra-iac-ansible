@@ -42,6 +42,10 @@ ansible_become_password: "{{ vault_cisco_enable_password }}"
 #   KexAlgorithms    — how the shared session key is negotiated
 #   HostKeyAlgorithms — the format of the switch's public host key
 #   Ciphers          — encryption algorithm for session data
+# Disable SSH key auth for Cisco — these switches use password auth only.
+# Overrides the global private_key_file set in ansible.cfg.
+ansible_private_key_file: ~
+
 ansible_ssh_common_args: >-
   -o KexAlgorithms=+diffie-hellman-group14-sha1,diffie-hellman-group1-sha1
   -o HostKeyAlgorithms=+ssh-rsa
