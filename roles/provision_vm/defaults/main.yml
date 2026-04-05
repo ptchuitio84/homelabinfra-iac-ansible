@@ -60,5 +60,5 @@ vm_dns_servers:
 # Post-clone wait settings
 # How long to wait for the VM to become reachable via SSH after boot.
 # =============================================================================
-vm_boot_timeout: 300                 # seconds to wait for VM to boot (5 min)
+vm_boot_timeout: 600                 # seconds to wait for VM to boot (10 min)
 vm_ssh_port: 22
