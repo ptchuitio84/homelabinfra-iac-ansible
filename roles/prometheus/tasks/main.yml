@@ -9,7 +9,41 @@
 
 ---
 # =============================================================================
-# SECTION 1: SYSTEM USER
+# SECTION 1: DATA DISK
+# Mount /dev/sdb at /var/lib/prometheus so all metrics data lives on its own
+# disk, separate from the OS. Same pattern as Jenkins.
+# =============================================================================
+
+- name: Check if /dev/sdb already has a filesystem
+  ansible.builtin.command: blkid /dev/sdb
+  register: sdb_blkid
+  changed_when: false
+  failed_when: false
+
+- name: Format /dev/sdb as XFS (only if blank)
+  community.general.filesystem:
+    fstype: "{{ prometheus_data_fstype }}"
+    dev: "{{ prometheus_data_device }}"
+  when: sdb_blkid.rc != 0
+
+- name: Create Prometheus data directory ({{ prometheus_data_dir }})
+  ansible.builtin.file:
+    path: "{{ prometheus_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Mount /dev/sdb at {{ prometheus_data_dir }} and add to fstab
+  ansible.posix.mount:
+    path: "{{ prometheus_data_dir }}"
+    src: "{{ prometheus_data_device }}"
+    fstype: "{{ prometheus_data_fstype }}"
+    opts: defaults
+    state: mounted
+
+# =============================================================================
+# SECTION 3: SYSTEM USER
 # Prometheus runs as a dedicated system user with no login shell.
 # This limits what a compromised Prometheus process can do on the host.
 # =============================================================================
@@ -43,8 +77,15 @@
   loop:
     - "{{ prometheus_install_dir }}"
     - "{{ prometheus_config_dir }}"
-    - "{{ prometheus_data_dir }}"
     - "{{ prometheus_log_dir }}"
+
+# Set ownership of data dir after mount — prometheus user needs to write here.
+- name: Set ownership of Prometheus data directory
+  ansible.builtin.file:
+    path: "{{ prometheus_data_dir }}"
+    owner: "{{ prometheus_user }}"
+    group: "{{ prometheus_group }}"
+    mode: '0755'
 
 # =============================================================================
 # SECTION 3: INSTALL

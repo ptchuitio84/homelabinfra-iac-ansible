@@ -18,6 +18,16 @@
 # =============================================================================
 
 ---
+# =============================================================================
+# DISK LAYOUT
+# /dev/sda (30GB) — OS only
+# /dev/sdb (60GB) — mounted at /var/lib/prometheus (all metrics data lives here)
+# Keeping data on a separate disk means the OS can be rebuilt without losing
+# any metrics history.
+# =============================================================================
+prometheus_data_device: /dev/sdb
+prometheus_data_fstype: xfs
+
 # Prometheus version to install.
 prometheus_version: "2.51.2"
 
