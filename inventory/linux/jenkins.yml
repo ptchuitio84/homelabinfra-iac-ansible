@@ -1,0 +1,37 @@
+# =============================================================================
+# inventory/linux/jenkins.yml — Jenkins CI/CD Server Inventory
+# =============================================================================
+# Defines the Jenkins server used for CI/CD and container builds in the lab.
+#
+# WHAT IS THIS SERVER?
+# Jenkins is the automation hub — it watches GitHub for changes and
+# automatically runs Ansible playbooks, builds Docker images, and eventually
+# deploys to Kubernetes. Think of it as the brain that triggers everything else.
+#
+# OS: Oracle Linux 9.7 — RHEL-compatible, same baseline as the control node.
+#
+# DISK LAYOUT:
+#   /dev/sda (30GB) — OS only
+#   /dev/sdb (60GB) — mounted at /var/lib/jenkins (all Jenkins data lives here)
+#
+# Separating Jenkins data onto its own disk means you can wipe and rebuild the
+# OS without losing any jobs, build history, or credentials.
+#
+# GROUP: jenkins
+# Connection settings defined in:
+#   inventory/group_vars/jenkins/vars.yml
+#   inventory/group_vars/jenkins/vault.yml (encrypted admin password)
+# =============================================================================
+
+---
+jenkins:
+  hosts:
+
+    # hmvlapjkn001 — Jenkins CI/CD Server
+    # Mgmt IP:  10.10.1.41 (VLAN 10 — INFRACORENET, /23 subnet)
+    # OS:       Oracle Linux 9.7
+    # Role:     CI/CD pipelines, Docker builds, Kubernetes deployments
+    #           Jenkins data: /var/lib/jenkins (on /dev/sdb, 60GB)
+    # Status:   Pending bootstrap
+    hmvlapjkn001.nnt.com:
+      ansible_host: 10.10.1.41

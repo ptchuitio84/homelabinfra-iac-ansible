@@ -1,0 +1,180 @@
+# =============================================================================
+# roles/jenkins/tasks/main.yml — Jenkins CI/CD Server Setup Tasks
+# =============================================================================
+# Configures a fresh OL9 VM as the Jenkins CI/CD and container build server.
+# Run via: ansible-playbook playbooks/setup_jenkins.yml
+#
+# These tasks are idempotent — safe to re-run without side effects.
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: DATA DISK SETUP
+# Mount /dev/sdb at /var/lib/jenkins so all Jenkins data lives on its own disk.
+# This means the OS (sda) can be wiped and rebuilt without losing any Jenkins
+# jobs, build history, credentials, or configuration.
+# =============================================================================
+
+# Check if /dev/sdb already has a filesystem on it.
+# If it does, we skip formatting to avoid destroying existing data on re-runs.
+- name: Check if /dev/sdb already has a filesystem
+  ansible.builtin.command: blkid /dev/sdb
+  register: sdb_blkid
+  changed_when: false
+  failed_when: false   # blkid returns non-zero if no filesystem found — that's OK
+
+# Format /dev/sdb as XFS only if it has no existing filesystem.
+# XFS is the default and recommended filesystem for RHEL/OL9.
+# WARNING: This will destroy all data on /dev/sdb if it runs.
+# "when: sdb_blkid.rc != 0" ensures it only runs on a blank disk.
+- name: Format /dev/sdb as XFS (only if blank)
+  community.general.filesystem:
+    fstype: "{{ jenkins_data_fstype }}"
+    dev: "{{ jenkins_data_device }}"
+  when: sdb_blkid.rc != 0
+
+# Create the /var/lib/jenkins mount point directory.
+# Jenkins RPM also creates this, but we need it to exist before mounting.
+- name: Create Jenkins data directory ({{ jenkins_data_mount }})
+  ansible.builtin.file:
+    path: "{{ jenkins_data_mount }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+# Mount /dev/sdb at /var/lib/jenkins and add it to /etc/fstab so it
+# survives reboots. "fstype: xfs" tells the system how to read the disk.
+- name: Mount /dev/sdb at {{ jenkins_data_mount }} and add to fstab
+  ansible.posix.mount:
+    path: "{{ jenkins_data_mount }}"
+    src: "{{ jenkins_data_device }}"
+    fstype: "{{ jenkins_data_fstype }}"
+    opts: defaults
+    state: mounted
+
+# =============================================================================
+# SECTION 2: JAVA
+# Jenkins LTS requires Java 17. Install it before adding the Jenkins repo.
+# =============================================================================
+
+- name: Install Java 17 (required by Jenkins LTS)
+  ansible.builtin.dnf:
+    name: "{{ java_package }}"
+    state: present
+
+# =============================================================================
+# SECTION 3: JENKINS
+# Install Jenkins from the official Jenkins RPM repository.
+# The OS package manager (dnf) does not carry a current version of Jenkins.
+# =============================================================================
+
+# Add the official Jenkins stable (LTS) repo.
+# "LTS" = Long-Term Support — updated every 12 weeks, stable for production.
+- name: Add Jenkins LTS repository
+  ansible.builtin.get_url:
+    url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+    dest: /etc/yum.repos.d/jenkins.repo
+    mode: '0644'
+
+# Import the Jenkins GPG signing key so RPM can verify package authenticity.
+- name: Import Jenkins GPG key
+  ansible.builtin.rpm_key:
+    key: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+    state: present
+
+# Install Jenkins. This also creates the "jenkins" system user and group.
+- name: Install Jenkins
+  ansible.builtin.dnf:
+    name: jenkins
+    state: present
+
+# =============================================================================
+# SECTION 4: DOCKER
+# Install Docker CE for container builds. Jenkins pipelines will use Docker
+# to build and run containers as part of CI/CD workflows.
+# =============================================================================
+
+# Add the Docker CE repo for RHEL9/OL9. Docker does not publish an OL9-specific
+# repo — the CentOS Stream 9 repo is fully compatible.
+- name: Add Docker CE repository
+  ansible.builtin.get_url:
+    url: "{{ docker_repo_url }}"
+    dest: /etc/yum.repos.d/docker-ce.repo
+    mode: '0644'
+
+# Install Docker CE and the CLI tools.
+#   docker-ce         — the Docker daemon (the engine that runs containers)
+#   docker-ce-cli     — the "docker" command-line tool
+#   containerd.io     — the container runtime Docker depends on
+#   docker-buildx-plugin — modern "docker buildx" build command (multi-arch support)
+#   docker-compose-plugin — "docker compose" command (v2, replaces docker-compose)
+- name: Install Docker CE and tooling
+  ansible.builtin.dnf:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+
+# Add the jenkins user to the docker group.
+# Without this, Jenkins pipelines cannot run "docker build" or "docker run"
+# because only members of the docker group can talk to the Docker daemon.
+- name: Add jenkins user to docker group
+  ansible.builtin.user:
+    name: "{{ jenkins_user }}"
+    groups: docker
+    append: true   # append to existing groups, don't replace them
+
+# =============================================================================
+# SECTION 5: SERVICE MANAGEMENT
+# Enable and start both Docker and Jenkins so they come up after every reboot.
+# =============================================================================
+
+- name: Enable and start Docker
+  ansible.builtin.systemd:
+    name: docker
+    enabled: true
+    state: started
+
+# Fix ownership of /var/lib/jenkins now that the mount is in place and
+# the jenkins user exists. Jenkins needs to own its own data directory.
+- name: Set ownership of Jenkins data directory to jenkins user
+  ansible.builtin.file:
+    path: "{{ jenkins_data_mount }}"
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+    mode: '0755'
+
+- name: Enable and start Jenkins
+  ansible.builtin.systemd:
+    name: jenkins
+    enabled: true
+    state: started
+
+# =============================================================================
+# SECTION 6: POST-INSTALL INFO
+# =============================================================================
+
+# Jenkins generates a one-time admin password on first start.
+# You need this password to complete the web UI setup wizard.
+# It is stored at /var/lib/jenkins/secrets/initialAdminPassword.
+- name: Wait for Jenkins initial admin password to be generated (up to 60s)
+  ansible.builtin.wait_for:
+    path: /var/lib/jenkins/secrets/initialAdminPassword
+    timeout: 60
+
+- name: Read Jenkins initial admin password
+  ansible.builtin.slurp:
+    src: /var/lib/jenkins/secrets/initialAdminPassword
+  register: jenkins_init_password
+
+- name: Display Jenkins initial admin password and access URL
+  ansible.builtin.debug:
+    msg:
+      - "Jenkins is up and running."
+      - "URL:      http://{{ ansible_host }}:{{ jenkins_http_port }}"
+      - "Password: {{ jenkins_init_password.content | b64decode | trim }}"
+      - "Complete the setup wizard in the browser to finish installation."

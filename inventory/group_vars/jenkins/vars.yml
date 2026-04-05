@@ -1,0 +1,26 @@
+# =============================================================================
+# group_vars/jenkins/vars.yml — Jenkins Server Connection Settings
+# =============================================================================
+# These variables apply to every host in the "jenkins" group.
+#
+# ENCRYPTED CREDENTIALS:
+# The root password is stored in vault.yml (encrypted with ansible-vault).
+# After bootstrap, SSH key authentication replaces password auth.
+# =============================================================================
+
+---
+# Login as root for full system access during provisioning.
+ansible_user: root
+
+# Root password — decrypted at runtime from vault.yml.
+# Long-term: replace with SSH key auth and remove this.
+ansible_password: "{{ vault_jenkins_host_password }}"
+
+# Standard SSH connection — Linux VM.
+ansible_connection: ssh
+
+# SSH private key — used after key auth is set up on the host.
+ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+
+# Use the system Python 3 interpreter (pre-installed on OL9).
+ansible_python_interpreter: /usr/bin/python3

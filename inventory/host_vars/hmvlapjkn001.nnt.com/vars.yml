@@ -1,0 +1,26 @@
+# =============================================================================
+# host_vars/hmvlapjkn001.nnt.com/vars.yml — Jenkins Server Host Metadata
+# =============================================================================
+# Host-specific variables for the Jenkins CI/CD server.
+# These are informational — used for documentation and future automation
+# (e.g., VMware provisioning playbooks).
+# =============================================================================
+
+---
+# Network
+mgmt_ip: 10.10.1.41
+mgmt_prefix: 23
+mgmt_gateway: 10.10.1.1
+mgmt_vlan: 10
+
+# VM specs
+vm_vcpus: 4
+vm_memory_mb: 16384   # 16GB
+
+# Disk layout
+vm_disk_os_gb: 30     # /dev/sda — OS
+vm_disk_data_gb: 60   # /dev/sdb — mounted at /var/lib/jenkins
+
+# Role
+vm_role: jenkins-cicd
+vm_os: OL9.7

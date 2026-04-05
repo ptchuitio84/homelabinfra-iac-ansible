@@ -1,0 +1,50 @@
+# =============================================================================
+# playbooks/setup_jenkins.yml — Bootstrap the Jenkins CI/CD Server
+# =============================================================================
+# PURPOSE:
+# Turns a fresh Oracle Linux 9 VM (hmvlapjkn001) into a fully operational
+# Jenkins CI/CD and container build server in a single playbook run.
+#
+# WHEN TO RUN THIS:
+# Once — when setting up the Jenkins server for the first time.
+# Can be safely re-run if something fails partway through (idempotent).
+#
+# WHERE TO RUN THIS FROM:
+# The Ansible control node (hmvlapans001) or your Mac.
+#
+# PREREQUISITES:
+#   1. VM deployed with OL9.7, 4vCPU, 16GB RAM, 30GB sda, 60GB sdb
+#   2. Static IP configured: 10.10.1.41/23
+#   3. SSH access to 10.10.1.41 from the machine running this playbook
+#   4. vault_jenkins_host_password set in:
+#        inventory/group_vars/jenkins/vault.yml (encrypted)
+#
+# USAGE:
+#   # If using password auth (first setup before SSH key is deployed):
+#   ansible-playbook playbooks/setup_jenkins.yml -k
+#     -k = prompt for SSH password
+#
+#   # If SSH key is already deployed:
+#   ansible-playbook playbooks/setup_jenkins.yml
+#
+# WHAT HAPPENS:
+#   1. common role       — timezone, NTP, base packages, SELinux permissive
+#   2. jenkins role      — disk mount, Java, Jenkins, Docker, service start
+#
+# AFTER THIS COMPLETES:
+#   1. Open browser: http://10.10.1.41:8080
+#   2. Enter the initial admin password printed at the end of the playbook run
+#   3. Install suggested plugins
+#   4. Create your admin user
+#   5. Configure GitHub webhook and first pipeline
+# =============================================================================
+
+---
+- name: Bootstrap Jenkins CI/CD server (hmvlapjkn001)
+  hosts: jenkins
+  become: true       # run tasks as root (required for package installs, disk mount)
+  gather_facts: true # collect OS/hardware info — used by role tasks
+
+  roles:
+    - common    # baseline OS config (timezone, NTP, packages, SELinux)
+    - jenkins   # disk setup, Java, Jenkins, Docker

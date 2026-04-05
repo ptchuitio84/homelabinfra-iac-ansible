@@ -1,0 +1,38 @@
+# =============================================================================
+# roles/jenkins/defaults/main.yml — Jenkins Role Default Variables
+# =============================================================================
+# Default values for the "jenkins" role.
+# Override any of these in group_vars or host_vars if needed.
+#
+# WHAT THIS ROLE DOES:
+# Turns a fresh OL9 VM into a fully operational Jenkins CI/CD server by:
+#   1. Formatting and mounting /dev/sdb at /var/lib/jenkins
+#   2. Installing Java 17 (required by Jenkins LTS)
+#   3. Installing Jenkins from the official Jenkins repo
+#   4. Installing Docker CE for container builds
+#   5. Adding the jenkins user to the docker group
+#   6. Enabling and starting Jenkins
+# =============================================================================
+
+---
+# Jenkins data disk — all jobs, builds, credentials, and configs live here.
+# Keeping this on a separate disk from the OS means you can rebuild the OS
+# without losing any Jenkins data.
+jenkins_data_device: /dev/sdb
+jenkins_data_mount: /var/lib/jenkins
+jenkins_data_fstype: xfs
+
+# Jenkins listens on this port. 8080 is the standard default.
+# Change this if something else is already using 8080.
+jenkins_http_port: 8080
+
+# Jenkins runs as this system user/group (created automatically by the RPM).
+jenkins_user: jenkins
+jenkins_group: jenkins
+
+# Java package to install. Jenkins LTS requires Java 11 or 17.
+# Java 17 is the current recommended version.
+java_package: java-17-openjdk
+
+# Docker CE repo URL for OL9 (same as RHEL9/CentOS Stream 9).
+docker_repo_url: "https://download.docker.com/linux/centos/docker-ce.repo"
