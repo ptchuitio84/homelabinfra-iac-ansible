@@ -1,5 +1,5 @@
 // =============================================================================
-// jenkins/nnt-jkn-net-backup.groovy — Network Device Backup Pipeline
+// jenkins/network/nnt-jkn-net-backup.groovy — Network Device Backup Pipeline
 // =============================================================================
 // JOB NAME: nnt-jkn-net-backup
 //
@@ -21,7 +21,7 @@
 //   3. SCM: Git → URL: https://github.com/ptchuitio84/homelabinfra-iac-ansible.git
 //   4. Credentials: github-pat
 //   5. Branch: */main
-//   6. Script Path: jenkins/nnt-jkn-net-backup.groovy
+//   6. Script Path: jenkins/network/nnt-jkn-net-backup.groovy
 //   7. Save
 // =============================================================================
 
