@@ -11,21 +11,38 @@
 ---
 # =============================================================================
 # SECTION 1: DATA DISK
-# Mount /dev/sda at /var/lib/grafana so all dashboard/plugin data lives on its
-# own disk, separate from the OS.
+# Auto-detect the 60GB data disk by size — VMware does not guarantee consistent
+# sda/sdb assignment across VMs. OS disk is always 30GB, data disk always 60GB.
+# Mounts the data disk at /var/lib/grafana so dashboard data lives separate from OS.
 # =============================================================================
 
-- name: Check if {{ grafana_data_device }} already has a filesystem
-  ansible.builtin.command: blkid {{ grafana_data_device }}
-  register: grafana_sda_blkid
+- name: Detect data disk (disk > 50GB with no partitions)
+  ansible.builtin.set_fact:
+    _grafana_data_device: "/dev/{{ item.key }}"
+  loop: "{{ ansible_devices | dict2items }}"
+  when:
+    - item.key is match('^sd[a-z]$')
+    - (item.value.size | regex_replace(' GB', '') | float) > 50
+    - item.value.partitions | length == 0
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Fail if no data disk detected
+  ansible.builtin.fail:
+    msg: "No unpartitioned disk > 50GB found — is the data disk attached and unformatted?"
+  when: _grafana_data_device is not defined
+
+- name: Check if {{ _grafana_data_device }} already has a filesystem
+  ansible.builtin.command: blkid {{ _grafana_data_device }}
+  register: grafana_blkid
   changed_when: false
   failed_when: false
 
-- name: Format {{ grafana_data_device }} as XFS (only if blank)
+- name: Format {{ _grafana_data_device }} as XFS (only if blank)
   community.general.filesystem:
     fstype: "{{ grafana_data_fstype }}"
-    dev: "{{ grafana_data_device }}"
-  when: grafana_sda_blkid.rc != 0
+    dev: "{{ _grafana_data_device }}"
+  when: grafana_blkid.rc != 0
 
 - name: Create Grafana data directory ({{ grafana_data_dir }})
   ansible.builtin.file:
@@ -35,20 +52,22 @@
     group: root
     mode: '0755'
 
-- name: Check if {{ grafana_data_dir }} is already a mount point
-  ansible.builtin.command: mountpoint -q {{ grafana_data_dir }}
-  register: grafana_data_mounted
+- name: Check if {{ _grafana_data_device }} is already mounted at {{ grafana_data_dir }}
+  ansible.builtin.shell: grep -qs "^{{ _grafana_data_device }} " /proc/mounts
+  register: grafana_disk_mounted
   changed_when: false
   failed_when: false
 
-- name: Mount {{ grafana_data_device }} at {{ grafana_data_dir }} and add to fstab
-  ansible.posix.mount:
-    path: "{{ grafana_data_dir }}"
-    src: "{{ grafana_data_device }}"
-    fstype: "{{ grafana_data_fstype }}"
-    opts: defaults
-    state: mounted
-  when: grafana_data_mounted.rc != 0
+- name: Mount {{ _grafana_data_device }} at {{ grafana_data_dir }}
+  ansible.builtin.command: mount {{ _grafana_data_device }} {{ grafana_data_dir }}
+  when: grafana_disk_mounted.rc != 0
+
+- name: Ensure {{ _grafana_data_device }} is in fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: "^{{ _grafana_data_device }}\\s"
+    line: "{{ _grafana_data_device }} {{ grafana_data_dir }} {{ grafana_data_fstype }} defaults 0 0"
+    state: present
 
 # =============================================================================
 # SECTION 2: INSTALL

@@ -18,7 +18,8 @@
 
 ---
 # Data disk — 60GB, blank on fresh clone (VMware assigns sda=data, sdb=OS)
-grafana_data_device: /dev/sda
+# Data disk device is auto-detected at runtime by size (>50GB, unpartitioned).
+# VMware SCSI slot assignment is inconsistent across VMs — do not hardcode.
 grafana_data_fstype: xfs
 
 # System user/group Grafana runs as.

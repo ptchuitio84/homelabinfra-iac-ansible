@@ -10,21 +10,38 @@
 ---
 # =============================================================================
 # SECTION 1: DATA DISK
-# Mount /dev/sdb at /var/lib/prometheus so all metrics data lives on its own
-# disk, separate from the OS. Same pattern as Jenkins.
+# Auto-detect the 60GB data disk by size — VMware does not guarantee consistent
+# sda/sdb assignment across VMs. OS disk is always 30GB, data disk always 60GB.
+# Mounts the data disk at /var/lib/prometheus so metrics live separate from OS.
 # =============================================================================
 
-- name: Check if {{ prometheus_data_device }} already has a filesystem
-  ansible.builtin.command: blkid {{ prometheus_data_device }}
-  register: sdb_blkid
+- name: Detect data disk (disk > 50GB with no partitions)
+  ansible.builtin.set_fact:
+    _prometheus_data_device: "/dev/{{ item.key }}"
+  loop: "{{ ansible_devices | dict2items }}"
+  when:
+    - item.key is match('^sd[a-z]$')
+    - (item.value.size | regex_replace(' GB', '') | float) > 50
+    - item.value.partitions | length == 0
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Fail if no data disk detected
+  ansible.builtin.fail:
+    msg: "No unpartitioned disk > 50GB found — is the data disk attached and unformatted?"
+  when: _prometheus_data_device is not defined
+
+- name: Check if {{ _prometheus_data_device }} already has a filesystem
+  ansible.builtin.command: blkid {{ _prometheus_data_device }}
+  register: prometheus_blkid
   changed_when: false
   failed_when: false
 
-- name: Format {{ prometheus_data_device }} as XFS (only if blank)
+- name: Format {{ _prometheus_data_device }} as XFS (only if blank)
   community.general.filesystem:
     fstype: "{{ prometheus_data_fstype }}"
-    dev: "{{ prometheus_data_device }}"
-  when: sdb_blkid.rc != 0
+    dev: "{{ _prometheus_data_device }}"
+  when: prometheus_blkid.rc != 0
 
 - name: Create Prometheus data directory ({{ prometheus_data_dir }})
   ansible.builtin.file:
@@ -34,20 +51,22 @@
     group: root
     mode: '0755'
 
-- name: Check if {{ prometheus_data_dir }} is already a mount point
-  ansible.builtin.command: mountpoint -q {{ prometheus_data_dir }}
-  register: prometheus_data_mounted
+- name: Check if {{ _prometheus_data_device }} is already mounted at {{ prometheus_data_dir }}
+  ansible.builtin.shell: grep -qs "^{{ _prometheus_data_device }} " /proc/mounts
+  register: prometheus_disk_mounted
   changed_when: false
   failed_when: false
 
-- name: Mount /dev/sdb at {{ prometheus_data_dir }} and add to fstab
-  ansible.posix.mount:
-    path: "{{ prometheus_data_dir }}"
-    src: "{{ prometheus_data_device }}"
-    fstype: "{{ prometheus_data_fstype }}"
-    opts: defaults
-    state: mounted
-  when: prometheus_data_mounted.rc != 0
+- name: Mount {{ _prometheus_data_device }} at {{ prometheus_data_dir }}
+  ansible.builtin.command: mount {{ _prometheus_data_device }} {{ prometheus_data_dir }}
+  when: prometheus_disk_mounted.rc != 0
+
+- name: Ensure {{ _prometheus_data_device }} is in fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: "^{{ _prometheus_data_device }}\\s"
+    line: "{{ _prometheus_data_device }} {{ prometheus_data_dir }} {{ prometheus_data_fstype }} defaults 0 0"
+    state: present
 
 # =============================================================================
 # SECTION 3: SYSTEM USER
