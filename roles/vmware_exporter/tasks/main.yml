@@ -32,12 +32,11 @@
 # removed TLS_METHOD which twisted depends on.
 # =============================================================================
 
-- name: Install Python3, pip, and virtualenv
+- name: Install Python3 and pip
   ansible.builtin.dnf:
     name:
       - python3
       - python3-pip
-      - python3-virtualenv
     state: present
 
 - name: Create vmware_exporter virtualenv directory
@@ -55,6 +54,7 @@
       - "cryptography==38.0.4"
       - vmware_exporter
     virtualenv: /opt/vmware_exporter/venv
+    virtualenv_command: "python3 -m venv"
     state: present
 
 # =============================================================================
