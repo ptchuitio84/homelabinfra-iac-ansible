@@ -95,7 +95,7 @@
     # The commit message includes the date and time for easy log reading.
     - name: Commit config changes
       ansible.builtin.command:
-        cmd: "git commit -m 'Network backup: {{ lookup('pipe', 'date +%Y-%m-%d %H:%M') }}'"
+        cmd: "git commit -m 'Network backup: {{ lookup('pipe', 'date +%Y-%m-%dT%H:%M') }}'"
         chdir: /opt/nnt-network-configs
       when: git_diff.rc == 1   # rc 1 = changes exist
 
