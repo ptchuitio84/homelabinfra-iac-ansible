@@ -23,30 +23,23 @@
 esxi_hosts:
   hosts:
 
-    # hmvlesxi001 — Dell PowerEdge R710 (ESXi Host 1)
+    # hsplv021 — Dell PowerEdge R710 (ESXi Host 1)
     # Mgmt IP:  10.10.1.21 (VLAN 10 — INFRACORENET)
     # Role:     Primary compute host — runs most infrastructure VMs
     # Status:   Active
-    hmvlesxi001.nnt.com:
+    hsplv021.nnt.com:
       ansible_host: 10.10.1.21
 
-    # hmvlesxi002 — Dell PowerEdge R710 (ESXi Host 2)
+    # hsplv022 — Dell PowerEdge R710 (ESXi Host 2)
     # Mgmt IP:  10.10.1.22 (VLAN 10 — INFRACORENET)
-    # Role:     Secondary compute host — HA pair with hmvlesxi001
+    # Role:     Secondary compute host
     # Status:   Active
-    hmvlesxi002.nnt.com:
+    hsplv022.nnt.com:
       ansible_host: 10.10.1.22
 
-    # hmvlesxi003 — Dell PowerEdge T710 (ESXi Host 3)
-    # Mgmt IP:  10.10.0.33 (VLAN 10 — INFRACORENET)
-    # Role:     Third compute host — expands cluster for Kubernetes nodes
-    # Status:   Pending — deploy via PXE kickstart (pxe_server role, Phase 2)
-    hmvlesxi033.nnt.com:
-      ansible_host: 10.10.0.33
-
-    # hmvlesxi034 — Dell PowerEdge R310 (ESXi Host 4)
+    # hsplv034 — Dell PowerEdge R310 (ESXi Host 3)
     # Mgmt IP:  10.10.0.34 (VLAN 10 — INFRACORENET)
-    # Role:     Lightweight compute host — development / test workloads
-    # Status:   Pending — deploy via PXE kickstart
-    hmvlesxi034.nnt.com:
+    # Role:     Lightweight compute — added 2026-04-05, not yet in cluster
+    # Status:   Active — standalone, pending cluster join
+    hsplv034.nnt.com:
       ansible_host: 10.10.0.34

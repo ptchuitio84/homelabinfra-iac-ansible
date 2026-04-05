@@ -36,8 +36,8 @@ vm_domain: nnt.com                   # DNS domain
 # VM placement — target ESXi host and datastore
 # No DRS cluster in use — specify host directly.
 # =============================================================================
-vm_esxi_host: hmvlesxi001.nnt.com    # Default to Host 1 — override per VM
-vm_datastore: CHANGEME               # e.g. datastore1, SAN_LUN01 — override per VM
+vm_esxi_host: hsplv021.nnt.com       # Default to Host 1 — override per VM
+vm_datastore: LUNPLV163001              # e.g. datastore1, SAN_LUN01 — override per VM
 
 # =============================================================================
 # VM hardware specs — override to match the VM's role
