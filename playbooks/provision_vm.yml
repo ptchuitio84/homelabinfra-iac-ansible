@@ -1,0 +1,46 @@
+# =============================================================================
+# playbooks/provision_vm.yml — Zero-Touch VM Provisioner
+# =============================================================================
+# PURPOSE:
+# Clones a VM from the golden template (PLTMPOL0903302026), sets hostname
+# and static IP via VMware Guest Customization, and waits for SSH to be ready.
+# No manual touches required — run this, walk away, come back to a live VM.
+#
+# PREREQUISITES:
+#   1. vCenter credentials in inventory/group_vars/vcenter/vault.yml (encrypted)
+#   2. Target ESXi host reachable from control node
+#   3. Template PLTMPOL0903302026 exists in vCenter
+#
+# USAGE:
+#   ansible-playbook playbooks/provision_vm.yml \
+#     --extra-vars "
+#       vm_name=hmvlapmon001
+#       vm_hostname=hmvlapmon001
+#       vm_ip=10.10.1.51
+#       vm_esxi_host=hmvlesxi001.nnt.com
+#       vm_datastore=datastore1
+#       vm_vcpus=2
+#       vm_memory_mb=4096
+#     "
+#
+# AFTER THIS COMPLETES:
+#   Run the service playbook against the new VM:
+#     ansible-playbook playbooks/setup_prometheus.yml --limit hmvlapmon001.nnt.com
+#
+# VARIABLES (all overridable via --extra-vars):
+#   vm_name        — VM name in vCenter
+#   vm_hostname    — OS hostname (without domain)
+#   vm_ip          — Static IP address
+#   vm_esxi_host   — Target ESXi host FQDN
+#   vm_datastore   — Target datastore name
+#   vm_vcpus       — Number of vCPUs (default: 2)
+#   vm_memory_mb   — RAM in MB (default: 4096)
+# =============================================================================
+
+---
+- name: Provision VM from template
+  hosts: vcenter         # Targets vCenter — API calls run via delegate_to: localhost
+  gather_facts: false    # No SSH into vCenter — skip fact collection
+
+  roles:
+    - provision_vm

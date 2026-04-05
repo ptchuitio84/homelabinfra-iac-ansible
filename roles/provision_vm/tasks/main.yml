@@ -1,0 +1,94 @@
+# =============================================================================
+# roles/provision_vm/tasks/main.yml — Zero-Touch VM Provisioner
+# =============================================================================
+# Clones a VM from the golden template, applies VMware Guest Customization
+# to set hostname and static IP at boot, then waits for SSH to come up.
+#
+# No manual touches required after this role runs — the VM is fully
+# reachable and ready for a service-specific playbook.
+#
+# Run via: ansible-playbook playbooks/provision_vm.yml --extra-vars "..."
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: CLONE FROM TEMPLATE
+# Uses community.vmware to clone the golden template in vCenter.
+# VMware Guest Customization (handled by open-vm-tools on the guest) sets
+# the hostname, static IP, and DNS at first boot — no cloud-init needed.
+# =============================================================================
+
+- name: Clone VM from template and apply guest customization
+  community.vmware.vmware_guest:
+    hostname: "{{ vcenter_hostname }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    validate_certs: "{{ vcenter_validate_certs }}"
+
+    # VM identity
+    name: "{{ vm_name }}"
+    template: "{{ vm_template }}"
+    datacenter: "{{ vcenter_datacenter }}"
+    folder: "{{ vcenter_folder }}"
+
+    # Placement — target ESXi host and datastore
+    esxi_hostname: "{{ vm_esxi_host }}"
+    datastore: "{{ vm_datastore }}"
+
+    # Hardware specs
+    hardware:
+      num_cpus: "{{ vm_vcpus }}"
+      memory_mb: "{{ vm_memory_mb }}"
+
+    # Network adapter — connect to the correct portgroup
+    networks:
+      - name: "{{ vm_portgroup }}"
+        device_type: vmxnet3
+
+    # Guest Customization — VMware injects these settings via open-vm-tools
+    # on first boot. Replaces cloud-init entirely for our use case.
+    customization:
+      hostname: "{{ vm_hostname }}"
+      domain: "{{ vm_domain }}"
+      dns_servers: "{{ vm_dns_servers }}"
+      network:
+        - name: "{{ vm_portgroup }}"
+          ip: "{{ vm_ip }}"
+          netmask: "{{ vm_netmask }}"
+          gateway: "{{ vm_gateway }}"
+
+    # Power on immediately after clone
+    state: poweredon
+
+    # Wait for VMware Tools to confirm customization is complete before
+    # returning. Without this, the task returns before the IP is applied.
+    wait_for_customization: true
+    wait_for_customization_timeout: "{{ vm_boot_timeout }}"
+
+  delegate_to: localhost   # API call runs from control node, not the new VM
+
+# =============================================================================
+# SECTION 2: WAIT FOR SSH
+# Guest Customization reboots the VM after applying settings.
+# Wait for SSH to be ready before declaring success.
+# =============================================================================
+
+- name: Wait for SSH to become available on {{ vm_ip }}
+  ansible.builtin.wait_for:
+    host: "{{ vm_ip }}"
+    port: "{{ vm_ssh_port }}"
+    timeout: "{{ vm_boot_timeout }}"
+    state: started
+  delegate_to: localhost
+
+# =============================================================================
+# SECTION 3: CONFIRM
+# =============================================================================
+
+- name: VM provisioning complete
+  ansible.builtin.debug:
+    msg:
+      - "VM '{{ vm_name }}' is up and reachable."
+      - "IP:       {{ vm_ip }}"
+      - "Hostname: {{ vm_hostname }}.{{ vm_domain }}"
+      - "Next:     run the service playbook against {{ vm_ip }}"

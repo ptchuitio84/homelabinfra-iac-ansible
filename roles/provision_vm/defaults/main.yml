@@ -1,0 +1,64 @@
+# =============================================================================
+# roles/provision_vm/defaults/main.yml — VM Provisioner Default Variables
+# =============================================================================
+# Default values for the "provision_vm" role.
+# Override these via --extra-vars when running the playbook, or in host_vars.
+#
+# WHAT THIS ROLE DOES:
+# Clones a VM from a vCenter template, sets hostname and static IP via
+# VMware Guest Customization (no cloud-init, no manual touches), waits for
+# the VM to become reachable, then stops. The service-specific playbook
+# (setup_jenkins.yml, setup_prometheus.yml, etc.) runs next.
+#
+# REQUIRES: open-vm-tools installed on the template (verified 2026-04-05)
+# =============================================================================
+
+---
+# =============================================================================
+# vCenter connection — sourced from group_vars/vcenter/vars.yml + vault.yml
+# =============================================================================
+vcenter_datacenter: NNTDC
+vcenter_folder: /NNTDC/vm/staging    # All new VMs land here until promoted
+
+# =============================================================================
+# Template
+# =============================================================================
+vm_template: PLTMPOL0903302026       # Golden image — OL9.7, open-vm-tools, no cloud-init
+
+# =============================================================================
+# VM identity — OVERRIDE THESE per deployment via --extra-vars
+# =============================================================================
+vm_name: CHANGEME                    # VM name in vCenter (e.g. hmvlapmon001)
+vm_hostname: CHANGEME                # OS hostname (e.g. hmvlapmon001)
+vm_domain: nnt.com                   # DNS domain
+
+# =============================================================================
+# VM placement — target ESXi host and datastore
+# No DRS cluster in use — specify host directly.
+# =============================================================================
+vm_esxi_host: hmvlesxi001.nnt.com    # Default to Host 1 — override per VM
+vm_datastore: CHANGEME               # e.g. datastore1, SAN_LUN01 — override per VM
+
+# =============================================================================
+# VM hardware specs — override to match the VM's role
+# =============================================================================
+vm_vcpus: 2
+vm_memory_mb: 4096                   # 4GB default
+
+# =============================================================================
+# Networking — VLAN 10 (INFRACORENET, 10.10.0.0/23)
+# =============================================================================
+vm_portgroup: VLAN010_CORE_UP010
+vm_ip: CHANGEME                      # Static IP (e.g. 10.10.1.51)
+vm_netmask: 255.255.254.0            # /23
+vm_gateway: 10.10.1.1
+vm_dns_servers:
+  - 8.8.8.8
+  - 8.8.4.4
+
+# =============================================================================
+# Post-clone wait settings
+# How long to wait for the VM to become reachable via SSH after boot.
+# =============================================================================
+vm_boot_timeout: 300                 # seconds to wait for VM to boot (5 min)
+vm_ssh_port: 22
