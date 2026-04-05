@@ -27,22 +27,35 @@
 
 # =============================================================================
 # SECTION 2: INSTALL
-# vmware_exporter is Python-based — install via pip into a virtualenv
-# so it doesn't pollute system Python.
+# vmware_exporter is Python-based. Install into a virtualenv with pinned
+# pyOpenSSL/cryptography versions — OL9 system pyOpenSSL is too new and
+# removed TLS_METHOD which twisted depends on.
 # =============================================================================
 
-- name: Install Python3 and pip
+- name: Install Python3, pip, and virtualenv
   ansible.builtin.dnf:
     name:
       - python3
       - python3-pip
+      - python3-virtualenv
     state: present
 
-- name: Install vmware_exporter via pip
+- name: Create vmware_exporter virtualenv directory
+  ansible.builtin.file:
+    path: /opt/vmware_exporter/venv
+    state: directory
+    owner: "{{ vmware_exporter_user }}"
+    group: "{{ vmware_exporter_group }}"
+    mode: '0755'
+
+- name: Install vmware_exporter into virtualenv with pinned SSL deps
   ansible.builtin.pip:
-    name: vmware_exporter
+    name:
+      - "pyOpenSSL==22.1.0"
+      - "cryptography==38.0.4"
+      - vmware_exporter
+    virtualenv: /opt/vmware_exporter/venv
     state: present
-    executable: pip3
 
 # =============================================================================
 # SECTION 3: CONFIGURATION

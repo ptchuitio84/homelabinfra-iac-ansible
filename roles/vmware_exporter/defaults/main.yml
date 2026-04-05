@@ -21,6 +21,7 @@ vmware_exporter_ignore_ssl: true    # vCenter uses self-signed cert
 vmware_exporter_port: 9272
 
 # Install paths
+vmware_exporter_venv: /opt/vmware_exporter/venv
 vmware_exporter_config_dir: /etc/vmware_exporter
 vmware_exporter_config_file: "{{ vmware_exporter_config_dir }}/config.yml"
 

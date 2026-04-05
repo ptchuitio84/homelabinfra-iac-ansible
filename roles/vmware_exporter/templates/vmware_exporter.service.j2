@@ -10,7 +10,7 @@ After=network.target
 User={{ vmware_exporter_user }}
 Group={{ vmware_exporter_group }}
 Type=simple
-ExecStart=/usr/local/bin/vmware_exporter \
+ExecStart=/opt/vmware_exporter/venv/bin/vmware_exporter \
   -c {{ vmware_exporter_config_file }} \
   --port {{ vmware_exporter_port }}
 Restart=on-failure
