@@ -40,22 +40,21 @@
       num_cpus: "{{ vm_vcpus }}"
       memory_mb: "{{ vm_memory_mb }}"
 
-    # Network adapter — connect to the correct portgroup
+    # Network adapter — IP, netmask, and gateway are set here, not under
+    # customization. The customization block handles hostname/DNS only.
     networks:
       - name: "{{ vm_portgroup }}"
         device_type: vmxnet3
+        ip: "{{ vm_ip }}"
+        netmask: "{{ vm_netmask }}"
+        gateway: "{{ vm_gateway }}"
 
-    # Guest Customization — VMware injects these settings via open-vm-tools
-    # on first boot. Replaces cloud-init entirely for our use case.
+    # Guest Customization — VMware injects hostname and DNS via open-vm-tools
+    # on first boot. Network IP settings live in the networks block above.
     customization:
       hostname: "{{ vm_hostname }}"
       domain: "{{ vm_domain }}"
       dns_servers: "{{ vm_dns_servers }}"
-      network:
-        - name: "{{ vm_portgroup }}"
-          ip: "{{ vm_ip }}"
-          netmask: "{{ vm_netmask }}"
-          gateway: "{{ vm_gateway }}"
 
     # Power on immediately after clone
     state: poweredon
