@@ -75,7 +75,7 @@ pipeline {
                 sshagent(credentials: [ANSIBLE_SSH_CRED]) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANSIBLE_USER}@${ANSIBLE_NODE} \
-                            'cd ${ANSIBLE_REPO_PATH} && ansible-playbook playbooks/network_backup.yml'
+                            'cd ${ANSIBLE_REPO_PATH} && ansible-playbook playbooks/network/network_backup.yml'
                     """
                 }
             }
