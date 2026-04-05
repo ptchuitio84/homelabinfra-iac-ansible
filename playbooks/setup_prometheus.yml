@@ -1,0 +1,19 @@
+# =============================================================================
+# playbooks/setup_prometheus.yml — Deploy Prometheus
+# =============================================================================
+# Deploys Prometheus to hmvlapmon002 (10.10.1.52).
+# Run after provisioning the VM with: ./scripts/provision-hmvlapmon002.sh
+#
+# USAGE:
+#   ansible-playbook playbooks/setup_prometheus.yml
+# =============================================================================
+
+---
+- name: Deploy Prometheus (hmvlapmon002)
+  hosts: hmvlapmon002.nnt.com
+  become: true
+  gather_facts: true
+
+  roles:
+    - common       # timezone, NTP, SELinux, base packages
+    - prometheus   # install and configure Prometheus

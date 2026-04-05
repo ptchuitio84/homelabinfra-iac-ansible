@@ -1,0 +1,74 @@
+# =============================================================================
+# roles/prometheus/defaults/main.yml — Prometheus Role Default Variables
+# =============================================================================
+# Default values for the "prometheus" role.
+# Override any of these in group_vars or host_vars if needed.
+#
+# WHAT THIS ROLE DOES:
+# Deploys Prometheus on OL9 as a systemd service. Prometheus scrapes metrics
+# from all lab targets (Linux VMs, ESXi, Jenkins, network devices) and stores
+# them locally for Grafana to query.
+#
+# ARCHITECTURE:
+#   Grafana (hmvlapmon001:3000) → queries → Prometheus (hmvlapmon002:9090)
+#   Prometheus → scrapes → node_exporter on all Linux VMs (:9100)
+#                        → vmware_exporter (:9272)
+#                        → Jenkins metrics (:8080/prometheus)
+#                        → snmp_exporter for network devices (:9116)
+# =============================================================================
+
+---
+# Prometheus version to install.
+prometheus_version: "2.51.2"
+
+# System user/group Prometheus runs as.
+# Created as a system account (no login shell, no home dir).
+prometheus_user: prometheus
+prometheus_group: prometheus
+
+# Directories
+prometheus_install_dir: /opt/prometheus
+prometheus_config_dir: /etc/prometheus
+prometheus_data_dir: /var/lib/prometheus
+prometheus_log_dir: /var/log/prometheus
+
+# Port Prometheus listens on.
+prometheus_port: 9090
+
+# How long to retain metrics data. 30 days is enough for a homelab.
+prometheus_retention: "30d"
+
+# Scrape interval — how often Prometheus polls each target.
+prometheus_scrape_interval: "15s"
+prometheus_evaluation_interval: "15s"
+
+# node_exporter port — must match what's configured on each Linux VM.
+node_exporter_port: 9100
+
+# vmware_exporter port
+vmware_exporter_port: 9272
+
+# snmp_exporter port
+snmp_exporter_port: 9116
+
+# Jenkins metrics endpoint
+jenkins_metrics_port: 8080
+
+# Lab hosts to scrape with node_exporter
+prometheus_node_targets:
+  - "hmvlapans001.nnt.com:{{ node_exporter_port }}"   # Ansible control node
+  - "hmvlapjkn001.nnt.com:{{ node_exporter_port }}"   # Jenkins
+  - "hmvlapmon001.nnt.com:{{ node_exporter_port }}"   # Grafana
+  - "hmvlapmon002.nnt.com:{{ node_exporter_port }}"   # Prometheus (self)
+  - "hmvlapmon003.nnt.com:{{ node_exporter_port }}"   # Loki
+
+# Network devices to scrape via SNMP
+prometheus_snmp_targets:
+  - "swplnet251.nnt.com"   # Cisco Catalyst 3750G
+  - "swplnet252.nnt.com"   # Arista 7050SX
+
+# ESXi hosts to scrape via vmware_exporter
+prometheus_vmware_targets:
+  - "hsplv021.nnt.com"
+  - "hsplv022.nnt.com"
+  - "hsplv034.nnt.com"

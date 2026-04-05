@@ -1,0 +1,10 @@
+# =============================================================================
+# group_vars/monitoring/vars.yml — Monitoring Stack Connection Settings
+# =============================================================================
+
+---
+ansible_user: root
+ansible_connection: ssh
+ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+ansible_python_interpreter: /usr/bin/python3
+ansible_password: "{{ vault_monitoring_host_password }}"

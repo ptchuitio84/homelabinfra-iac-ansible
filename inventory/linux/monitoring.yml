@@ -1,0 +1,37 @@
+# =============================================================================
+# inventory/linux/monitoring.yml — Monitoring Stack Inventory
+# =============================================================================
+# Defines the monitoring VMs for the lab.
+#
+# STACK:
+#   hmvlapmon001 — Grafana       (visualization, dashboards)
+#   hmvlapmon002 — Prometheus    (metrics collection and storage)
+#   hmvlapmon003 — Loki          (centralized log aggregation) — pending
+#
+# All VMs are on VLAN 10 (INFRACORENET, 10.10.1.0/23).
+# Connection settings in:
+#   inventory/group_vars/monitoring/vars.yml
+#   inventory/group_vars/monitoring/vault.yml
+# =============================================================================
+
+---
+monitoring:
+  hosts:
+
+    # hmvlapmon001 — Grafana
+    # IP: 10.10.1.51 | 2vCPU / 8GB RAM
+    hmvlapmon001.nnt.com:
+      ansible_host: 10.10.1.51
+      vm_role: grafana
+
+    # hmvlapmon002 — Prometheus
+    # IP: 10.10.1.52 | 2vCPU / 8GB RAM
+    hmvlapmon002.nnt.com:
+      ansible_host: 10.10.1.52
+      vm_role: prometheus
+
+    # hmvlapmon003 — Loki (pending provisioning)
+    # IP: 10.10.1.53 | 2vCPU / 8GB RAM
+    # hmvlapmon003.nnt.com:
+    #   ansible_host: 10.10.1.53
+    #   vm_role: loki

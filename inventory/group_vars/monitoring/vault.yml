@@ -1,0 +1,5 @@
+---
+# ansible-vault encrypted — encrypt before committing:
+#   ansible-vault encrypt inventory/group_vars/monitoring/vault.yml
+
+vault_monitoring_host_password: CHANGE_ME

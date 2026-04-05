@@ -1,0 +1,13 @@
+# =============================================================================
+# roles/prometheus/handlers/main.yml — Prometheus Handlers
+# =============================================================================
+# Handlers run at the end of a play, only when notified by a task.
+# "Restart Prometheus" is triggered when config or service file changes.
+# =============================================================================
+
+---
+- name: Restart Prometheus
+  ansible.builtin.systemd:
+    name: prometheus
+    state: restarted
+    daemon_reload: true

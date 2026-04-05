@@ -1,0 +1,142 @@
+# =============================================================================
+# roles/prometheus/tasks/main.yml — Prometheus Deployment Tasks
+# =============================================================================
+# Deploys Prometheus on OL9 as a systemd service.
+# Run via: ansible-playbook playbooks/setup_prometheus.yml
+#
+# These tasks are idempotent — safe to re-run without side effects.
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: SYSTEM USER
+# Prometheus runs as a dedicated system user with no login shell.
+# This limits what a compromised Prometheus process can do on the host.
+# =============================================================================
+
+- name: Create prometheus system group
+  ansible.builtin.group:
+    name: "{{ prometheus_group }}"
+    system: true
+    state: present
+
+- name: Create prometheus system user
+  ansible.builtin.user:
+    name: "{{ prometheus_user }}"
+    group: "{{ prometheus_group }}"
+    system: true
+    shell: /sbin/nologin
+    create_home: false
+    state: present
+
+# =============================================================================
+# SECTION 2: DIRECTORIES
+# =============================================================================
+
+- name: Create Prometheus directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ prometheus_user }}"
+    group: "{{ prometheus_group }}"
+    mode: '0755'
+  loop:
+    - "{{ prometheus_install_dir }}"
+    - "{{ prometheus_config_dir }}"
+    - "{{ prometheus_data_dir }}"
+    - "{{ prometheus_log_dir }}"
+
+# =============================================================================
+# SECTION 3: INSTALL
+# Download and extract the Prometheus binary from GitHub releases.
+# =============================================================================
+
+- name: Download Prometheus {{ prometheus_version }}
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/prometheus-{{ prometheus_version }}.tar.gz"
+    mode: '0644'
+
+- name: Extract Prometheus archive
+  ansible.builtin.unarchive:
+    src: "/tmp/prometheus-{{ prometheus_version }}.tar.gz"
+    dest: /tmp/
+    remote_src: true
+
+- name: Install Prometheus binary
+  ansible.builtin.copy:
+    src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/prometheus"
+    dest: "{{ prometheus_install_dir }}/prometheus"
+    owner: "{{ prometheus_user }}"
+    group: "{{ prometheus_group }}"
+    mode: '0755'
+    remote_src: true
+
+- name: Install promtool binary
+  ansible.builtin.copy:
+    src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/promtool"
+    dest: "{{ prometheus_install_dir }}/promtool"
+    owner: "{{ prometheus_user }}"
+    group: "{{ prometheus_group }}"
+    mode: '0755'
+    remote_src: true
+
+- name: Install Prometheus console libraries
+  ansible.builtin.copy:
+    src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/{{ item }}"
+    dest: "{{ prometheus_install_dir }}/{{ item }}"
+    owner: "{{ prometheus_user }}"
+    group: "{{ prometheus_group }}"
+    remote_src: true
+  loop:
+    - consoles
+    - console_libraries
+
+# =============================================================================
+# SECTION 4: CONFIGURATION
+# Deploy prometheus.yml from the Jinja2 template.
+# Prometheus reloads config on SIGHUP — no restart needed for config changes.
+# =============================================================================
+
+- name: Deploy Prometheus configuration
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ prometheus_config_dir }}/prometheus.yml"
+    owner: "{{ prometheus_user }}"
+    group: "{{ prometheus_group }}"
+    mode: '0644'
+  notify: Restart Prometheus
+
+# =============================================================================
+# SECTION 5: SYSTEMD SERVICE
+# =============================================================================
+
+- name: Deploy Prometheus systemd service
+  ansible.builtin.template:
+    src: prometheus.service.j2
+    dest: /etc/systemd/system/prometheus.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Prometheus
+
+- name: Enable and start Prometheus
+  ansible.builtin.systemd:
+    name: prometheus
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# =============================================================================
+# SECTION 6: VERIFY
+# =============================================================================
+
+- name: Wait for Prometheus to be reachable
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ prometheus_port }}"
+    timeout: 30
+
+- name: Display Prometheus access URL
+  ansible.builtin.debug:
+    msg: "Prometheus is up — http://{{ ansible_host }}:{{ prometheus_port }}"
