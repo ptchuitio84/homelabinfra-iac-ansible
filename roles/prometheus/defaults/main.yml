@@ -25,7 +25,7 @@
 # Keeping data on a separate disk means the OS can be rebuilt without losing
 # any metrics history.
 # =============================================================================
-prometheus_data_device: /dev/sdb
+prometheus_data_device: /dev/sda      # 60GB data disk (VMware assigns sda=data, sdb=OS)
 prometheus_data_fstype: xfs
 
 # Prometheus version to install.

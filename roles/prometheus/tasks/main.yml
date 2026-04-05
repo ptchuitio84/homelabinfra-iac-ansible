@@ -14,13 +14,13 @@
 # disk, separate from the OS. Same pattern as Jenkins.
 # =============================================================================
 
-- name: Check if /dev/sdb already has a filesystem
-  ansible.builtin.command: blkid /dev/sdb
+- name: Check if {{ prometheus_data_device }} already has a filesystem
+  ansible.builtin.command: blkid {{ prometheus_data_device }}
   register: sdb_blkid
   changed_when: false
   failed_when: false
 
-- name: Format /dev/sdb as XFS (only if blank)
+- name: Format {{ prometheus_data_device }} as XFS (only if blank)
   community.general.filesystem:
     fstype: "{{ prometheus_data_fstype }}"
     dev: "{{ prometheus_data_device }}"
