@@ -16,22 +16,22 @@ This is not a tutorial repo. It's a working system.
 
 ```
 Network Layer
-├── Cisco Catalyst 3750G        (swplnet251) — core switching
-├── Arista 7050SX               (swplnet252) — spine (pending)
-└── Meraki MX                                — edge/routing
+├── Cisco Catalyst 3750G        — core switching
+├── Arista 7050SX               — spine (pending)
+└── Meraki MX                   — edge/routing
 
 Compute Layer (VMware vSphere)
-├── vCenter                     (hmvlapvc001) — VM management
-├── ESXi hosts                  (hsplv021, hsplv022, hsplv034)
+├── vCenter                     — VM management
+├── 3x ESXi hosts
 └── All VMs cloned from golden OL9 template — zero manual touches
 
 Services
-├── Ansible control node        (hmvlapans001 — 10.10.1.31)
-├── Jenkins CI/CD               (hmvlapjkn001 — 10.10.1.41)
+├── Ansible control node
+├── Jenkins CI/CD
 └── Monitoring stack
-    ├── Grafana                 (hmvlapmon001 — 10.10.1.51)
-    ├── Prometheus              (hmvlapmon002 — 10.10.1.52)
-    └── Loki                    (hmvlapmon003 — 10.10.1.53)
+    ├── Grafana                 — dashboards and visualization
+    ├── Prometheus              — metrics collection and storage
+    └── Loki                    — centralized log aggregation
 ```
 
 ---
@@ -42,14 +42,14 @@ Services
 |------|---------|--------|
 | `common` | Timezone, NTP, SELinux, base packages | All Linux VMs |
 | `provision_vm` | Zero-touch VM clone from vCenter template | vCenter API |
-| `ansible_node` | Bootstrap Ansible control node | hmvlapans001 |
-| `jenkins` | Jenkins LTS + Docker CE | hmvlapjkn001 |
-| `prometheus` | Prometheus metrics collection | hmvlapmon002 |
-| `grafana` | Grafana dashboards | hmvlapmon001 |
-| `loki` | Centralized log aggregation | hmvlapmon003 |
+| `ansible_node` | Bootstrap Ansible control node | Control node VM |
+| `jenkins` | Jenkins LTS + Docker CE | CI/CD VM |
+| `prometheus` | Prometheus metrics collection | Monitoring VM |
+| `grafana` | Grafana dashboards | Monitoring VM |
+| `loki` | Centralized log aggregation | Monitoring VM |
 | `node_exporter` | Host metrics agent | All Linux VMs |
 | `promtail` | Log shipping agent | All Linux VMs |
-| `vmware_exporter` | ESXi/vCenter metrics | hmvlapmon002 |
+| `vmware_exporter` | ESXi/vCenter metrics | Monitoring VM |
 
 ---
 
@@ -81,16 +81,16 @@ VMs are provisioned zero-touch using VMware Guest Customization. No cloud-init, 
 
 ```bash
 # Provision a specific VM
-./scripts/provision-hmvlapmon001.sh   # Grafana
-./scripts/provision-hmvlapmon002.sh   # Prometheus
-./scripts/provision-hmvlapmon003.sh   # Loki
-./scripts/provision-hmvlapjkn001.sh   # Jenkins
-./scripts/provision-hmvlapans001.sh   # Ansible control node
+./scripts/provision-grafana.sh        # Grafana VM
+./scripts/provision-prometheus.sh     # Prometheus VM
+./scripts/provision-loki.sh           # Loki VM
+./scripts/provision-jenkins.sh        # Jenkins VM
+./scripts/provision-ansible.sh        # Ansible control node
 ```
 
 Each script sets hostname, static IP, and domain via vCenter guest customization, then waits for SSH to become available. The service playbook runs next.
 
-**Template:** `PLTMPOL0903302026` — OL9.7, open-vm-tools, SSH key pre-loaded, cloud-init disabled.
+**Template:** OL9.7, open-vm-tools, SSH key pre-loaded, cloud-init disabled.
 
 ---
 
@@ -124,7 +124,7 @@ Dashboards: Grafana (3000) → queries Prometheus + Loki
 
 ## Network Automation
 
-Network device configs are backed up to a separate git repo (`nnt-network-configs`) on a schedule via Jenkins. Changes are committed with timestamps — full audit trail, no file server required.
+Network device configs are backed up to a separate git repo on a schedule via Jenkins. Changes are committed with timestamps — full audit trail, no file server required.
 
 Supported:
 - Cisco IOS (Catalyst 3750G) — `ios_command` via SSH
