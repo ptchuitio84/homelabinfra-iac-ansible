@@ -52,6 +52,7 @@
 - name: Backup Arista EOS running configurations
   hosts: arista_switches
   gather_facts: false
+  ignore_errors: true   # Arista switch not yet in service — skip without failing
 
   tasks:
     # "show running-config" on EOS returns the full active config via eAPI.
