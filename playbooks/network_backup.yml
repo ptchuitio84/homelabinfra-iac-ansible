@@ -2,12 +2,13 @@
 # playbooks/network_backup.yml — Back Up All Network Device Configurations
 # =============================================================================
 # PURPOSE:
-# Pulls the running configuration from every network device and saves it as a
-# timestamped text file in network/backups/. Use this before any change window,
-# and schedule it to run daily for a configuration audit trail.
+# Pulls the running configuration from every network device, saves it to the
+# nnt-network-configs git repo (/opt/nnt-network-configs), and commits the
+# change with a timestamp. Each backup is a git commit — giving you a full
+# audit trail, config diffs, and rollback capability.
 #
-# This playbook is READ-ONLY — it makes no changes to any device.
-# Safe to run at any time without risk.
+# This playbook is READ-ONLY on network devices — it makes no changes to any
+# switch or router. Safe to run at any time without risk.
 #
 # USAGE:
 #   # Back up everything:
@@ -20,8 +21,9 @@
 #   ansible-playbook playbooks/network_backup.yml --limit arista_switches
 #
 # OUTPUT:
-#   network/backups/<hostname>_<YYYY-MM-DD>.txt
-#   Example: network/backups/swplnet251.nnt.com_2026-04-04.txt
+#   /opt/nnt-network-configs/<hostname>.cfg  (committed to GitHub)
+#   One file per device — git history shows every change over time.
+#   View diffs: git log --oneline  /  git diff <commit> <commit>
 #
 # VAULT REQUIRED: yes — credentials are encrypted in group_vars/*/vault.yml
 # =============================================================================
@@ -30,40 +32,78 @@
 # ── CISCO SWITCHES ────────────────────────────────────────────────────────────
 - name: Backup Cisco IOS running configurations
   hosts: cisco_switches
-  gather_facts: false  # skip OS fact collection — not needed for show commands
+  gather_facts: false
 
   tasks:
     # "show running-config" pulls the full active configuration from the switch.
-    # The result is stored in the "ios_config" variable for the next task.
     - name: Retrieve running config from switch
       cisco.ios.ios_command:
         commands: show running-config
       register: ios_config
 
-    # Write the config to a local file on the control node (delegate_to: localhost).
-    # The filename includes the date so multiple backups coexist without overwriting.
-    - name: Save config to timestamped backup file
+    # Save the config to the nnt-network-configs repo on the control node.
+    # One file per device — named by hostname, no date suffix needed because
+    # git history tracks every version automatically.
+    - name: Save config to nnt-network-configs repo
       ansible.builtin.copy:
         content: "{{ ios_config.stdout[0] }}"
-        dest: "{{ playbook_dir }}/../network/backups/{{ inventory_hostname }}_{{ lookup('pipe', 'date +%Y-%m-%d') }}.txt"
-      delegate_to: localhost  # write the file on the control node, not the switch
+        dest: "/opt/nnt-network-configs/{{ inventory_hostname }}.cfg"
+      delegate_to: localhost
 
 # ── ARISTA SWITCHES ───────────────────────────────────────────────────────────
 - name: Backup Arista EOS running configurations
   hosts: arista_switches
   gather_facts: false
-  ignore_errors: true   # Arista switch not yet in service — skip without failing
+  ignore_errors: true   # Arista switch not yet in service — remove when 7048T-A arrives
 
   tasks:
-    # "show running-config" on EOS returns the full active config via eAPI.
     - name: Retrieve running config from switch
       arista.eos.eos_command:
         commands: show running-config
       register: eos_config
 
-    # Save to a local file. Same naming pattern as Cisco for consistency.
-    - name: Save config to timestamped backup file
+    - name: Save config to nnt-network-configs repo
       ansible.builtin.copy:
         content: "{{ eos_config.stdout[0] }}"
-        dest: "{{ playbook_dir }}/../network/backups/{{ inventory_hostname }}_{{ lookup('pipe', 'date +%Y-%m-%d') }}.txt"
+        dest: "/opt/nnt-network-configs/{{ inventory_hostname }}.cfg"
       delegate_to: localhost
+
+# ── COMMIT AND PUSH ───────────────────────────────────────────────────────────
+- name: Commit and push configs to GitHub
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    # Stage all changed config files.
+    - name: Stage all config changes
+      ansible.builtin.command:
+        cmd: git add -A
+        chdir: /opt/nnt-network-configs
+
+    # Check if there is anything new to commit.
+    # "git diff --cached --quiet" exits 0 if nothing staged, 1 if there are changes.
+    # We register the result so the commit task only runs when needed.
+    - name: Check if there are changes to commit
+      ansible.builtin.command:
+        cmd: git diff --cached --quiet
+        chdir: /opt/nnt-network-configs
+      register: git_diff
+      changed_when: false
+      failed_when: false   # exit code 1 = changes exist — not an error
+
+    # Commit only if there are staged changes.
+    # The commit message includes the date and time for easy log reading.
+    - name: Commit config changes
+      ansible.builtin.command:
+        cmd: "git commit -m 'Network backup: {{ lookup('pipe', 'date +%Y-%m-%d %H:%M') }}'"
+        chdir: /opt/nnt-network-configs
+      when: git_diff.rc == 1   # rc 1 = changes exist
+
+    # Push to GitHub. Uses the github-netconfigs SSH host alias configured
+    # in /root/.ssh/config on the control node, which maps to the deploy key
+    # for the nnt-network-configs repo.
+    - name: Push configs to GitHub
+      ansible.builtin.command:
+        cmd: git push origin main
+        chdir: /opt/nnt-network-configs
+      when: git_diff.rc == 1   # only push if something was committed
