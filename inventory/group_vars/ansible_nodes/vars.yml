@@ -28,3 +28,7 @@ ansible_connection: ssh
 # Use the system Python 3 interpreter (pre-installed on OL9).
 # Ansible needs Python on the target host to run most modules.
 ansible_python_interpreter: /usr/bin/python3
+
+# SSH private key for Linux hosts — key-based auth replaces password auth
+# once the public key is deployed to the target host.
+ansible_ssh_private_key_file: ~/.ssh/id_ed25519
