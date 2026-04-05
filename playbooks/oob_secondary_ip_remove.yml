@@ -1,0 +1,29 @@
+# =============================================================================
+# playbooks/oob_secondary_ip_remove.yml — Remove secondary IP from OOB VLAN2
+# =============================================================================
+# Run this AFTER reconfiguring all OOB interfaces to their correct IPs.
+# Removes the temporary 10.2.0.5 secondary from interface Vlan2.
+#
+# USAGE:
+#   ansible-playbook playbooks/oob_secondary_ip_remove.yml --check
+#   ansible-playbook playbooks/oob_secondary_ip_remove.yml
+# =============================================================================
+
+---
+- name: Remove 10.2.0.5 secondary IP from Vlan2 (OOB) — cleanup
+  hosts: swplnet251.nnt.com
+  gather_facts: false
+
+  tasks:
+    - name: Remove secondary IP 10.2.0.5/24 from interface Vlan2
+      cisco.ios.ios_config:
+        lines:
+          - no ip address 10.2.0.5 255.255.255.0 secondary
+        parents: interface Vlan2
+      notify: Save running config
+
+  handlers:
+    - name: Save running config
+      cisco.ios.ios_command:
+        commands:
+          - command: write memory
