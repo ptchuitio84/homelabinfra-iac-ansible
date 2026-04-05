@@ -1,0 +1,10 @@
+# =============================================================================
+# roles/vmware_exporter/handlers/main.yml
+# =============================================================================
+
+---
+- name: Restart vmware_exporter
+  ansible.builtin.systemd:
+    name: vmware_exporter
+    state: restarted
+    daemon_reload: true

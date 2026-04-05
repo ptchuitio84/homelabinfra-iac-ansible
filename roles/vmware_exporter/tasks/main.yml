@@ -1,0 +1,101 @@
+# =============================================================================
+# roles/vmware_exporter/tasks/main.yml — vmware_exporter Deployment Tasks
+# =============================================================================
+# Deploys vmware_exporter on OL9 as a systemd service.
+# Run via: ansible-playbook playbooks/setup_vmware_exporter.yml
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: SYSTEM USER
+# =============================================================================
+
+- name: Create vmware_exporter system group
+  ansible.builtin.group:
+    name: "{{ vmware_exporter_group }}"
+    system: true
+    state: present
+
+- name: Create vmware_exporter system user
+  ansible.builtin.user:
+    name: "{{ vmware_exporter_user }}"
+    group: "{{ vmware_exporter_group }}"
+    system: true
+    shell: /sbin/nologin
+    create_home: false
+    state: present
+
+# =============================================================================
+# SECTION 2: INSTALL
+# vmware_exporter is Python-based — install via pip into a virtualenv
+# so it doesn't pollute system Python.
+# =============================================================================
+
+- name: Install Python3 and pip
+  ansible.builtin.dnf:
+    name:
+      - python3
+      - python3-pip
+    state: present
+
+- name: Install vmware_exporter via pip
+  ansible.builtin.pip:
+    name: vmware_exporter
+    state: present
+    executable: pip3
+
+# =============================================================================
+# SECTION 3: CONFIGURATION
+# =============================================================================
+
+- name: Create vmware_exporter config directory
+  ansible.builtin.file:
+    path: "{{ vmware_exporter_config_dir }}"
+    state: directory
+    owner: "{{ vmware_exporter_user }}"
+    group: "{{ vmware_exporter_group }}"
+    mode: '0750'
+
+- name: Deploy vmware_exporter config
+  ansible.builtin.template:
+    src: config.yml.j2
+    dest: "{{ vmware_exporter_config_file }}"
+    owner: "{{ vmware_exporter_user }}"
+    group: "{{ vmware_exporter_group }}"
+    mode: '0640'
+  no_log: true
+  notify: Restart vmware_exporter
+
+# =============================================================================
+# SECTION 4: SYSTEMD SERVICE
+# =============================================================================
+
+- name: Deploy vmware_exporter systemd service
+  ansible.builtin.template:
+    src: vmware_exporter.service.j2
+    dest: /etc/systemd/system/vmware_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart vmware_exporter
+
+- name: Enable and start vmware_exporter
+  ansible.builtin.systemd:
+    name: vmware_exporter
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# =============================================================================
+# SECTION 5: VERIFY
+# =============================================================================
+
+- name: Wait for vmware_exporter to be reachable
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ vmware_exporter_port }}"
+    timeout: 30
+
+- name: Display vmware_exporter status
+  ansible.builtin.debug:
+    msg: "vmware_exporter is up — http://localhost:{{ vmware_exporter_port }}/metrics"

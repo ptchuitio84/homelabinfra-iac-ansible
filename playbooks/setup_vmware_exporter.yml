@@ -1,0 +1,18 @@
+# =============================================================================
+# playbooks/setup_vmware_exporter.yml — Deploy vmware_exporter
+# =============================================================================
+# Deploys vmware_exporter to hmvlapmon002 (alongside Prometheus).
+# Connects to vCenter API to expose ESXi host and VM metrics on port 9272.
+#
+# USAGE:
+#   ansible-playbook playbooks/setup_vmware_exporter.yml
+# =============================================================================
+
+---
+- name: Deploy vmware_exporter (hmvlapmon002)
+  hosts: hmvlapmon002.nnt.com
+  become: true
+  gather_facts: true
+
+  roles:
+    - vmware_exporter

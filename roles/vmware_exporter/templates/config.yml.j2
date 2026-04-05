@@ -1,0 +1,15 @@
+# =============================================================================
+# /etc/vmware_exporter/config.yml — managed by Ansible (roles/vmware_exporter)
+# =============================================================================
+
+default:
+  vsphere_host: "{{ vmware_exporter_vcenter_host }}"
+  vsphere_user: "{{ vmware_exporter_vcenter_user }}"
+  vsphere_password: "{{ vmware_exporter_vcenter_password }}"
+  ignore_ssl: {{ vmware_exporter_ignore_ssl | lower }}
+  collect_only:
+    vms: {{ vmware_exporter_collect_vms | lower }}
+    vmguests: {{ vmware_exporter_collect_vmguests | lower }}
+    datastores: {{ vmware_exporter_collect_datastores | lower }}
+    hosts: {{ vmware_exporter_collect_hosts | lower }}
+    snapshots: {{ vmware_exporter_collect_snapshots | lower }}

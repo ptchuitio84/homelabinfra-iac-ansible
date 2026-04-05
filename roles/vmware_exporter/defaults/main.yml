@@ -1,0 +1,36 @@
+# =============================================================================
+# roles/vmware_exporter/defaults/main.yml — vmware_exporter Role Default Variables
+# =============================================================================
+# Deploys vmware_exporter on mon002 alongside Prometheus.
+# vmware_exporter connects to vCenter via the vSphere API and exposes ESXi/VM
+# metrics on port 9272 for Prometheus to scrape.
+#
+# ARCHITECTURE:
+#   Prometheus → scrapes → localhost:9272?target=hsplvXXX.nnt.com
+#   vmware_exporter → queries → vCenter API → ESXi host metrics
+# =============================================================================
+
+---
+# vCenter connection — credentials stored in group_vars/monitoring/vault.yml
+vmware_exporter_vcenter_host: "{{ vault_vcenter_host }}"
+vmware_exporter_vcenter_user: "{{ vault_vcenter_username }}"
+vmware_exporter_vcenter_password: "{{ vault_vcenter_password }}"
+vmware_exporter_ignore_ssl: true    # vCenter uses self-signed cert
+
+# Port vmware_exporter listens on — must match Prometheus scrape config.
+vmware_exporter_port: 9272
+
+# Install paths
+vmware_exporter_config_dir: /etc/vmware_exporter
+vmware_exporter_config_file: "{{ vmware_exporter_config_dir }}/config.yml"
+
+# System user vmware_exporter runs as
+vmware_exporter_user: vmware_exporter
+vmware_exporter_group: vmware_exporter
+
+# What to collect — all enabled for full visibility
+vmware_exporter_collect_vms: true
+vmware_exporter_collect_vmguests: true
+vmware_exporter_collect_datastores: true
+vmware_exporter_collect_hosts: true
+vmware_exporter_collect_snapshots: true
