@@ -159,7 +159,7 @@
     daemon_reload: true
 
 # =============================================================================
-# SECTION 6: VERIFY
+# SECTION 6: VERIFY AND ENFORCE CREDENTIALS
 # =============================================================================
 
 - name: Wait for Grafana to be reachable
@@ -168,6 +168,14 @@
     port: "{{ grafana_port }}"
     timeout: 30
 
+# grafana.ini admin_password is only read on first startup — enforce via CLI
+# on every run so the vault value is always authoritative.
+- name: Enforce Grafana admin password via CLI
+  ansible.builtin.command:
+    cmd: grafana-cli admin reset-admin-password "{{ grafana_admin_password }}"
+  no_log: true
+  changed_when: true
+
 - name: Display Grafana access URL
   ansible.builtin.debug:
-    msg: "Grafana is up — http://{{ ansible_host }}:{{ grafana_port }} (admin / {{ grafana_admin_password }})"
+    msg: "Grafana is up — http://{{ ansible_host }}:{{ grafana_port }}"
