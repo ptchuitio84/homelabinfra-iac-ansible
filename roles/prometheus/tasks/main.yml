@@ -34,6 +34,12 @@
     group: root
     mode: '0755'
 
+- name: Check if {{ prometheus_data_dir }} is already a mount point
+  ansible.builtin.command: mountpoint -q {{ prometheus_data_dir }}
+  register: prometheus_data_mounted
+  changed_when: false
+  failed_when: false
+
 - name: Mount /dev/sdb at {{ prometheus_data_dir }} and add to fstab
   ansible.posix.mount:
     path: "{{ prometheus_data_dir }}"
@@ -41,6 +47,7 @@
     fstype: "{{ prometheus_data_fstype }}"
     opts: defaults
     state: mounted
+  when: prometheus_data_mounted.rc != 0
 
 # =============================================================================
 # SECTION 3: SYSTEM USER
