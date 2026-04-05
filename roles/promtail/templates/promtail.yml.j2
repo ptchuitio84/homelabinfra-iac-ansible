@@ -1,0 +1,35 @@
+# =============================================================================
+# /etc/promtail/promtail.yml — managed by Ansible (roles/promtail)
+# =============================================================================
+
+server:
+  http_listen_port: {{ promtail_port }}
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/promtail-positions.yaml
+
+clients:
+  - url: {{ promtail_loki_url }}
+
+scrape_configs:
+  # Collect systemd journal logs
+  - job_name: journal
+    journal:
+      max_age: 12h
+      labels:
+        job: systemd-journal
+        host: {{ inventory_hostname }}
+    relabel_configs:
+      - source_labels: [__journal__systemd_unit]
+        target_label: unit
+
+  # Collect log files
+  - job_name: varlogs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: varlogs
+          host: {{ inventory_hostname }}
+          __path__: /var/log/{messages,secure,*.log}

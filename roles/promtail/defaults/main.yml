@@ -1,0 +1,30 @@
+# =============================================================================
+# roles/promtail/defaults/main.yml — Promtail Role Default Variables
+# =============================================================================
+# Promtail is the log shipping agent — runs on every Linux VM and forwards
+# logs to Loki for centralized storage and querying.
+# =============================================================================
+
+---
+# Promtail version — must match Loki version.
+promtail_version: "2.9.4"
+
+# System user/group
+promtail_user: promtail
+promtail_group: promtail
+
+# Install and config paths
+promtail_install_dir: /opt/promtail
+promtail_config_dir: /etc/promtail
+
+# Loki endpoint to ship logs to
+promtail_loki_url: "http://hmvlapmon003.nnt.com:3100/loki/api/v1/push"
+
+# Port promtail exposes for its own HTTP server (health checks)
+promtail_port: 9080
+
+# Log paths to collect — systemd journal + common log files
+promtail_log_paths:
+  - /var/log/*.log
+  - /var/log/messages
+  - /var/log/secure

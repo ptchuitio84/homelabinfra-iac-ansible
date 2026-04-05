@@ -1,0 +1,45 @@
+# =============================================================================
+# roles/loki/defaults/main.yml — Loki Role Default Variables
+# =============================================================================
+# Default values for the "loki" role.
+#
+# WHAT THIS ROLE DOES:
+# Deploys Grafana Loki on OL9 as a systemd service. Loki stores logs shipped
+# by Promtail from all lab VMs. Grafana queries Loki for log visualization.
+#
+# ARCHITECTURE:
+#   Promtail (all VMs) → ships logs → Loki (hmvlapmon003:3100)
+#   Grafana (hmvlapmon001:3000) → queries → Loki (hmvlapmon003:3100)
+#
+# DISK LAYOUT:
+#   sda or sdb (60GB) — auto-detected, mounted at /var/lib/loki
+#   OS disk (30GB) — boot + LVM root + swap
+# =============================================================================
+
+---
+# Loki version to install.
+loki_version: "2.9.4"
+
+# System user/group Loki runs as.
+loki_user: loki
+loki_group: loki
+
+# Directories
+loki_install_dir: /opt/loki
+loki_config_dir: /etc/loki
+loki_data_dir: /var/lib/loki
+loki_log_dir: /var/log/loki
+
+# Port Loki listens on.
+loki_port: 3100
+
+# Data disk filesystem
+loki_data_fstype: xfs
+
+# How long to retain logs (168h = 7 days for homelab)
+loki_retention_period: 168h
+
+# Loki chunk store and index settings
+loki_chunks_dir: "{{ loki_data_dir }}/chunks"
+loki_rules_dir: "{{ loki_data_dir }}/rules"
+loki_index_dir: "{{ loki_data_dir }}/index"

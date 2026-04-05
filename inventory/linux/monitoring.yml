@@ -30,8 +30,8 @@ monitoring:
       ansible_host: 10.10.1.52
       vm_role: prometheus
 
-    # hmvlapmon003 — Loki (pending provisioning)
+    # hmvlapmon003 — Loki
     # IP: 10.10.1.53 | 2vCPU / 8GB RAM
-    # hmvlapmon003.nnt.com:
-    #   ansible_host: 10.10.1.53
-    #   vm_role: loki
+    hmvlapmon003.nnt.com:
+      ansible_host: 10.10.1.53
+      vm_role: loki

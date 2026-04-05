@@ -1,0 +1,19 @@
+# =============================================================================
+# playbooks/setup_loki.yml — Deploy Loki
+# =============================================================================
+# Deploys Grafana Loki to hmvlapmon003 (10.10.1.53).
+# Run after provisioning the VM with: ./scripts/provision-hmvlapmon003.sh
+#
+# USAGE:
+#   ansible-playbook playbooks/setup_loki.yml
+# =============================================================================
+
+---
+- name: Deploy Loki (hmvlapmon003)
+  hosts: hmvlapmon003.nnt.com
+  become: true
+  gather_facts: true
+
+  roles:
+    - common
+    - loki

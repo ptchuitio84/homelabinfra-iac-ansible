@@ -1,0 +1,24 @@
+# =============================================================================
+# playbooks/deploy_promtail.yml — Deploy Promtail (log shipper)
+# =============================================================================
+# Deploys Promtail to all Linux VMs. Promtail tails logs and ships them
+# to Loki on hmvlapmon003:3100.
+#
+# Run after Loki is deployed and healthy.
+#
+# USAGE:
+#   ansible-playbook playbooks/deploy_promtail.yml          # all hosts
+#   ansible-playbook playbooks/deploy_promtail.yml --limit hmvlapmon001.nnt.com
+# =============================================================================
+
+---
+- name: Deploy Promtail (all Linux VMs)
+  hosts:
+    - ansible_nodes
+    - jenkins
+    - monitoring
+  become: true
+  gather_facts: true
+
+  roles:
+    - promtail

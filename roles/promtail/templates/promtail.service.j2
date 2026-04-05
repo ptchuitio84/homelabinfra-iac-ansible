@@ -1,0 +1,18 @@
+# =============================================================================
+# /etc/systemd/system/promtail.service — managed by Ansible (roles/promtail)
+# =============================================================================
+
+[Unit]
+Description=Grafana Promtail log shipper
+After=network.target
+
+[Service]
+User={{ promtail_user }}
+Group={{ promtail_group }}
+Type=simple
+ExecStart={{ promtail_install_dir }}/promtail -config.file={{ promtail_config_dir }}/promtail.yml
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

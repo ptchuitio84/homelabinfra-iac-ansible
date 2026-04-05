@@ -1,0 +1,129 @@
+# =============================================================================
+# roles/promtail/tasks/main.yml — Promtail Deployment Tasks
+# =============================================================================
+# Deploys Grafana Promtail on OL9 as a systemd service.
+# Run via: ansible-playbook playbooks/deploy_promtail.yml
+#
+# These tasks are idempotent — safe to re-run without side effects.
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: SYSTEM USER
+# =============================================================================
+
+- name: Create promtail system group
+  ansible.builtin.group:
+    name: "{{ promtail_group }}"
+    system: true
+    state: present
+
+- name: Create promtail system user
+  ansible.builtin.user:
+    name: "{{ promtail_user }}"
+    group: "{{ promtail_group }}"
+    system: true
+    shell: /sbin/nologin
+    create_home: false
+    state: present
+
+# promtail needs to read system logs
+- name: Add promtail user to systemd-journal group
+  ansible.builtin.user:
+    name: "{{ promtail_user }}"
+    groups: systemd-journal
+    append: true
+
+# =============================================================================
+# SECTION 2: INSTALL
+# =============================================================================
+
+- name: Download Promtail {{ promtail_version }}
+  ansible.builtin.get_url:
+    url: "https://github.com/grafana/loki/releases/download/v{{ promtail_version }}/promtail-linux-amd64.zip"
+    dest: "/tmp/promtail-{{ promtail_version }}.zip"
+    mode: '0644'
+
+- name: Install unzip
+  ansible.builtin.dnf:
+    name: unzip
+    state: present
+
+- name: Extract Promtail binary
+  ansible.builtin.unarchive:
+    src: "/tmp/promtail-{{ promtail_version }}.zip"
+    dest: /tmp/
+    remote_src: true
+
+- name: Create Promtail install directory
+  ansible.builtin.file:
+    path: "{{ promtail_install_dir }}"
+    state: directory
+    owner: "{{ promtail_user }}"
+    group: "{{ promtail_group }}"
+    mode: '0755'
+
+- name: Install Promtail binary
+  ansible.builtin.copy:
+    src: /tmp/promtail-linux-amd64
+    dest: "{{ promtail_install_dir }}/promtail"
+    owner: "{{ promtail_user }}"
+    group: "{{ promtail_group }}"
+    mode: '0755'
+    remote_src: true
+  notify: Restart promtail
+
+# =============================================================================
+# SECTION 3: CONFIGURATION
+# =============================================================================
+
+- name: Create Promtail config directory
+  ansible.builtin.file:
+    path: "{{ promtail_config_dir }}"
+    state: directory
+    owner: "{{ promtail_user }}"
+    group: "{{ promtail_group }}"
+    mode: '0755'
+
+- name: Deploy Promtail configuration
+  ansible.builtin.template:
+    src: promtail.yml.j2
+    dest: "{{ promtail_config_dir }}/promtail.yml"
+    owner: "{{ promtail_user }}"
+    group: "{{ promtail_group }}"
+    mode: '0644'
+  notify: Restart promtail
+
+# =============================================================================
+# SECTION 4: SYSTEMD SERVICE
+# =============================================================================
+
+- name: Deploy Promtail systemd service
+  ansible.builtin.template:
+    src: promtail.service.j2
+    dest: /etc/systemd/system/promtail.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart promtail
+
+- name: Enable and start Promtail
+  ansible.builtin.systemd:
+    name: promtail
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# =============================================================================
+# SECTION 5: VERIFY
+# =============================================================================
+
+- name: Wait for Promtail to be reachable
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ promtail_port }}"
+    timeout: 30
+
+- name: Display Promtail status
+  ansible.builtin.debug:
+    msg: "Promtail is up on {{ inventory_hostname }} — shipping logs to {{ promtail_loki_url }}"

@@ -1,0 +1,198 @@
+# =============================================================================
+# roles/loki/tasks/main.yml — Loki Deployment Tasks
+# =============================================================================
+# Deploys Grafana Loki on OL9 as a systemd service.
+# Run via: ansible-playbook playbooks/setup_loki.yml
+#
+# These tasks are idempotent — safe to re-run without side effects.
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: DATA DISK
+# Auto-detect the 60GB data disk by size — VMware SCSI slot assignment
+# is inconsistent across VMs. OS disk is always 30GB, data disk 60GB.
+# =============================================================================
+
+- name: Detect data disk (disk > 50GB with no partitions)
+  ansible.builtin.set_fact:
+    _loki_data_device: "/dev/{{ item.key }}"
+  loop: "{{ ansible_devices | dict2items }}"
+  when:
+    - item.key is match('^sd[a-z]$')
+    - (item.value.size | regex_replace(' GB', '') | float) > 50
+    - item.value.partitions | length == 0
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Fail if no data disk detected
+  ansible.builtin.fail:
+    msg: "No unpartitioned disk > 50GB found — is the data disk attached?"
+  when: _loki_data_device is not defined
+
+- name: Check if {{ _loki_data_device }} already has a filesystem
+  ansible.builtin.command: blkid {{ _loki_data_device }}
+  register: loki_blkid
+  changed_when: false
+  failed_when: false
+
+- name: Format {{ _loki_data_device }} as XFS (only if blank)
+  community.general.filesystem:
+    fstype: "{{ loki_data_fstype }}"
+    dev: "{{ _loki_data_device }}"
+  when: loki_blkid.rc != 0
+
+- name: Create Loki data directory ({{ loki_data_dir }})
+  ansible.builtin.file:
+    path: "{{ loki_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Check if {{ _loki_data_device }} is already mounted at {{ loki_data_dir }}
+  ansible.builtin.shell: grep -qs "^{{ _loki_data_device }} " /proc/mounts
+  register: loki_disk_mounted
+  changed_when: false
+  failed_when: false
+
+- name: Mount {{ _loki_data_device }} at {{ loki_data_dir }}
+  ansible.builtin.command: mount {{ _loki_data_device }} {{ loki_data_dir }}
+  when: loki_disk_mounted.rc != 0
+
+- name: Ensure {{ _loki_data_device }} is in fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: "^{{ _loki_data_device }}\\s"
+    line: "{{ _loki_data_device }} {{ loki_data_dir }} {{ loki_data_fstype }} defaults 0 0"
+    state: present
+
+# =============================================================================
+# SECTION 2: SYSTEM USER
+# =============================================================================
+
+- name: Create loki system group
+  ansible.builtin.group:
+    name: "{{ loki_group }}"
+    system: true
+    state: present
+
+- name: Create loki system user
+  ansible.builtin.user:
+    name: "{{ loki_user }}"
+    group: "{{ loki_group }}"
+    system: true
+    shell: /sbin/nologin
+    create_home: false
+    state: present
+
+# =============================================================================
+# SECTION 3: INSTALL
+# =============================================================================
+
+- name: Download Loki {{ loki_version }}
+  ansible.builtin.get_url:
+    url: "https://github.com/grafana/loki/releases/download/v{{ loki_version }}/loki-linux-amd64.zip"
+    dest: "/tmp/loki-{{ loki_version }}.zip"
+    mode: '0644'
+
+- name: Install unzip
+  ansible.builtin.dnf:
+    name: unzip
+    state: present
+
+- name: Extract Loki binary
+  ansible.builtin.unarchive:
+    src: "/tmp/loki-{{ loki_version }}.zip"
+    dest: /tmp/
+    remote_src: true
+
+- name: Create Loki install directory
+  ansible.builtin.file:
+    path: "{{ loki_install_dir }}"
+    state: directory
+    owner: "{{ loki_user }}"
+    group: "{{ loki_group }}"
+    mode: '0755'
+
+- name: Install Loki binary
+  ansible.builtin.copy:
+    src: /tmp/loki-linux-amd64
+    dest: "{{ loki_install_dir }}/loki"
+    owner: "{{ loki_user }}"
+    group: "{{ loki_group }}"
+    mode: '0755'
+    remote_src: true
+  notify: Restart Loki
+
+# =============================================================================
+# SECTION 4: DIRECTORIES AND PERMISSIONS
+# =============================================================================
+
+- name: Create Loki directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ loki_user }}"
+    group: "{{ loki_group }}"
+    mode: '0755'
+  loop:
+    - "{{ loki_config_dir }}"
+    - "{{ loki_log_dir }}"
+    - "{{ loki_chunks_dir }}"
+    - "{{ loki_rules_dir }}"
+    - "{{ loki_index_dir }}"
+
+- name: Set ownership of Loki data directory
+  ansible.builtin.file:
+    path: "{{ loki_data_dir }}"
+    owner: "{{ loki_user }}"
+    group: "{{ loki_group }}"
+    mode: '0755'
+
+# =============================================================================
+# SECTION 5: CONFIGURATION
+# =============================================================================
+
+- name: Deploy Loki configuration
+  ansible.builtin.template:
+    src: loki.yml.j2
+    dest: "{{ loki_config_dir }}/loki.yml"
+    owner: "{{ loki_user }}"
+    group: "{{ loki_group }}"
+    mode: '0644'
+  notify: Restart Loki
+
+# =============================================================================
+# SECTION 6: SYSTEMD SERVICE
+# =============================================================================
+
+- name: Deploy Loki systemd service
+  ansible.builtin.template:
+    src: loki.service.j2
+    dest: /etc/systemd/system/loki.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Loki
+
+- name: Enable and start Loki
+  ansible.builtin.systemd:
+    name: loki
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# =============================================================================
+# SECTION 7: VERIFY
+# =============================================================================
+
+- name: Wait for Loki to be reachable
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ loki_port }}"
+    timeout: 30
+
+- name: Display Loki access URL
+  ansible.builtin.debug:
+    msg: "Loki is up — http://{{ ansible_host }}:{{ loki_port }}/ready"
