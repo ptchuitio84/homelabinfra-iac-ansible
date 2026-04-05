@@ -1,0 +1,27 @@
+# =============================================================================
+# playbooks/deploy_node_exporter.yml — Deploy Prometheus node_exporter
+# =============================================================================
+# Deploys node_exporter to all Linux VMs so Prometheus can scrape host metrics.
+#
+# TARGETS (defined in prometheus_node_targets in roles/prometheus/defaults):
+#   hmvlapans001 — Ansible control node
+#   hmvlapjkn001 — Jenkins
+#   hmvlapmon001 — Grafana
+#   hmvlapmon002 — Prometheus (self-scrape)
+#
+# USAGE:
+#   ansible-playbook playbooks/deploy_node_exporter.yml          # all hosts
+#   ansible-playbook playbooks/deploy_node_exporter.yml --limit hmvlapmon001.nnt.com
+# =============================================================================
+
+---
+- name: Deploy node_exporter (all Linux VMs)
+  hosts:
+    - ansible_nodes
+    - jenkins
+    - monitoring
+  become: true
+  gather_facts: true
+
+  roles:
+    - node_exporter

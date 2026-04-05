@@ -1,0 +1,26 @@
+# =============================================================================
+# roles/node_exporter/defaults/main.yml — node_exporter Role Default Variables
+# =============================================================================
+# Default values for the "node_exporter" role.
+#
+# WHAT THIS ROLE DOES:
+# Deploys Prometheus node_exporter on OL9 as a systemd service.
+# node_exporter exposes host-level metrics (CPU, memory, disk, network)
+# on port 9100 for Prometheus to scrape.
+#
+# Deployed to ALL Linux VMs — no data disk needed (metrics are read-only).
+# =============================================================================
+
+---
+# node_exporter version to install.
+node_exporter_version: "1.7.0"
+
+# System user/group node_exporter runs as.
+node_exporter_user: node_exporter
+node_exporter_group: node_exporter
+
+# Install directory
+node_exporter_install_dir: /opt/node_exporter
+
+# Port node_exporter listens on — must match prometheus_node_targets in Prometheus role.
+node_exporter_port: 9100
