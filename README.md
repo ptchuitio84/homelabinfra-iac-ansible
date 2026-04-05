@@ -25,13 +25,23 @@ Compute Layer (VMware vSphere)
 ├── 3x ESXi hosts
 └── All VMs cloned from golden OL9 template — zero manual touches
 
-Services
-├── Ansible control node
-├── Jenkins CI/CD
-└── Monitoring stack
-    ├── Grafana                 — dashboards and visualization
-    ├── Prometheus              — metrics collection and storage
-    └── Loki                    — centralized log aggregation
+Identity & Messaging
+├── Active Directory            — DNS, authentication, group policy
+├── Exchange Server             — internal mail
+└── Mailcleaner                 — mail filtering / hygiene
+
+CI/CD & Automation
+├── Ansible control node        — infrastructure automation
+└── Jenkins                     — CI/CD pipelines, scheduled jobs
+
+Monitoring & Observability
+├── Grafana                     — dashboards and visualization
+├── Prometheus                  — metrics collection and storage
+└── Loki                        — centralized log aggregation
+
+Applications
+├── Plex Media Server           — media streaming
+└── AIgentic Solutions          — AI/automation platform (in development)
 ```
 
 ---
