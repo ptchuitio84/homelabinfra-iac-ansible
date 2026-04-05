@@ -6,7 +6,7 @@
 #
 # WHAT THIS ROLE DOES:
 # Turns a fresh OL9 VM into a fully operational Jenkins CI/CD server by:
-#   1. Formatting and mounting /dev/sdb at /var/lib/jenkins
+#   1. Formatting and mounting /dev/sda at /var/lib/jenkins
 #   2. Installing Java 17 (required by Jenkins LTS)
 #   3. Installing Jenkins from the official Jenkins repo
 #   4. Installing Docker CE for container builds
@@ -18,7 +18,7 @@
 # Jenkins data disk — all jobs, builds, credentials, and configs live here.
 # Keeping this on a separate disk from the OS means you can rebuild the OS
 # without losing any Jenkins data.
-jenkins_data_device: /dev/sdb
+jenkins_data_device: /dev/sda         # 60GB data disk (VMware assigns sda=data, sdb=OS)
 jenkins_data_mount: /var/lib/jenkins
 jenkins_data_fstype: xfs
 
