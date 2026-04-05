@@ -1,0 +1,6 @@
+---
+# ansible-vault encrypted — encrypt before committing:
+#   ansible-vault encrypt inventory/group_vars/arista_switches/vault.yml
+
+vault_arista_password: CHANGE_ME
+vault_arista_enable_password: CHANGE_ME

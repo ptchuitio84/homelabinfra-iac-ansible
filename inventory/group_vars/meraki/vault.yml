@@ -1,0 +1,7 @@
+---
+# ansible-vault encrypted — encrypt before committing:
+#   ansible-vault encrypt inventory/group_vars/meraki/vault.yml
+
+vault_meraki_api_key: CHANGE_ME
+vault_meraki_org_id: CHANGE_ME
+vault_meraki_network_id: CHANGE_ME

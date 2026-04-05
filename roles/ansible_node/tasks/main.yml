@@ -90,18 +90,28 @@
       [defaults]
       vault_password_file = {{ vault_password_file }}
 
-# Create the directory that will hold the cloned repo.
-- name: Create repo directory ({{ repo_dest }})
+# Check whether the destination is already a git repo.
+# If .git exists, the ansible.builtin.git module will update (pull) in place.
+# If it does not exist, the directory was either never cloned or was only partially
+# populated by the fallback copy task on a prior run — in that case we remove it
+# so git can clone cleanly (git clone creates its own directory).
+- name: Check if repo directory is already a git repo
+  ansible.builtin.stat:
+    path: "{{ repo_dest }}/.git"
+  register: git_dir
+
+# Only runs when the directory exists but is NOT a real git repo.
+# Removes it so the clone task below gets a clean slate.
+- name: Remove non-git repo directory to allow clean clone
   ansible.builtin.file:
     path: "{{ repo_dest }}"
-    state: directory
-    owner: root
-    group: root
-    mode: '0755'
+    state: absent
+  when: not git_dir.stat.exists
 
 # Clone this repo onto the control node.
+# git clone creates the destination directory itself — no need to pre-create it.
 # Requires an SSH deploy key to be set up on GitHub and the public key added
-# to the control node's root SSH agent or ~/.ssh/.
+# to the control node's root SSH agent or /root/.ssh/.
 # "ignore_errors: true" prevents failure on first run before the key is in place.
 - name: Clone homelabinfra-iac-ansible repo to {{ repo_dest }}
   ansible.builtin.git:
@@ -110,6 +120,16 @@
     version: main
     accept_hostkey: true
   ignore_errors: true
+
+# Fallback: ensure the repo directory exists even if the clone failed.
+# The copy task below needs the directory to be present.
+- name: Create repo directory if clone did not create it
+  ansible.builtin.file:
+    path: "{{ repo_dest }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
 
 # Fallback: if the clone failed (no SSH key yet), copy requirements.yml manually
 # so collection installation can still proceed.

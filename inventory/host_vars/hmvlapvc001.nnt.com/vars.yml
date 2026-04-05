@@ -29,7 +29,7 @@ mgmt_ip: 10.10.0.5
 
 # VMware datacenter name as configured in vCenter.
 # All cluster, host, and VM objects live under this datacenter.
-datacenter_name: HomeLab
+datacenter_name: NNTDC
 
 # Cluster name — the HA/DRS cluster containing all ESXi hosts.
-cluster_name: HomeLab-Cluster
+cluster_name: NNTVMCLS01
