@@ -78,10 +78,10 @@
   ansible.builtin.yum_repository:
     name: grafana
     description: Grafana OSS
-    baseurl: "{{ grafana_repo_url }}/oss/rpm"
+    baseurl: "{{ grafana_repo_baseurl }}"
     repo_gpgcheck: true
     gpgcheck: true
-    gpgkey: "{{ grafana_repo_url }}/gpg.key"
+    gpgkey: "{{ grafana_repo_gpgkey }}"
     sslverify: true
     sslcacert: /etc/pki/tls/certs/ca-bundle.crt
     enabled: true

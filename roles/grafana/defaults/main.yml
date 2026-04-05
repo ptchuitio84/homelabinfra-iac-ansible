@@ -45,4 +45,5 @@ grafana_prometheus_url: "http://hmvlapmon002.nnt.com:9090"
 
 # Grafana version — installed from official OSS RPM repo (no version pin needed,
 # repo always serves latest stable).
-grafana_repo_url: "https://rpm.grafana.com"
+grafana_repo_baseurl: "https://rpm.grafana.com"
+grafana_repo_gpgkey: "https://rpm.grafana.com/gpg.key"
