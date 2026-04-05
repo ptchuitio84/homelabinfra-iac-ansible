@@ -1,7 +1,7 @@
 # =============================================================================
 # playbooks/oob_secondary_ip_add.yml — Add secondary IP to OOB VLAN2 SVI
 # =============================================================================
-# TEMPORARY — adds 10.2.0.5/24 as a secondary IP to interface Vlan2 so the
+# TEMPORARY — adds 10.2.0.5/23 as a secondary IP to interface Vlan2 so the
 # OOB management interfaces (currently misconfigured to 10.2.0.5) can be
 # reached and reconfigured to their correct IPs.
 #
@@ -19,10 +19,10 @@
   gather_facts: false
 
   tasks:
-    - name: Add secondary IP 10.2.0.5/24 to interface Vlan2
+    - name: Add secondary IP 10.2.0.5/23 to interface Vlan2
       cisco.ios.ios_config:
         lines:
-          - ip address 10.2.0.5 255.255.255.0 secondary
+          - ip address 10.2.0.5 255.255.254.0 secondary
         parents: interface Vlan2
       notify: Save running config
 

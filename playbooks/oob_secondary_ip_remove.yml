@@ -15,10 +15,10 @@
   gather_facts: false
 
   tasks:
-    - name: Remove secondary IP 10.2.0.5/24 from interface Vlan2
+    - name: Remove secondary IP 10.2.0.5/23 from interface Vlan2
       cisco.ios.ios_config:
         lines:
-          - no ip address 10.2.0.5 255.255.255.0 secondary
+          - no ip address 10.2.0.5 255.255.254.0 secondary
         parents: interface Vlan2
       notify: Save running config
 
