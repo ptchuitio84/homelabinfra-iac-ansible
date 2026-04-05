@@ -39,6 +39,11 @@
       - python3-pip
     state: present
 
+- name: Remove existing venv to ensure clean install
+  ansible.builtin.file:
+    path: /opt/vmware_exporter/venv
+    state: absent
+
 - name: Create vmware_exporter virtualenv directory
   ansible.builtin.file:
     path: /opt/vmware_exporter/venv
@@ -52,6 +57,7 @@
     name:
       - "pyOpenSSL==22.1.0"
       - "cryptography==38.0.4"
+      - requests
       - vmware_exporter
     virtualenv: /opt/vmware_exporter/venv
     virtualenv_command: "python3 -m venv"
