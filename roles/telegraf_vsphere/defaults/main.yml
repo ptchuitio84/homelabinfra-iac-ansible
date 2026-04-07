@@ -1,0 +1,30 @@
+# =============================================================================
+# roles/telegraf_vsphere/defaults/main.yml
+# =============================================================================
+# Deploys Telegraf on mon002 to replace vmware_exporter.
+# Telegraf's inputs.vsphere queries vCenter directly; outputs.prometheus_client
+# exposes metrics on :9273 for Prometheus to scrape.
+#
+# Reuses the same vault variables as vmware_exporter:
+#   vault_vcenter_host, vault_vcenter_username, vault_vcenter_password
+# =============================================================================
+
+---
+# vCenter connection
+telegraf_vcenter_host:     "{{ vault_vcenter_host }}"
+telegraf_vcenter_user:     "{{ vault_vcenter_username }}"
+telegraf_vcenter_password: "{{ vault_vcenter_password }}"
+telegraf_vcenter_insecure: true   # vCenter uses self-signed cert
+
+# Port Telegraf's prometheus_client output listens on.
+# Prometheus scrapes this directly — no proxy mode, no relabeling.
+telegraf_prometheus_port: 9273
+
+# How often Telegraf collects from vCenter.
+# 60s is a safe interval — vCenter performance data rolls up every 20s.
+telegraf_collection_interval: "60s"
+
+# Concurrent goroutines for collection and discovery.
+# Keep low to avoid overwhelming vCenter API.
+telegraf_collect_concurrency: 2
+telegraf_discover_concurrency: 2

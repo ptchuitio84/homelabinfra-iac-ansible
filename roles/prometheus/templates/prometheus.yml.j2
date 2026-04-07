@@ -39,23 +39,14 @@ scrape_configs:
     static_configs:
       - targets: ["hmvlapjkn001.nnt.com:{{ jenkins_metrics_port }}"]
 
-  # ── VMware ESXi (vmware_exporter) ─────────────────────────────────────────
-  # vmware_exporter connects to vCenter API and exposes per-host and per-VM
-  # metrics: CPU ready, memory balloon, datastore latency, VM power state.
+  # ── VMware ESXi (Telegraf vSphere input) ──────────────────────────────────
+  # Telegraf on mon002 connects to vCenter API via inputs.vsphere and exposes
+  # host, VM, datastore, and cluster metrics via outputs.prometheus_client.
+  # Direct scrape — no proxy mode, no relabeling needed.
+  # Replaces pryorda/vmware_exporter (abandoned, broken on vCenter 7.x).
   - job_name: "vmware"
-    metrics_path: /metrics
     static_configs:
-      - targets:
-{% for target in prometheus_vmware_targets %}
-          - "{{ target }}"
-{% endfor %}
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: instance
-      - target_label: __address__
-        replacement: "localhost:{{ vmware_exporter_port }}"
+      - targets: ["hmvlapmon002.nnt.com:{{ telegraf_prometheus_port }}"]
 
   # ── Network devices (snmp_exporter) ───────────────────────────────────────
   # snmp_exporter polls switches via SNMP and exposes interface stats,

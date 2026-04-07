@@ -1,0 +1,84 @@
+# =============================================================================
+# roles/telegraf_vsphere/tasks/main.yml — Telegraf vSphere Exporter
+# =============================================================================
+# Replaces vmware_exporter (abandoned, broken on vCenter 7.x).
+# Telegraf is actively maintained, supports vCenter 5.5–8.x.
+#
+# Flow:
+#   vCenter → inputs.vsphere → Telegraf → outputs.prometheus_client :9273
+#   Prometheus scrapes :9273 directly (no proxy mode, no relabeling)
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: REPOSITORY + INSTALL
+# =============================================================================
+
+- name: Import InfluxData GPG key
+  ansible.builtin.rpm_key:
+    key: https://repos.influxdata.com/influxdata-archive_compat.key
+    state: present
+
+- name: Add InfluxData repository
+  ansible.builtin.yum_repository:
+    name: influxdata
+    description: InfluxData Repository - Stable
+    baseurl: "https://repos.influxdata.com/stable/{{ ansible_architecture }}/main"
+    gpgcheck: true
+    gpgkey: https://repos.influxdata.com/influxdata-archive_compat.key
+    enabled: true
+
+- name: Install telegraf
+  ansible.builtin.dnf:
+    name: telegraf
+    state: present
+
+# =============================================================================
+# SECTION 2: CONFIGURATION
+# =============================================================================
+
+- name: Deploy Telegraf vSphere config
+  ansible.builtin.template:
+    src: telegraf.conf.j2
+    dest: /etc/telegraf/telegraf.conf
+    owner: telegraf
+    group: telegraf
+    mode: '0640'
+  no_log: true
+  notify: Restart telegraf
+
+# =============================================================================
+# SECTION 3: FIREWALL
+# =============================================================================
+
+- name: Open Telegraf prometheus_client port in firewalld
+  ansible.posix.firewalld:
+    port: "{{ telegraf_prometheus_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+
+# =============================================================================
+# SECTION 4: SERVICE
+# =============================================================================
+
+- name: Enable and start Telegraf
+  ansible.builtin.systemd:
+    name: telegraf
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# =============================================================================
+# SECTION 5: VERIFY
+# =============================================================================
+
+- name: Wait for Telegraf prometheus_client port to be reachable
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ telegraf_prometheus_port }}"
+    timeout: 30
+
+- name: Display Telegraf status
+  ansible.builtin.debug:
+    msg: "Telegraf vSphere exporter is up — http://{{ inventory_hostname }}:{{ telegraf_prometheus_port }}/metrics"

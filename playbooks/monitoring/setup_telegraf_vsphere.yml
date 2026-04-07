@@ -1,0 +1,27 @@
+# =============================================================================
+# playbooks/monitoring/setup_telegraf_vsphere.yml
+# =============================================================================
+# Deploys Telegraf on hmvlapmon002 as a vSphere metrics exporter.
+# Replaces pryorda/vmware_exporter (abandoned, incompatible with vCenter 7.x).
+#
+# Telegraf inputs.vsphere → outputs.prometheus_client on :9273
+# Prometheus scrapes :9273 directly — no proxy, no relabeling.
+#
+# After running this playbook, also re-run setup_prometheus.yml to push
+# the updated scrape config (vmware job now points to :9273).
+#
+# USAGE:
+#   ansible-playbook playbooks/monitoring/setup_telegraf_vsphere.yml
+#   ansible-playbook playbooks/monitoring/setup_prometheus.yml
+#
+# Grafana dashboard: import ID 8159 (VMware vSphere by Telegraf)
+# =============================================================================
+
+---
+- name: Deploy Telegraf vSphere exporter (hmvlapmon002)
+  hosts: hmvlapmon002.nnt.com
+  become: true
+  gather_facts: true
+
+  roles:
+    - telegraf_vsphere
