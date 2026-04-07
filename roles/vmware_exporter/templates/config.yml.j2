@@ -7,6 +7,7 @@ default:
   vsphere_user: "{{ vmware_exporter_vcenter_user }}"
   vsphere_password: "{{ vmware_exporter_vcenter_password }}"
   ignore_ssl: {{ vmware_exporter_ignore_ssl | lower }}
+  specs_size: 500
   collect_only:
     vms: {{ vmware_exporter_collect_vms | lower }}
     vmguests: {{ vmware_exporter_collect_vmguests | lower }}
