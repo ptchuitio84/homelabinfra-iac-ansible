@@ -46,3 +46,4 @@ ansible_ssh_common_args: >-
   -o KexAlgorithms=+diffie-hellman-group14-sha1,diffie-hellman-group1-sha1
   -o HostKeyAlgorithms=+ssh-rsa
   -o Ciphers=+aes128-cbc,3des-cbc,aes192-cbc,aes256-cbc
+  -o RequiredRSASize=512
