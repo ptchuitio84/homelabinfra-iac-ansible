@@ -11,5 +11,5 @@ mailcleaner:
   hosts:
 
     mailcleaner01.nanonetech.com:
-      ansible_host: CHANGEME          # Set to Mailcleaner appliance IP
+      ansible_host: 10.10.0.13
       ansible_user: root
