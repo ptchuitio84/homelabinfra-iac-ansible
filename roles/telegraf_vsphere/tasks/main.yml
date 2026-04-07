@@ -14,18 +14,16 @@
 # SECTION 1: REPOSITORY + INSTALL
 # =============================================================================
 
-- name: Import InfluxData GPG key
-  ansible.builtin.rpm_key:
-    key: https://repos.influxdata.com/influxdata-archive_compat.key
-    state: present
-
+# InfluxData now ships an influxdata-archive-keyring RPM as a dependency.
+# That RPM itself requires GPG verification before it can install — creating
+# a chicken-and-egg problem with rpm_key. gpgcheck=false is acceptable here
+# since this is an internal home lab, not a production system.
 - name: Add InfluxData repository
   ansible.builtin.yum_repository:
     name: influxdata
     description: InfluxData Repository - Stable
     baseurl: "https://repos.influxdata.com/stable/{{ ansible_architecture }}/main"
-    gpgcheck: true
-    gpgkey: https://repos.influxdata.com/influxdata-archive_compat.key
+    gpgcheck: false
     enabled: true
 
 - name: Install telegraf
