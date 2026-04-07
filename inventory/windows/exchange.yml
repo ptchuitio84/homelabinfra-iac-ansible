@@ -10,4 +10,4 @@ exchange:
   hosts:
 
     exchange01.nanonetech.com:
-      ansible_host: CHANGEME        # Set to Exchange server IP
+      ansible_host: 10.10.1.12
