@@ -46,8 +46,3 @@ ansible_ssh_common_args: >-
   -o KexAlgorithms=+diffie-hellman-group14-sha1,diffie-hellman-group1-sha1
   -o HostKeyAlgorithms=+ssh-rsa
   -o Ciphers=+aes128-cbc,3des-cbc,aes192-cbc,aes256-cbc
-
-# Use system OpenSSH binary for network_cli — paramiko and pylibssh both
-# have their own crypto stacks that cannot negotiate legacy IOS 12.2 ciphers.
-# openssh respects ansible_ssh_common_args and the system crypto policy.
-ansible_network_cli_ssh_type: openssh
