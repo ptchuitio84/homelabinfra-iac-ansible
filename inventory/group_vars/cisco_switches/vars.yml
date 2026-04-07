@@ -35,6 +35,12 @@ ansible_network_cli_ssh_type: paramiko
 # falls back to plain ssh-rsa — the only algorithm the switch supports.
 ansible_paramiko_use_rsa_sha2_algorithms: false
 
+# Prevent paramiko from trying private keys in ~/.ssh/ before the password.
+# ans001 has 3 ed25519 keys. IOS 12.2 max auth retries = 3. All three key
+# attempts fail (switch doesn't support ed25519), exhausting retry budget
+# before the password ever gets tried. look_for_keys=False fixes this.
+ansible_paramiko_look_for_keys: false
+
 # SSH login username (must have privilege 15 on the switch).
 ansible_user: ptchuitio
 
