@@ -31,3 +31,9 @@ mailcleaner_admin_port: 443
 # Mailcleaner SSH connection (Debian-based appliance)
 # Override ansible_user/ansible_ssh_private_key_file in host_vars if needed
 mailcleaner_admin_user: root
+
+# LDAP / AD settings for address verification and user auth
+mailcleaner_ldap_server: 10.10.0.10
+mailcleaner_ldap_base_dn: DC=nanonetech,DC=com
+mailcleaner_ldap_bind_user: "CN=Mail MC. Cleaner,OU=NNT Managed Service Accounts,OU=NNT Admins,DC=nanonetech,DC=com"
+mailcleaner_ldap_bind_password: "{{ vault_mailcleaner_ldap_password }}"
