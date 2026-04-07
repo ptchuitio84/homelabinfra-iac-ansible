@@ -49,6 +49,12 @@
 # SECTION 3: FIREWALL
 # =============================================================================
 
+- name: Ensure firewalld is running
+  ansible.builtin.systemd:
+    name: firewalld
+    enabled: true
+    state: started
+
 - name: Open Telegraf prometheus_client port in firewalld
   ansible.posix.firewalld:
     port: "{{ telegraf_prometheus_port }}/tcp"
