@@ -23,6 +23,18 @@ ansible_network_os: cisco.ios.ios
 # just like a human typing at the CLI prompt.
 ansible_connection: ansible.netcommon.network_cli
 
+# Force paramiko as the SSH backend. ansible-pylibssh is installed on this control
+# node but cannot negotiate the legacy KEX/ciphers that IOS 12.2 requires.
+# paramiko supports them natively and direct connection tests confirm it works.
+# Valid values: paramiko, libssh, auto (auto prefers libssh when installed).
+ansible_network_cli_ssh_type: paramiko
+
+# IOS 12.2 only supports ssh-rsa for host key verification.
+# Ansible's paramiko plugin defaults to offering rsa-sha2-256/512 first,
+# which IOS 12.2 cannot negotiate. This disables rsa-sha2 so paramiko
+# falls back to plain ssh-rsa — the only algorithm the switch supports.
+ansible_paramiko_use_rsa_sha2_algorithms: false
+
 # SSH login username (must have privilege 15 on the switch).
 ansible_user: ptchuitio
 
