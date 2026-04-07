@@ -34,6 +34,7 @@ mailcleaner_admin_user: root
 
 # LDAP / AD settings for address verification and user auth
 mailcleaner_ldap_server: 10.10.0.10
-mailcleaner_ldap_base_dn: DC=nanonetech,DC=com
-mailcleaner_ldap_bind_user: "CN=Mail MC. Cleaner,OU=NNT Managed Service Accounts,OU=NNT Admins,DC=nanonetech,DC=com"
+mailcleaner_ldap_base_dn: dc=nanonetech,dc=com
+mailcleaner_ldap_bind_user: "nnt\\svc-mailcleaner"
+mailcleaner_ldap_user_attribute: SamAccountName
 mailcleaner_ldap_bind_password: "{{ vault_mailcleaner_ldap_password }}"
