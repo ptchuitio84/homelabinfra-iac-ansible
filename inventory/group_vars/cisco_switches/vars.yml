@@ -46,3 +46,8 @@ ansible_ssh_common_args: >-
   -o KexAlgorithms=+diffie-hellman-group14-sha1,diffie-hellman-group1-sha1
   -o HostKeyAlgorithms=+ssh-rsa
   -o Ciphers=+aes128-cbc,3des-cbc,aes192-cbc,aes256-cbc
+
+# Force system OpenSSH binary instead of paramiko.
+# Paramiko ignores ansible_ssh_common_args and cannot negotiate legacy
+# Cisco IOS 12.2 ciphers. System SSH respects the args above.
+ansible_ssh_executable: /usr/bin/ssh
