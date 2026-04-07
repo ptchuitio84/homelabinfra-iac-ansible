@@ -12,7 +12,7 @@
 
 ---
 # Mailcleaner SMTP relay target — deliver clean mail to Exchange
-mailcleaner_relay_host: exchange01.nanonetech.com
+mailcleaner_relay_host: hmvwapex001.nanonetech.com
 mailcleaner_relay_port: 25
 
 # Domain handled by Mailcleaner

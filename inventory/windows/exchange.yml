@@ -9,5 +9,5 @@
 exchange:
   hosts:
 
-    exchange01.nanonetech.com:
+    hmvwapex001.nanonetech.com:
       ansible_host: 10.10.1.12
