@@ -47,7 +47,7 @@ ansible_ssh_common_args: >-
   -o HostKeyAlgorithms=+ssh-rsa
   -o Ciphers=+aes128-cbc,3des-cbc,aes192-cbc,aes256-cbc
 
-# Force system OpenSSH binary instead of paramiko.
-# Paramiko ignores ansible_ssh_common_args and cannot negotiate legacy
-# Cisco IOS 12.2 ciphers. System SSH respects the args above.
-ansible_ssh_executable: /usr/bin/ssh
+# Use system OpenSSH binary for network_cli — paramiko and pylibssh both
+# have their own crypto stacks that cannot negotiate legacy IOS 12.2 ciphers.
+# openssh respects ansible_ssh_common_args and the system crypto policy.
+ansible_network_cli_ssh_type: openssh
