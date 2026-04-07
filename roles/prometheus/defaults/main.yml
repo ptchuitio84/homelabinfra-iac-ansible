@@ -56,8 +56,11 @@ prometheus_evaluation_interval: "15s"
 # node_exporter port — must match what's configured on each Linux VM.
 node_exporter_port: 9100
 
-# vmware_exporter port
+# vmware_exporter port (kept for reference — replaced by Telegraf)
 vmware_exporter_port: 9272
+
+# Telegraf vSphere prometheus_client port — replaces vmware_exporter
+telegraf_prometheus_port: 9273
 
 # snmp_exporter port
 snmp_exporter_port: 9116
