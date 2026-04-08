@@ -120,3 +120,95 @@ Note: the vars.yml entries are redundant (the daemon doesn't reliably apply them
 ---
 
 *Add new entries below using the same format. Include date, symptom, investigation path, root cause, and fix.*
+
+---
+
+## LL-002 — snmp_exporter 0.26.0 Config Format Breaking Change (auth-split)
+
+**Date:** 2026-04-07
+**Severity:** Medium — blocked snmp_exporter deployment, service crash-looping
+**Affected:** `roles/snmp_exporter`, mon002 (hmvlapmon002.nnt.com)
+
+---
+
+### Symptom
+
+snmp_exporter service deployed successfully but immediately crash-looped with exit code 1:
+
+```
+level=error msg="Error parsing config file" err="yaml: unmarshal errors:
+  line 212: field auth not found in type config.plain
+  line 214: field lookups not found in type config.plain"
+level=error msg="Possible old config file, see https://github.com/prometheus/snmp_exporter/blob/main/auth-split-migration.md"
+```
+
+Service never bound to port 9116. `wait_for` task timed out after 30 seconds.
+
+---
+
+### Investigation Path
+
+| Attempt | Hypothesis | Result |
+|---|---|---|
+| Check journalctl | Service config error | Confirmed: `field auth not found in type config.plain` |
+| Remove `auth: public_v2` from module definitions | auth field no longer valid in modules in 0.26.0 | Partial fix — auth error gone, but `lookups` still failed |
+| Remove `lookups` from module definitions | lookups also not valid inside modules in 0.26.0 | **FIXED** — service started |
+| Check community string in deployed config | Vault not decrypting | `nntnetwatch` correctly rendered — vault fine |
+
+---
+
+### Root Cause
+
+snmp_exporter 0.26.0 introduced a breaking config format change called **auth-split**. In the old format, each module contained an `auth` field referencing a community/auth config and a `lookups` block for label enrichment. In 0.26.0:
+
+- **`auth` inside modules is removed.** Auths are now top-level only and are selected at scrape time via URL parameter: `?auth=<auth_name>`
+- **`lookups` inside modules is also removed.** Label enrichment via index lookups is no longer supported in the module definition in this format.
+
+The snmp.yml.j2 template was written based on the pre-0.26.0 format documentation, which still showed `auth` and `lookups` as valid module fields.
+
+---
+
+### Fix
+
+**`roles/snmp_exporter/templates/snmp.yml.j2`** — removed `auth:` reference and `lookups:` block from all module definitions. The `auths:` top-level section remains correct and unchanged.
+
+**`roles/prometheus/templates/prometheus.yml.j2`** — added `auth` as a URL parameter in the snmp scrape job so snmp_exporter knows which auth to use at scrape time:
+
+```yaml
+params:
+  module: [if_mib]
+  auth: [public_v2]
+```
+
+---
+
+### Side Effect
+
+Removing `lookups` means interface metrics carry `ifIndex` as a label rather than `ifName`. The `ifName` metric is still scraped separately (it's in the walk), so interface names are available in Grafana — they just aren't automatically joined as a label on every metric. Workaround: use `ifName` as a join key in Grafana panel queries, or use `ifDescr` which is already a label on each metric.
+
+---
+
+### Key Takeaways
+
+1. **Always check the migration guide when a new major/minor version ships.** snmp_exporter explicitly logs the URL to the migration doc on failure — read it first.
+
+2. **snmp_exporter 0.26.0+ auth-split format:** `auth` and `lookups` do not belong inside module definitions. Auth is selected via `?auth=<name>` URL parameter at scrape time.
+
+3. **The Prometheus snmp job must pass `auth` as a URL param** when using 0.26.0+:
+   ```yaml
+   params:
+     module: [if_mib]
+     auth: [public_v2]
+   ```
+
+4. **Vault password exposure incident:** accidentally put a personal password as the value of `vault_snmp_community` during vault editing. This was pushed to the switch before being caught. Always verify vault contents with `ansible-vault view` before running playbooks that push sensitive values to devices. The wrong community was removed manually from the switch and the vault corrected before re-running.
+
+---
+
+### Related Commits
+
+| Commit | Description |
+|---|---|
+| `6fea05a` | Add snmp_exporter role and Cisco SNMP config playbook |
+| `76c8730` | Fix snmp.yml for 0.26.0 auth-split format, add auth param to prometheus snmp job |
+| `81c0323` | snmp_exporter: remove lookups from module — not supported in 0.26.0 |
