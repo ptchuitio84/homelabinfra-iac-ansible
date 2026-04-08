@@ -32,11 +32,6 @@ modules:
     get:
       - 1.3.6.1.2.1.1.3.0    # sysUpTime
 
-    lookups:
-      - source_indexes: [ifIndex]
-        lookup: 1.3.6.1.2.1.31.1.1.1.1  # ifName — adds ifName label to all interface metrics
-        drop_source_indexes: false
-
     metrics:
 
       # --- System ---
