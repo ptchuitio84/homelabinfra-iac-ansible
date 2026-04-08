@@ -1,0 +1,133 @@
+# =============================================================================
+# roles/snmp_exporter/tasks/main.yml — SNMP Exporter Deployment
+# =============================================================================
+# Deploys Prometheus snmp_exporter on mon002.
+# Polls network devices via SNMPv2c and exposes metrics for Prometheus.
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: SYSTEM USER
+# =============================================================================
+
+- name: Create snmp_exporter system group
+  ansible.builtin.group:
+    name: "{{ snmp_exporter_group }}"
+    system: true
+    state: present
+
+- name: Create snmp_exporter system user
+  ansible.builtin.user:
+    name: "{{ snmp_exporter_user }}"
+    group: "{{ snmp_exporter_group }}"
+    system: true
+    shell: /sbin/nologin
+    create_home: false
+    state: present
+
+# =============================================================================
+# SECTION 2: INSTALL
+# =============================================================================
+
+- name: Create snmp_exporter install directory
+  ansible.builtin.file:
+    path: "{{ snmp_exporter_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Download snmp_exporter {{ snmp_exporter_version }}
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/snmp_exporter/releases/download/v{{ snmp_exporter_version }}/snmp_exporter-{{ snmp_exporter_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/snmp_exporter-{{ snmp_exporter_version }}.tar.gz"
+    mode: '0644'
+
+- name: Extract snmp_exporter archive
+  ansible.builtin.unarchive:
+    src: "/tmp/snmp_exporter-{{ snmp_exporter_version }}.tar.gz"
+    dest: /tmp/
+    remote_src: true
+
+- name: Install snmp_exporter binary
+  ansible.builtin.copy:
+    src: "/tmp/snmp_exporter-{{ snmp_exporter_version }}.linux-amd64/snmp_exporter"
+    dest: /usr/local/bin/snmp_exporter
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: true
+  notify: Restart snmp_exporter
+
+# =============================================================================
+# SECTION 3: CONFIGURATION
+# =============================================================================
+
+- name: Create snmp_exporter config directory
+  ansible.builtin.file:
+    path: "{{ snmp_exporter_config_dir }}"
+    state: directory
+    owner: "{{ snmp_exporter_user }}"
+    group: "{{ snmp_exporter_group }}"
+    mode: '0750'
+
+- name: Deploy snmp.yml config
+  ansible.builtin.template:
+    src: snmp.yml.j2
+    dest: "{{ snmp_exporter_config_file }}"
+    owner: "{{ snmp_exporter_user }}"
+    group: "{{ snmp_exporter_group }}"
+    mode: '0640'
+  no_log: true
+  notify: Restart snmp_exporter
+
+- name: Deploy snmp_exporter systemd service
+  ansible.builtin.template:
+    src: snmp_exporter.service.j2
+    dest: /etc/systemd/system/snmp_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart snmp_exporter
+
+# =============================================================================
+# SECTION 4: FIREWALL
+# =============================================================================
+
+- name: Ensure firewalld is running
+  ansible.builtin.systemd:
+    name: firewalld
+    enabled: true
+    state: started
+
+- name: Open snmp_exporter port in firewalld
+  ansible.posix.firewalld:
+    port: "{{ snmp_exporter_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+
+# =============================================================================
+# SECTION 5: SERVICE
+# =============================================================================
+
+- name: Enable and start snmp_exporter
+  ansible.builtin.systemd:
+    name: snmp_exporter
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# =============================================================================
+# SECTION 6: VERIFY
+# =============================================================================
+
+- name: Wait for snmp_exporter to be reachable
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ snmp_exporter_port }}"
+    timeout: 30
+
+- name: Display snmp_exporter status
+  ansible.builtin.debug:
+    msg: "snmp_exporter is up — http://{{ inventory_hostname }}:{{ snmp_exporter_port }}/snmp?target=swplnet251.nnt.com&module=if_mib"

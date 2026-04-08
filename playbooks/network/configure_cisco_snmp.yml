@@ -1,0 +1,87 @@
+# =============================================================================
+# playbooks/network/configure_cisco_snmp.yml
+# =============================================================================
+# Enables SNMPv2c read-only access on swplnet251 (Cisco Catalyst 3750G).
+# Required before snmp_exporter can poll the switch.
+#
+# What this does:
+#   - Configures SNMP community string (read-only) from vault
+#   - Sets system contact and location
+#   - Restricts SNMP access to mon002 only (ACL)
+#   - Saves config to startup-config
+#
+# Prerequisites:
+#   vault_snmp_community must be set in cisco_switches vault
+#
+# Usage:
+#   # Dry run first:
+#   ansible-playbook playbooks/network/configure_cisco_snmp.yml --check \
+#     --vault-password-file ~/.vault_pass
+#
+#   # Apply:
+#   ansible-playbook playbooks/network/configure_cisco_snmp.yml \
+#     --vault-password-file ~/.vault_pass
+#
+# Verify after apply (from mon002):
+#   snmpwalk -v2c -c nntnetwatch swplnet251.nnt.com 1.3.6.1.2.1.1
+# =============================================================================
+
+---
+- name: Configure SNMPv2c on Cisco 3750G
+  hosts: swplnet251.nnt.com
+  gather_facts: false
+
+  vars:
+    # mon002 management IP — SNMP access restricted to this host
+    snmp_manager_ip: "{{ hostvars['hmvlapmon002.nnt.com']['ansible_host'] | default('10.100.100.22') }}"
+    snmp_acl_name: SNMP_MGMT_ACCESS
+
+  tasks:
+
+    - name: Create SNMP access-list (restrict to mon002 only)
+      cisco.ios.ios_config:
+        lines:
+          - "permit {{ snmp_manager_ip }}"
+        parents: "ip access-list standard {{ snmp_acl_name }}"
+      notify: Save running config
+
+    - name: Configure SNMPv2c read-only community with ACL
+      cisco.ios.ios_config:
+        lines:
+          - "snmp-server community {{ vault_snmp_community }} RO {{ snmp_acl_name }}"
+      notify: Save running config
+
+    - name: Set SNMP system contact
+      cisco.ios.ios_config:
+        lines:
+          - "snmp-server contact homelab-admin"
+      notify: Save running config
+
+    - name: Set SNMP system location
+      cisco.ios.ios_config:
+        lines:
+          - "snmp-server location homelab-patchpanel-rack"
+      notify: Save running config
+
+    - name: Enable SNMP trap source (optional — documents management interface)
+      cisco.ios.ios_config:
+        lines:
+          - "snmp-server trap-source Vlan100"
+      notify: Save running config
+
+    - name: Verify SNMP config is present
+      cisco.ios.ios_command:
+        commands:
+          - show snmp community
+          - show run | include snmp-server
+      register: snmp_verify
+
+    - name: Display SNMP config
+      ansible.builtin.debug:
+        var: snmp_verify.stdout_lines
+
+  handlers:
+    - name: Save running config
+      cisco.ios.ios_command:
+        commands:
+          - command: write memory

@@ -1,0 +1,26 @@
+# =============================================================================
+# roles/snmp_exporter/defaults/main.yml
+# =============================================================================
+# Deploys Prometheus snmp_exporter on mon002.
+# Polls Cisco 3750G (swplnet251) via SNMPv2c and exposes interface metrics.
+#
+# Flow:
+#   Prometheus → /snmp?target=swplnet251&module=if_mib → snmp_exporter :9116
+#   snmp_exporter → SNMPv2c → Cisco 3750G → interface counters
+# =============================================================================
+
+---
+snmp_exporter_version: "0.26.0"
+snmp_exporter_port: 9116
+
+# System user snmp_exporter runs as
+snmp_exporter_user:  snmp_exporter
+snmp_exporter_group: snmp_exporter
+
+# SNMP community string — decrypted from vault at runtime
+snmp_exporter_community: "{{ vault_snmp_community }}"
+
+# Install paths
+snmp_exporter_install_dir: /opt/snmp_exporter
+snmp_exporter_config_dir:  /etc/snmp_exporter
+snmp_exporter_config_file: "{{ snmp_exporter_config_dir }}/snmp.yml"

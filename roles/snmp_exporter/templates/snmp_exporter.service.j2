@@ -1,0 +1,16 @@
+[Unit]
+Description=Prometheus SNMP Exporter
+After=network.target
+
+[Service]
+User={{ snmp_exporter_user }}
+Group={{ snmp_exporter_group }}
+Type=simple
+ExecStart=/usr/local/bin/snmp_exporter \
+  --config.file={{ snmp_exporter_config_file }} \
+  --web.listen-address=:{{ snmp_exporter_port }}
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

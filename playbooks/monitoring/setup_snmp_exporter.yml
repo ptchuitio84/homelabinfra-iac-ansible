@@ -1,0 +1,23 @@
+# =============================================================================
+# playbooks/monitoring/setup_snmp_exporter.yml
+# =============================================================================
+# Deploys Prometheus snmp_exporter on mon002.
+#
+# Prerequisites:
+#   1. vault_snmp_community must be set in the monitoring vault
+#   2. SNMP must be enabled on target network devices (see configure_cisco_snmp.yml)
+#
+# Usage:
+#   ansible-playbook playbooks/monitoring/setup_snmp_exporter.yml \
+#     --vault-password-file ~/.vault_pass
+#
+# Verify after deploy:
+#   curl "http://hmvlapmon002.nnt.com:9116/snmp?target=swplnet251.nnt.com&module=if_mib"
+# =============================================================================
+
+---
+- name: Deploy snmp_exporter
+  hosts: hmvlapmon002.nnt.com
+  become: true
+  roles:
+    - snmp_exporter
