@@ -21,6 +21,14 @@
 # =============================================================================
 
 ---
+# EOS 4.12 eAPI rejects the "version" parameter sent by newer arista.eos
+# collection versions ("expected version 1"). Switch to network_cli (SSH)
+# for this host to avoid the incompatibility. EOS 4.28 (swplnet252) stays
+# on httpapi as defined in group_vars.
+ansible_connection: ansible.netcommon.network_cli
+ansible_become: true
+ansible_become_method: enable
+
 switch_platform: arista_eos
 
 switch_model: 7048T-A
