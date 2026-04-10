@@ -1,58 +1,41 @@
 # =============================================================================
-# playbooks/arista_push.yml — Push Configuration to Arista Switches
+# playbooks/network/arista_push.yml — Push Configuration to Arista Switches
 # =============================================================================
 # PURPOSE:
-# Applies EOS configuration files to Arista switches via eAPI, then saves
-# the result to startup-config so it survives a reboot.
+# Applies EOS baseline config files to all Arista switches via eAPI.
+# This is ADDITIVE — only lines that differ from the running config are pushed.
+# Saves to startup-config if any changes are made.
 #
-# HOW EOS CONFIG PUSH WORKS:
-# The eos_config module with "src:" sends the config file to the switch via
-# the eAPI HTTPS interface. Like Cisco, this is ADDITIVE — it merges the file
-# into the running config but does not automatically remove lines that exist
-# on the switch but not in the file.
-#
-# SUPPORTED HOSTS:
-#   swplnet252.nnt.com  → Arista 7050SX-64 (active, VRRP master)
-#   swplnet251.nnt.com  → Arista 7048T-A   (uncomment in arista_switches.yml first)
-#
-# CONFIG FILE MAPPING:
-#   swplnet252 → network/arista_7050sx_swplnet005.eos
-#   swplnet251 → network/arista_7048t_swplnet251.eos  (after 7048T-A replaces Cisco)
+# CONFIG FILE SOURCE:
+# Each switch resolves its own config file path from host_vars:
+#   swplnet252 → network/arista_7050sx_swplnet252.eos  (host_vars/swplnet252.nnt.com/vars.yml)
+#   swplnet253 → network/arista_7048t_swplnet253.eos   (host_vars/swplnet253.nnt.com/vars.yml)
 #
 # USAGE:
 #   # Push to all Arista switches:
-#   ansible-playbook playbooks/arista_push.yml
+#   ansible-playbook playbooks/network/arista_push.yml --vault-password-file ~/.vault_pass
 #
 #   # Push to one switch only:
-#   ansible-playbook playbooks/arista_push.yml --limit swplnet252.nnt.com
+#   ansible-playbook playbooks/network/arista_push.yml --limit swplnet252.nnt.com \
+#     --vault-password-file ~/.vault_pass
 #
 # VAULT REQUIRED: yes — credentials in group_vars/arista_switches/vault.yml
 # =============================================================================
 
 ---
-- name: Push Arista EOS configs
+- name: Push Arista EOS baseline configs
   hosts: arista_switches
   gather_facts: false
 
   vars:
-    # Directory where pre-push backups are saved.
-    backup_dir: "{{ playbook_dir }}/../network/backups"
-
-    # Map each switch hostname to its config file.
-    # Add an entry here when the 7048T-A replaces the Cisco (and is uncommented
-    # in inventory/network/arista_switches.yml).
-    config_map:
-      swplnet252.nnt.com: "{{ playbook_dir }}/../network/arista_7050sx_swplnet005.eos"
-      swplnet251.nnt.com: "{{ playbook_dir }}/../network/arista_7048t_swplnet251.eos"
+    backup_dir: "{{ playbook_dir }}/../../network/backups"
 
   tasks:
-    # Look up the config file path for this specific host from the map above.
-    # "set_fact" stores it as a variable for use in later tasks.
+
     - name: Resolve config file path for this host
       ansible.builtin.set_fact:
-        config_file: "{{ config_map[inventory_hostname] }}"
+        config_file: "{{ playbook_dir }}/../../{{ hostvars[inventory_hostname].config_file }}"
 
-    # Safety check before doing anything else.
     - name: Verify config file exists on control node
       ansible.builtin.stat:
         path: "{{ config_file }}"
@@ -64,7 +47,6 @@
         msg: "Config file not found: {{ config_file }} — aborting push."
       when: not config_stat.stat.exists
 
-    # Always back up before pushing.
     - name: Capture running config before making changes
       arista.eos.eos_command:
         commands: show running-config
@@ -76,19 +58,15 @@
         dest: "{{ backup_dir }}/{{ inventory_hostname }}_pre-push_{{ lookup('pipe', 'date +%Y-%m-%d_%H%M') }}.txt"
       delegate_to: localhost
 
-    # Push the EOS config file via eAPI.
-    # "notify" triggers the save handler if any change is applied.
-    - name: Push config file to switch
+    - name: Push baseline config to switch
       arista.eos.eos_config:
         src: "{{ config_file }}"
       notify: Save startup config
 
   handlers:
-    # Saves running config to startup-config so it persists across reboots.
-    # The prompt/answer handles the EOS confirmation prompt for this command.
     - name: Save startup config
       arista.eos.eos_command:
         commands:
           - command: copy running-config startup-config
-            prompt: '\[startup-config\]'   # EOS asks "Save?" — answer with empty (confirms default)
+            prompt: '\[startup-config\]'
             answer: ''
