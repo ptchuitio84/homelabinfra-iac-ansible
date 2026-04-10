@@ -40,4 +40,4 @@ mgmt_ip: 10.100.100.252
 
 # Path to the EOS config file for this switch (relative to repo root).
 # Used by playbooks/arista_push.yml to know which file to push.
-config_file: network/arista_7050sx_swplnet005.eos
+config_file: network/arista_7050sx_swplnet252.eos

@@ -27,15 +27,13 @@ ansible_network_os: arista.eos.eos
 # The switch's web API receives the request and applies the configuration.
 ansible_connection: ansible.netcommon.httpapi
 
-# Use HTTPS (not plain HTTP) to encrypt all API communication.
-ansible_httpapi_use_ssl: true
+# Use HTTP (not HTTPS) — Mac's newer OpenSSL rejects the EOS self-signed TLS
+# negotiation. HTTP is acceptable on the isolated management VLAN (VLAN 100).
+# Switch to HTTPS once AD CS (internal CA) is deployed and cert is trusted.
+ansible_httpapi_use_ssl: false
 
-# The switches use self-signed TLS certificates. Disable cert validation
-# since there is no internal CA yet. Will tighten when AD CS is deployed.
-ansible_httpapi_validate_certs: false
-
-# eAPI listens on port 443 (standard HTTPS).
-ansible_httpapi_port: 443
+# eAPI listens on port 80 (HTTP).
+ansible_httpapi_port: 80
 
 # Login username (must exist on the switch with network-admin role).
 ansible_user: ptchuitio

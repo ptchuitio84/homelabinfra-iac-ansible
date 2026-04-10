@@ -22,13 +22,19 @@ arista_switches:
     # Role:     VRRP master L3 switch (priority 110), all traffic flows through here
     # Ports:    48x 10GbE SFP+ (Ethernet1-48), 4x 40GbE QSFP+ (Ethernet49-52)
     # Mgmt IP:  10.100.100.252 (VLAN 100 — COREMGMTNET)
-    # eAPI:     https://10.100.100.252  (HTTPS, self-signed cert, validation disabled)
+    # eAPI:     http://10.100.100.252:80  (HTTP — Mac OpenSSL rejects EOS self-signed TLS)
     swplnet252.nnt.com:
       ansible_host: 10.100.100.252
 
-    # swplnet251 (Arista 7048T-A) — uncomment after Cisco 3750G is decommissioned
-    # The 7048T-A takes over swplnet251's IP and role as VRRP backup
-    # Role:     VRRP backup L3 switch (priority 90), DHCP server, 1GbE server uplinks
+    # swplnet253 — Arista 7048T-A
+    # Location: Home lab network rack
+    # Role:     VRRP secondary L3 switch (priority 100), 1GbE server uplinks
     # Ports:    48x 1GbE RJ45 (Ethernet1-48), 4x 10GbE SFP+ (Ethernet49-52)
+    # Mgmt IP:  10.100.100.253 (VLAN 100 — COREMGMTNET)
+    # Uplinks:  Po1 (10GbE DAC) → swplnet252, Po2 (1GbE) → swplnet251
+    swplnet253.nnt.com:
+      ansible_host: 10.100.100.253
+
+    # swplnet251 (Arista 7048T-A) — uncomment if/when Cisco 3750G is decommissioned
     # swplnet251.nnt.com:
     #   ansible_host: 10.100.100.251

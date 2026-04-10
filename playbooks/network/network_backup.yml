@@ -54,7 +54,7 @@
 - name: Backup Arista EOS running configurations
   hosts: arista_switches
   gather_facts: false
-  ignore_errors: true   # Arista switch not yet in service — remove when 7048T-A arrives
+  ignore_errors: true   # keep: prevents one switch failure from blocking the git commit/push
 
   tasks:
     - name: Retrieve running config from switch

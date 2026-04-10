@@ -1,0 +1,73 @@
+# =============================================================================
+# playbooks/network/enforce_baseline_swplnet252.yml
+# =============================================================================
+# Enforces the baseline config on swplnet252 (Arista 7050SX-64).
+#
+# Compares the running config against the baseline file and pushes only the
+# lines that differ. If the switch is already compliant, no changes are made.
+# Saves to startup-config only if changes were applied.
+#
+# Baseline: network/arista_7050sx_swplnet252.eos
+#
+# USAGE:
+#   ansible-playbook playbooks/network/enforce_baseline_swplnet252.yml \
+#     --vault-password-file ~/.vault_pass
+#
+#   Dry run (check what would change without applying):
+#   ansible-playbook playbooks/network/enforce_baseline_swplnet252.yml \
+#     --vault-password-file ~/.vault_pass --check
+# =============================================================================
+
+---
+- name: Enforce baseline config — swplnet252 (Arista 7050SX-64)
+  hosts: swplnet252.nnt.com
+  gather_facts: false
+
+  vars:
+    config_file: "{{ playbook_dir }}/../../../network/arista_7050sx_swplnet252.eos"
+    backup_dir:  "{{ playbook_dir }}/../../../network/backups"
+
+  tasks:
+
+    - name: Verify baseline config file exists
+      ansible.builtin.stat:
+        path: "{{ config_file }}"
+      register: config_stat
+      delegate_to: localhost
+
+    - name: Abort if baseline file is missing
+      ansible.builtin.fail:
+        msg: "Baseline not found: {{ config_file }}"
+      when: not config_stat.stat.exists
+
+    - name: Capture running config (pre-enforcement backup)
+      arista.eos.eos_command:
+        commands: show running-config
+      register: pre_backup
+
+    - name: Save pre-enforcement backup to disk
+      ansible.builtin.copy:
+        content: "{{ pre_backup.stdout[0] }}"
+        dest: "{{ backup_dir }}/{{ inventory_hostname }}_pre-enforce_{{ lookup('pipe', 'date +%Y-%m-%d_%H%M') }}.txt"
+      delegate_to: localhost
+
+    - name: Enforce baseline — push only deltas
+      arista.eos.eos_config:
+        src: "{{ config_file }}"
+      register: enforce_result
+      notify: Save startup config
+
+    - name: Report enforcement result
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} —
+          {% if enforce_result.changed %}CHANGES APPLIED ({{ enforce_result.updates | length }} lines pushed)
+          {% else %}COMPLIANT — no changes needed{% endif %}
+
+  handlers:
+    - name: Save startup config
+      arista.eos.eos_command:
+        commands:
+          - command: copy running-config startup-config
+            prompt: '\[startup-config\]'
+            answer: ''

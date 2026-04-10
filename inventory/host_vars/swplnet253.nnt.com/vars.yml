@@ -1,0 +1,39 @@
+# =============================================================================
+# host_vars/swplnet253.nnt.com/vars.yml — Per-Host Config: swplnet253
+# =============================================================================
+# Host-specific variables for swplnet253 — Arista 7048T-A access switch.
+#
+# DEVICE: Arista 7048T-A
+# STATUS: Active — VRRP secondary, 1GbE server uplinks
+#
+# PORTS:
+#   Ethernet1-2    — Port-Channel2 (1GbE inter-switch trunk to Cisco swplnet251)
+#   Ethernet4      — PT Backdoor (laptop/console access)
+#   Ethernet17     — ESXi Infra 1GbE UPLink
+#   Ethernet21-22  — STR SAN MGMT 1G UPLinks (VLAN 10)
+#   Ethernet23     — R310 ESXi Server 1G UPLink
+#   Ethernet25     — BKP Server 1G UPLink (T710)
+#   Ethernet29-38  — ESXi Infra 1GbE UPLinks
+#   Ethernet39-44  — OOB Interfaces (VLAN 2)
+#   Ethernet45     — TPLink PoE UPLink (dual-homed: also on Cisco Gi2/0/45)
+#   Ethernet46     — Meraki Backup UPLink
+#   Ethernet51-52  — Port-Channel1 (10GbE DAC to swplnet252)
+# =============================================================================
+
+---
+switch_platform: arista_eos
+
+switch_model: 7048T-A
+eos_version: ""
+
+# VRRP role: "secondary" — between 7050SX (master) and Cisco (backup)
+vrrp_role: secondary
+
+# VRRP priority: 100
+vrrp_priority: 100
+
+mgmt_vlan: 100
+mgmt_ip: 10.100.100.253
+
+# Path to the EOS config file for this switch (relative to repo root).
+config_file: network/arista_7048t_swplnet253.eos
