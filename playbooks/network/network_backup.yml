@@ -50,11 +50,10 @@
         dest: "/opt/nnt-network-configs/{{ inventory_hostname }}.cfg"
       delegate_to: localhost
 
-# ── ARISTA SWITCHES ───────────────────────────────────────────────────────────
-- name: Backup Arista EOS running configurations
-  hosts: arista_switches
+# ── ARISTA EOS 4.28+ (eAPI / httpapi) ────────────────────────────────────────
+- name: Backup Arista EOS 4.28+ via eAPI
+  hosts: swplnet252.nnt.com
   gather_facts: false
-  ignore_errors: true   # keep: prevents one switch failure from blocking the git commit/push
 
   tasks:
     - name: Retrieve running config from switch
@@ -65,6 +64,25 @@
     - name: Save config to nnt-network-configs repo
       ansible.builtin.copy:
         content: "{{ eos_config.stdout[0] }}"
+        dest: "/opt/nnt-network-configs/{{ inventory_hostname }}.cfg"
+      delegate_to: localhost
+
+# ── ARISTA EOS 4.12 (network_cli / SSH) ──────────────────────────────────────
+# arista.eos.eos_command sends "show version | json" as a pre-flight check
+# which EOS 4.12 rejects. Use cli_command (raw SSH) instead.
+- name: Backup Arista EOS 4.12 via SSH
+  hosts: swplnet253.nnt.com
+  gather_facts: false
+
+  tasks:
+    - name: Retrieve running config from switch
+      ansible.netcommon.cli_command:
+        command: show running-config
+      register: eos_config
+
+    - name: Save config to nnt-network-configs repo
+      ansible.builtin.copy:
+        content: "{{ eos_config.stdout }}"
         dest: "/opt/nnt-network-configs/{{ inventory_hostname }}.cfg"
       delegate_to: localhost
 
