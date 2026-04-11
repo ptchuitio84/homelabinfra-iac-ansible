@@ -11,11 +11,11 @@
 #
 # USAGE:
 #   ansible-playbook playbooks/network/enforce_baseline_swplnet252.yml \
-#     --vault-password-file ~/.vault_pass
+#     --vault-password-file ~/.ansible/vault_pass.txt
 #
 #   Dry run (check what would change without applying):
 #   ansible-playbook playbooks/network/enforce_baseline_swplnet252.yml \
-#     --vault-password-file ~/.vault_pass --check
+#     --vault-password-file ~/.ansible/vault_pass.txt --check
 # =============================================================================
 
 ---

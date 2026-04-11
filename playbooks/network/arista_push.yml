@@ -2,29 +2,36 @@
 # playbooks/network/arista_push.yml — Push Configuration to Arista Switches
 # =============================================================================
 # PURPOSE:
-# Applies EOS baseline config files to all Arista switches via eAPI.
+# Applies EOS baseline config files to all Arista switches.
 # This is ADDITIVE — only lines that differ from the running config are pushed.
 # Saves to startup-config if any changes are made.
 #
 # CONFIG FILE SOURCE:
 # Each switch resolves its own config file path from host_vars:
-#   swplnet252 → network/arista_7050sx_swplnet252.eos  (host_vars/swplnet252.nnt.com/vars.yml)
-#   swplnet253 → network/arista_7048t_swplnet253.eos   (host_vars/swplnet253.nnt.com/vars.yml)
+#   swplnet252 → network/arista_7050sx_swplnet252.eos
+#   swplnet253 → network/arista_7048t_swplnet253.eos
+#
+# CONNECTION METHODS:
+#   swplnet252 — EOS 4.28, eAPI (eos_command / eos_config)
+#   swplnet253 — EOS 4.12, raw SSH (cli_command / cli_config)
+#                arista.eos modules rejected by EOS 4.12 due to eAPI version mismatch.
 #
 # USAGE:
 #   # Push to all Arista switches:
-#   ansible-playbook playbooks/network/arista_push.yml --vault-password-file ~/.vault_pass
+#   ansible-playbook playbooks/network/arista_push.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
 #
 #   # Push to one switch only:
 #   ansible-playbook playbooks/network/arista_push.yml --limit swplnet252.nnt.com \
-#     --vault-password-file ~/.vault_pass
+#     --vault-password-file ~/.ansible/vault_pass.txt
 #
 # VAULT REQUIRED: yes — credentials in group_vars/arista_switches/vault.yml
 # =============================================================================
 
 ---
-- name: Push Arista EOS baseline configs
-  hosts: arista_switches
+# ── swplnet252 — Arista 7050SX, EOS 4.28+ (eAPI) ─────────────────────────────
+- name: Push Arista EOS baseline — swplnet252 (7050SX)
+  hosts: swplnet252.nnt.com
   gather_facts: false
 
   vars:
@@ -32,7 +39,7 @@
 
   tasks:
 
-    - name: Resolve config file path for this host
+    - name: Resolve config file path
       ansible.builtin.set_fact:
         config_file: "{{ playbook_dir }}/../../{{ hostvars[inventory_hostname].config_file }}"
 
@@ -70,3 +77,53 @@
           - command: copy running-config startup-config
             prompt: '\[startup-config\]'
             answer: ''
+
+# ── swplnet253 — Arista 7048T-A, EOS 4.12 (raw SSH) ──────────────────────────
+# arista.eos modules rejected by EOS 4.12 — use netcommon cli_command/cli_config.
+- name: Push Arista EOS baseline — swplnet253 (7048T-A)
+  hosts: swplnet253.nnt.com
+  gather_facts: false
+
+  vars:
+    backup_dir: "{{ playbook_dir }}/../../network/backups"
+
+  tasks:
+
+    - name: Resolve config file path
+      ansible.builtin.set_fact:
+        config_file: "{{ playbook_dir }}/../../{{ hostvars[inventory_hostname].config_file }}"
+
+    - name: Verify config file exists on control node
+      ansible.builtin.stat:
+        path: "{{ config_file }}"
+      register: config_stat
+      delegate_to: localhost
+
+    - name: Abort if config file is missing
+      ansible.builtin.fail:
+        msg: "Config file not found: {{ config_file }} — aborting push."
+      when: not config_stat.stat.exists
+
+    # cli_command returns stdout as a string (not a list) — no [0] index needed.
+    - name: Capture running config before making changes
+      ansible.netcommon.cli_command:
+        command: show running-config
+      register: pre_backup
+
+    - name: Save pre-push backup to disk
+      ansible.builtin.copy:
+        content: "{{ pre_backup.stdout }}"
+        dest: "{{ backup_dir }}/{{ inventory_hostname }}_pre-push_{{ lookup('pipe', 'date +%Y-%m-%d_%H%M') }}.txt"
+      delegate_to: localhost
+
+    - name: Push baseline config to switch
+      ansible.netcommon.cli_config:
+        config: "{{ lookup('file', config_file) }}"
+      notify: Save startup config
+
+  handlers:
+    - name: Save startup config
+      ansible.netcommon.cli_command:
+        command: copy running-config startup-config
+        prompt: '\[startup-config\]'
+        answer: ''

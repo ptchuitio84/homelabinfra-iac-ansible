@@ -9,13 +9,17 @@
 #
 # Baseline: network/arista_7048t_swplnet253.eos
 #
+# NOTE: swplnet253 runs EOS 4.12 which rejects the arista.eos collection's
+# pre-flight "show version | json" check. All tasks use netcommon cli_command
+# and cli_config (raw SSH) instead of arista.eos modules.
+#
 # USAGE:
 #   ansible-playbook playbooks/network/enforce_baseline_swplnet253.yml \
-#     --vault-password-file ~/.vault_pass
+#     --vault-password-file ~/.ansible/vault_pass.txt
 #
 #   Dry run (check what would change without applying):
 #   ansible-playbook playbooks/network/enforce_baseline_swplnet253.yml \
-#     --vault-password-file ~/.vault_pass --check
+#     --vault-password-file ~/.ansible/vault_pass.txt --check
 # =============================================================================
 
 ---
@@ -40,20 +44,22 @@
         msg: "Baseline not found: {{ config_file }}"
       when: not config_stat.stat.exists
 
+    # cli_command returns stdout as a string (not a list) — no [0] index needed.
     - name: Capture running config (pre-enforcement backup)
-      arista.eos.eos_command:
-        commands: show running-config
+      ansible.netcommon.cli_command:
+        command: show running-config
       register: pre_backup
 
     - name: Save pre-enforcement backup to disk
       ansible.builtin.copy:
-        content: "{{ pre_backup.stdout[0] }}"
+        content: "{{ pre_backup.stdout }}"
         dest: "{{ backup_dir }}/{{ inventory_hostname }}_pre-enforce_{{ lookup('pipe', 'date +%Y-%m-%d_%H%M') }}.txt"
       delegate_to: localhost
 
+    # cli_config pushes config lines via raw SSH — no eAPI pre-flight.
     - name: Enforce baseline — push only deltas
-      arista.eos.eos_config:
-        src: "{{ config_file }}"
+      ansible.netcommon.cli_config:
+        config: "{{ lookup('file', config_file) }}"
       register: enforce_result
       notify: Save startup config
 
@@ -61,13 +67,12 @@
       ansible.builtin.debug:
         msg: >-
           {{ inventory_hostname }} —
-          {% if enforce_result.changed %}CHANGES APPLIED ({{ enforce_result.updates | length }} lines pushed)
+          {% if enforce_result.changed %}CHANGES APPLIED
           {% else %}COMPLIANT — no changes needed{% endif %}
 
   handlers:
     - name: Save startup config
-      arista.eos.eos_command:
-        commands:
-          - command: copy running-config startup-config
-            prompt: '\[startup-config\]'
-            answer: ''
+      ansible.netcommon.cli_command:
+        command: copy running-config startup-config
+        prompt: '\[startup-config\]'
+        answer: ''
