@@ -32,7 +32,7 @@ ansible_become_method: enable
 switch_platform: arista_eos
 
 switch_model: 7048T-A
-eos_version: ""
+eos_version: 4.12.7.1
 
 # VRRP role: "secondary" — between 7050SX (master) and Cisco (backup)
 vrrp_role: secondary
