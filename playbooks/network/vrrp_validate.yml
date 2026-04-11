@@ -2,34 +2,34 @@
 # playbooks/vrrp_validate.yml — Verify VRRP Master/Backup State
 # =============================================================================
 # PURPOSE:
-# Confirms that VRRP is operating correctly across both Arista switches:
-#   - swplnet252 (7050SX)  is MASTER  on all VLAN groups (priority 110)
-#   - swplnet251 (7048T-A) is BACKUP  on all VLAN groups (priority 90)
+# Confirms that VRRP is operating correctly across all 3 switches:
+#   - swplnet252 (Arista 7050SX)       MASTER  — priority 110
+#   - swplnet253 (Arista 7048T-A)      BACKUP  — priority 100
+#   - swplnet251 (Cisco Catalyst 3750G) BACKUP  — priority 90
 #
 # WHAT IS VRRP?
 # VRRP (Virtual Router Redundancy Protocol) assigns a shared virtual IP (.1)
 # to each VLAN that all hosts use as their default gateway. If the master switch
-# fails, the backup takes over the virtual IP automatically — hosts see no change.
+# fails, the next highest priority takes over automatically.
 # This playbook verifies that failover is correctly configured and standing by.
 #
 # WHEN TO RUN:
-#   - After cabling and configuring the Arista 7048T-A (swplnet251)
 #   - After any change to VRRP priority or configuration
 #   - As a periodic health check to confirm no unexpected failover has occurred
+#   - After a switch reboot to confirm it returned to expected state
 #
 # This playbook is READ-ONLY — it makes no changes to any device.
 #
 # USAGE:
-#   ansible-playbook playbooks/vrrp_validate.yml
-#
-# NOTE: swplnet251 must be uncommented in inventory/network/arista_switches.yml
-# before this playbook can target both switches.
+#   ansible-playbook playbooks/network/vrrp_validate.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
 #
 # VAULT REQUIRED: yes
 # =============================================================================
 
 ---
-- name: Validate VRRP master/backup state on Arista switches
+# ── ARISTA SWITCHES ───────────────────────────────────────────────────────────
+- name: Validate VRRP state on Arista switches
   hosts: arista_switches
   gather_facts: false
 
@@ -41,7 +41,6 @@
         commands: show vrrp brief
       register: vrrp_output
 
-    # Print the full VRRP table for each switch so it can be read in the output.
     - name: Display VRRP state for this switch
       ansible.builtin.debug:
         msg: |
@@ -50,26 +49,54 @@
           ============================================================
           {{ vrrp_output.stdout[0] }}
 
-    # Assert swplnet252 (7050SX) has NO groups in Backup state.
-    # If any group shows "Backup" on the master switch, something is wrong
-    # (e.g., the 7048T-A has a higher priority or preempted unexpectedly).
+    # swplnet252 (7050SX, priority 110) must be Master on all groups.
+    # If any group shows Backup, the 7048T-A or Cisco has unexpectedly preempted.
     - name: Assert swplnet252 is Master on all VRRP groups
       ansible.builtin.assert:
         that: "vrrp_output.stdout[0] is not search('Backup')"
         fail_msg: >
           FAIL: {{ inventory_hostname }} has one or more VRRP groups in Backup state.
-          Expected: all groups Master. Check VRRP priority and connectivity.
+          Expected: all groups Master (priority 110). Check VRRP priority and connectivity.
         success_msg: "PASS: {{ inventory_hostname }} is Master on all VRRP groups."
       when: inventory_hostname == 'swplnet252.nnt.com'
 
-    # Assert swplnet251 (7048T-A) has NO groups in Master state.
-    # If the backup switch is acting as Master, it means the 7050SX is down
-    # or VRRP priority is misconfigured.
+    # swplnet253 (7048T-A, priority 100) must be Backup on all groups while 252 is up.
+    # If any group shows Master, 252 may be down or VRRP priority is misconfigured.
+    - name: Assert swplnet253 is Backup on all VRRP groups
+      ansible.builtin.assert:
+        that: "vrrp_output.stdout[0] is not search('Master')"
+        fail_msg: >
+          FAIL: {{ inventory_hostname }} has one or more VRRP groups in Master state.
+          Expected: all groups Backup (priority 100). Investigate whether swplnet252 is down.
+        success_msg: "PASS: {{ inventory_hostname }} is Backup on all VRRP groups."
+      when: inventory_hostname == 'swplnet253.nnt.com'
+
+# ── CISCO SWITCH ──────────────────────────────────────────────────────────────
+- name: Validate VRRP state on Cisco switch
+  hosts: cisco_switches
+  gather_facts: false
+
+  tasks:
+    - name: Retrieve VRRP state summary
+      cisco.ios.ios_command:
+        commands: show vrrp brief
+      register: vrrp_output
+
+    - name: Display VRRP state for this switch
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          {{ inventory_hostname }} — VRRP State
+          ============================================================
+          {{ vrrp_output.stdout[0] }}
+
+    # swplnet251 (Cisco 3750G, priority 90) must be Backup on all groups.
+    # It only becomes Master if both Arista switches are unreachable — an emergency.
     - name: Assert swplnet251 is Backup on all VRRP groups
       ansible.builtin.assert:
         that: "vrrp_output.stdout[0] is not search('Master')"
         fail_msg: >
           FAIL: {{ inventory_hostname }} has one or more VRRP groups in Master state.
-          Expected: all groups Backup. Investigate whether swplnet252 is down.
+          Expected: all groups Backup (priority 90). Both Arista switches may be down.
         success_msg: "PASS: {{ inventory_hostname }} is Backup on all VRRP groups."
       when: inventory_hostname == 'swplnet251.nnt.com'

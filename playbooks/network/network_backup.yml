@@ -1,5 +1,5 @@
 # =============================================================================
-# playbooks/network_backup.yml — Back Up All Network Device Configurations
+# playbooks/network/network_backup.yml — Back Up All Network Device Configurations
 # =============================================================================
 # PURPOSE:
 # Pulls the running configuration from every network device, saves it to the
