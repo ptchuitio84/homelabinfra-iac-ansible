@@ -1,0 +1,68 @@
+# =============================================================================
+# playbooks/network/vlan_audit_swplnet252.yml — VLAN Audit: swplnet252 (Arista 7050SX)
+# =============================================================================
+# PURPOSE:
+# Validates that swplnet252 has exactly the right VLANs configured:
+#   - All common lab VLANs present
+#   - VLAN 502 (GWISOLNET2) present — 7050SX-only isolated Meraki uplink
+#   - VLANs 501, 503, 504 absent — belong to other switches or decommissioned
+#
+# This playbook is READ-ONLY — it makes no changes to any device.
+#
+# USAGE:
+#   ansible-playbook playbooks/network/vlan_audit_swplnet252.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+# VAULT REQUIRED: yes
+# =============================================================================
+
+---
+- name: VLAN Audit — swplnet252 (Arista 7050SX)
+  hosts: swplnet252.nnt.com
+  gather_facts: false
+
+  vars:
+    expected_vlans:
+      - { id: 2,   name: OOBNET }
+      - { id: 3,   name: GUESTNET }
+      - { id: 5,   name: HOMENET }
+      - { id: 6,   name: HOUSEHOLDNET }
+      - { id: 7,   name: TVNET }
+      - { id: 9,   name: PRINTNET }
+      - { id: 10,  name: INFRACORENET }
+      - { id: 11,  name: SANISCSINET }
+      - { id: 12,  name: STORVMNET }
+      - { id: 14,  name: SECCAMNET }
+      - { id: 17,  name: TESTNET }
+      - { id: 100, name: COREMGMTNET }
+      - { id: 105, name: CONFMGMTNET }
+      - { id: 200, name: NANONET }
+      - { id: 254, name: PLATFORMNET }
+      - { id: 502, name: GWISOLNET2 }    # 7050SX-only isolated Meraki uplink VLAN
+
+    # 501 belongs to Cisco. 503 belongs to 7048T-A. 504 is decommissioned everywhere.
+    banned_vlans: [501, 503, 504]
+
+  tasks:
+    - name: Retrieve VLAN table
+      arista.eos.eos_command:
+        commands: show vlan brief
+      register: vlan_output
+
+    - name: Verify all expected VLANs are present
+      ansible.builtin.assert:
+        that: "vlan_output.stdout[0] is search(item.id | string)"
+        fail_msg: "MISSING: VLAN {{ item.id }} ({{ item.name }}) not found on {{ inventory_hostname }}"
+        success_msg: "OK: VLAN {{ item.id }} ({{ item.name }}) present"
+      loop: "{{ expected_vlans }}"
+
+    - name: Verify banned VLANs are absent
+      ansible.builtin.assert:
+        that: "vlan_output.stdout[0] is not search('^' + item | string + ' ')"
+        fail_msg: "VIOLATION: VLAN {{ item }} must not exist on {{ inventory_hostname }}"
+        success_msg: "OK: VLAN {{ item }} correctly absent"
+      loop: "{{ banned_vlans }}"
+
+    - name: Display full VLAN table
+      ansible.builtin.debug:
+        msg: "{{ vlan_output.stdout[0] }}"
