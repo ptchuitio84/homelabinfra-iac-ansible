@@ -9,8 +9,8 @@
 # =============================================================================
 
 ---
-- name: Configure Exchange (exchange01.nanonetech.com)
-  hosts: exchange01.nanonetech.com
+- name: Configure Exchange (hmvwapex001.nanonetech.com)
+  hosts: hmvwapex001.nanonetech.com
   gather_facts: true
 
   roles:
