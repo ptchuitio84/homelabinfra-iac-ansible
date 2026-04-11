@@ -26,5 +26,5 @@ tp_link_poe:
     # Uplink:   Connected to swplnet251 (Cisco/Arista) via Gi2/0/45 or Et45
     # Mgmt IP:  10.100.100.253 (VLAN 100 — COREMGMTNET)
     # Automation: Partial — requires Omada controller for API access
-    swplnet253.nnt.com:
-      ansible_host: 10.100.100.253
+    swplnet250.nnt.com:
+      ansible_host: 10.100.100.250

@@ -1,0 +1,34 @@
+# =============================================================================
+# roles/idrac_fan_controller/defaults/main.yml
+# =============================================================================
+# Default settings for the Dell iDRAC fan controller Docker containers.
+# One container per physical server, all running on the Jenkins/Docker host.
+# Credentials come from vault — never hardcode here.
+# =============================================================================
+
+---
+idrac_fan_controller_image: tigerblue77/dell_idrac_fan_controller:latest
+
+# Fan speed (%) when CPU temp is below threshold
+idrac_fan_speed: 20
+
+# Hand control back to Dell when CPU exceeds this temperature (°C)
+idrac_cpu_temp_threshold: 40
+
+# How often to check temperatures (seconds)
+idrac_check_interval: 60
+
+# Physical servers to manage — one container will be started per entry
+idrac_servers:
+  - name: hsplv166
+    host: 10.2.0.33
+  - name: hsplv21
+    host: 10.2.0.21
+  - name: hsplv22
+    host: 10.2.0.22
+  - name: hsplv034
+    host: 10.2.0.34
+  - name: snplv163
+    host: 10.2.0.163
+  - name: hmpplxap002
+    host: 10.2.0.164

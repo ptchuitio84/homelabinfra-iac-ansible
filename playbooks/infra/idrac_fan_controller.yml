@@ -1,0 +1,17 @@
+# =============================================================================
+# playbooks/infra/idrac_fan_controller.yml
+# =============================================================================
+# Deploys one Dell iDRAC fan controller Docker container per physical server.
+# Runs on hmvlapjkn001 (Jenkins/Docker host). Targets each iDRAC over IPMI LAN.
+#
+# Usage:
+#   ansible-playbook playbooks/infra/idrac_fan_controller.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+# =============================================================================
+
+---
+- name: Deploy iDRAC fan controller containers
+  hosts: hmvlapjkn001.nnt.com
+  become: true
+  roles:
+    - idrac_fan_controller

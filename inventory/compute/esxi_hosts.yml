@@ -24,22 +24,22 @@ esxi_hosts:
   hosts:
 
     # hsplv021 — Dell PowerEdge R710 (ESXi Host 1)
-    # Mgmt IP:  10.10.1.21 (VLAN 10 — INFRACORENET)
+    # Mgmt IP:  10.100.254.21 (VLAN 254 — PLATFORMNET)
     # Role:     Primary compute host — runs most infrastructure VMs
     # Status:   Active
     hsplv021.nnt.com:
-      ansible_host: 10.10.1.21
+      ansible_host: 10.100.254.21
 
     # hsplv022 — Dell PowerEdge R710 (ESXi Host 2)
-    # Mgmt IP:  10.10.1.22 (VLAN 10 — INFRACORENET)
+    # Mgmt IP:  10.100.254.22 (VLAN 254 — PLATFORMNET)
     # Role:     Secondary compute host
     # Status:   Active
     hsplv022.nnt.com:
-      ansible_host: 10.10.1.22
+      ansible_host: 10.100.254.22
 
     # hsplv034 — Dell PowerEdge R310 (ESXi Host 3)
-    # Mgmt IP:  10.10.0.34 (VLAN 10 — INFRACORENET)
-    # Role:     Lightweight compute — added 2026-04-05, not yet in cluster
-    # Status:   Active — standalone, pending cluster join
+    # Mgmt IP:  10.100.254.34 (VLAN 254 — PLATFORMNET)
+    # Role:     Lightweight compute — Secondary compute host
+    # Status:   Active
     hsplv034.nnt.com:
-      ansible_host: 10.10.0.34
+      ansible_host: 10.100.254.34

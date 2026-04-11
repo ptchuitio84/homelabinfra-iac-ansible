@@ -1,0 +1,29 @@
+# =============================================================================
+# roles/idrac_fan_controller/tasks/main.yml
+# =============================================================================
+# Deploys one Dell iDRAC fan controller Docker container per physical server.
+# Runs on the Jenkins/Docker host — targets each iDRAC remotely via IPMI LAN.
+# =============================================================================
+
+---
+- name: Pull iDRAC fan controller image
+  community.docker.docker_image:
+    name: "{{ idrac_fan_controller_image }}"
+    source: pull
+
+- name: Start iDRAC fan controller container for each server
+  community.docker.docker_container:
+    name: "idrac_fan_ctrl_{{ item.name }}"
+    image: "{{ idrac_fan_controller_image }}"
+    state: started
+    restart_policy: unless-stopped
+    env:
+      IDRAC_HOST: "{{ item.host }}"
+      IDRAC_USERNAME: "{{ vault_idrac_username }}"
+      IDRAC_PASSWORD: "{{ vault_idrac_password }}"
+      FAN_SPEED: "{{ idrac_fan_speed | string }}"
+      CPU_TEMPERATURE_THRESHOLD: "{{ idrac_cpu_temp_threshold | string }}"
+      CHECK_INTERVAL: "{{ idrac_check_interval | string }}"
+  loop: "{{ idrac_servers }}"
+  loop_control:
+    label: "{{ item.name }} ({{ item.host }})"
