@@ -1,25 +1,26 @@
 # =============================================================================
-# playbooks/deploy_node_exporter.yml — Deploy Prometheus node_exporter
+# playbooks/monitoring/deploy_node_exporter.yml — Deploy Prometheus node_exporter
 # =============================================================================
-# Deploys node_exporter to all Linux VMs so Prometheus can scrape host metrics.
+# Deploys node_exporter to all Linux hosts so Prometheus can scrape host metrics.
 #
-# TARGETS (defined in prometheus_node_targets in roles/prometheus/defaults):
+# TARGETS:
 #   hmvlapans001 — Ansible control node
 #   hmvlapjkn001 — Jenkins
-#   hmvlapmon001 — Grafana
-#   hmvlapmon002 — Prometheus (self-scrape)
+#   hmvlapmon001-003 — Monitoring stack
+#   hmpplxap002  — Plex Media Server
 #
 # USAGE:
-#   ansible-playbook playbooks/deploy_node_exporter.yml          # all hosts
-#   ansible-playbook playbooks/deploy_node_exporter.yml --limit hmvlapmon001.nnt.com
+#   ansible-playbook playbooks/monitoring/deploy_node_exporter.yml
+#   ansible-playbook playbooks/monitoring/deploy_node_exporter.yml --limit hmpplxap002.nnt.com
 # =============================================================================
 
 ---
-- name: Deploy node_exporter (all Linux VMs)
+- name: Deploy node_exporter (all Linux hosts)
   hosts:
     - ansible_nodes
     - jenkins
     - monitoring
+    - plex_servers
   become: true
   gather_facts: true
 

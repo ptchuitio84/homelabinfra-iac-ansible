@@ -1,110 +1,148 @@
 # =============================================================================
 # roles/plex/tasks/main.yml — Plex Media Server Deployment Tasks
 # =============================================================================
-# Deploys Plex Media Server on OL7.6.
-# NOTE: OL7 uses yum, not dnf. Service management via systemd.
-# Run via: ansible-playbook playbooks/setup_plex.yml
+# Target: hmpplxap002 — Dell PowerEdge R510, Oracle Linux 7.9
+#
+# PREREQUISITES:
+#   - LVM volumes already mounted: /plx (vg01) and /data (vg00)
+#     Fresh build: run playbooks/infra/lvm_provision_plex.yml first
+#   - bond0 configured and connected to swplnet252 Port-Channel 6
+#     Fresh build: run playbooks/linux/configure_plex_bond.yml first
+#   - common role already applied (timezone, NTP, SELinux permissive, hostname)
 # =============================================================================
 
 ---
 # =============================================================================
-# SECTION 1: DATA DISK
-# Auto-detect 60GB data disk — same pattern as all other roles.
-# OL7.6 ansible_devices works the same as OL9.
+# SECTION 1: ASSERT STORAGE IS READY
+# Fail early if /plx is not mounted — no point proceeding without it.
 # =============================================================================
 
-- name: Detect data disk (disk > 50GB with no partitions)
-  ansible.builtin.set_fact:
-    _plex_data_device: "/dev/{{ item.key }}"
-  loop: "{{ ansible_devices | dict2items }}"
-  when:
-    - item.key is match('^sd[a-z]$')
-    - (item.value.size | regex_replace(' GB', '') | float) > 50
-    - item.value.partitions | length == 0
-  loop_control:
-    label: "{{ item.key }}"
+- name: Assert /plx is mounted
+  ansible.builtin.command:
+    cmd: mountpoint -q /plx
+  changed_when: false
+  failed_when: false
+  register: plx_mount_check
 
-- name: Fail if no data disk detected
+- name: Fail if /plx is not mounted
   ansible.builtin.fail:
-    msg: "No unpartitioned disk > 50GB found — is the data disk attached?"
-  when: _plex_data_device is not defined
+    msg: >
+      /plx is not mounted. Run playbooks/infra/lvm_provision_plex.yml first
+      (fresh build) or investigate why the LVM volume is not available.
+  when: plx_mount_check.rc != 0
 
-- name: Check if {{ _plex_data_device }} already has a filesystem
-  ansible.builtin.command: blkid {{ _plex_data_device }}
-  register: plex_blkid
-  changed_when: false
+# =============================================================================
+# SECTION 2: USERS AND GROUPS
+# Pre-create plex user/group before RPM install to lock in UID/GID.
+# The RPM sees the user already exists and skips auto-creation.
+# =============================================================================
+
+- name: Create plex group (gid {{ plex_gid }})
+  ansible.builtin.group:
+    name: "{{ plex_group }}"
+    gid: "{{ plex_gid }}"
+    state: present
+
+- name: Create plex user (uid {{ plex_uid }})
+  ansible.builtin.user:
+    name: "{{ plex_user }}"
+    uid: "{{ plex_uid }}"
+    group: "{{ plex_group }}"
+    shell: /bin/bash
+    home: /home/plex
+    create_home: true
+    comment: Plex Media Server
+    state: present
+
+- name: Create plexadmins group (gid {{ plex_admin_gid }})
+  ansible.builtin.group:
+    name: "{{ plex_admin_group }}"
+    gid: "{{ plex_admin_gid }}"
+    state: present
+
+- name: Add members to plexadmins group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: "{{ plex_admin_group }}"
+    append: true
+  loop: "{{ plex_admin_members }}"
+  # prtchuitio must already exist (created at OS install). Skip if missing.
   failed_when: false
 
-- name: Format {{ _plex_data_device }} as XFS (only if blank)
-  community.general.filesystem:
-    fstype: "{{ plex_data_fstype }}"
-    dev: "{{ _plex_data_device }}"
-  when: plex_blkid.rc != 0
+# =============================================================================
+# SECTION 3: PLEX YUM REPO AND INSTALL
+# =============================================================================
 
-- name: Create Plex data directory ({{ plex_data_dir }})
+- name: Add official Plex yum repository
+  ansible.builtin.yum_repository:
+    name: "{{ plex_repo_name }}"
+    description: Plex Media Server
+    baseurl: "{{ plex_repo_baseurl }}"
+    gpgkey: "{{ plex_repo_gpgkey }}"
+    gpgcheck: true
+    enabled: true
+    state: present
+
+- name: Install plexmediaserver
+  ansible.builtin.yum:
+    name: plexmediaserver
+    state: present
+
+# =============================================================================
+# SECTION 4: METADATA PERSISTENCE
+# Move Plex app data off the OS disk to /plx/.plex so it survives rebuilds.
+# /var/lib/plexmediaserver becomes a symlink to /plx/.plex.
+# =============================================================================
+
+- name: Create Plex metadata directory on /plx
   ansible.builtin.file:
+    path: "{{ plex_metadata_dir }}"
+    state: directory
+    owner: "{{ plex_user }}"
+    group: "{{ plex_group }}"
+    mode: '0755'
+
+- name: Check current state of /var/lib/plexmediaserver
+  ansible.builtin.stat:
     path: "{{ plex_data_dir }}"
-    state: directory
-    owner: root
-    group: root
-    mode: '0755'
+  register: plex_data_stat
 
-- name: Check if {{ _plex_data_device }} is already mounted at {{ plex_data_dir }}
-  ansible.builtin.shell: grep -qs "^{{ _plex_data_device }} " /proc/mounts
-  register: plex_disk_mounted
-  changed_when: false
-  failed_when: false
-
-- name: Mount {{ _plex_data_device }} at {{ plex_data_dir }}
-  ansible.builtin.command: mount {{ _plex_data_device }} {{ plex_data_dir }}
-  when: plex_disk_mounted.rc != 0
-
-- name: Ensure {{ _plex_data_device }} is in fstab
-  ansible.builtin.lineinfile:
-    path: /etc/fstab
-    regexp: "^{{ _plex_data_device }}\\s"
-    line: "{{ _plex_data_device }} {{ plex_data_dir }} {{ plex_data_fstype }} defaults 0 0"
-    state: present
-
-# =============================================================================
-# SECTION 2: MEDIA MOUNT (TrueNAS NFS)
-# =============================================================================
-
-- name: Install NFS client utilities (OL7 — yum)
-  ansible.builtin.yum:
-    name: nfs-utils
-    state: present
-
-- name: Create media mount point
-  ansible.builtin.file:
-    path: "{{ plex_media_mount }}"
-    state: directory
-    owner: root
-    group: root
-    mode: '0755'
-
-- name: Mount TrueNAS NFS media share
-  ansible.posix.mount:
-    path: "{{ plex_media_mount }}"
-    src: "{{ plex_media_nfs_server }}:{{ plex_media_nfs_share }}"
-    fstype: nfs
-    opts: "defaults,_netdev,nofail"
-    state: mounted
+- name: Migrate existing metadata to /plx/.plex (existing server — one-time)
   when:
-    - plex_media_nfs_server != 'CHANGEME'
-    - plex_media_nfs_share != 'CHANGEME'
+    - plex_data_stat.stat.exists
+    - not plex_data_stat.stat.islnk
+  block:
+    - name: Stop Plex before migration
+      ansible.builtin.service:
+        name: plexmediaserver
+        state: stopped
+
+    - name: Copy metadata to /plx/.plex
+      ansible.builtin.command:
+        cmd: cp -a {{ plex_data_dir }}/. {{ plex_metadata_dir }}/
+        creates: "{{ plex_metadata_dir }}/Library"
+
+    - name: Remove original metadata directory
+      ansible.builtin.file:
+        path: "{{ plex_data_dir }}"
+        state: absent
+
+    - name: Create symlink /var/lib/plexmediaserver → /plx/.plex
+      ansible.builtin.file:
+        src: "{{ plex_metadata_dir }}"
+        dest: "{{ plex_data_dir }}"
+        state: link
+
+- name: Create symlink on fresh build (no existing data)
+  ansible.builtin.file:
+    src: "{{ plex_metadata_dir }}"
+    dest: "{{ plex_data_dir }}"
+    state: link
+  when:
+    - not plex_data_stat.stat.exists
 
 # =============================================================================
-# SECTION 3: INSTALL PLEX (OL7 — yum)
-# =============================================================================
-
-- name: Install Plex Media Server RPM
-  ansible.builtin.yum:
-    name: "{{ plex_rpm_url }}"
-    state: present
-
-# =============================================================================
-# SECTION 4: DIRECTORIES AND PERMISSIONS
+# SECTION 5: DIRECTORIES AND PERMISSIONS
 # =============================================================================
 
 - name: Create Plex log directory
@@ -115,28 +153,93 @@
     group: "{{ plex_group }}"
     mode: '0755'
 
-- name: Set ownership of Plex data directory
+# Set ownership on /plx directory itself only — not recursive.
+# /plx contains 10TB of media; recursive chown would take hours.
+- name: Set ownership on /plx (directory only, not recursive)
   ansible.builtin.file:
-    path: "{{ plex_data_dir }}"
+    path: "{{ plex_media_dir }}"
+    state: directory
+    owner: "{{ plex_user }}"
+    group: "{{ plex_admin_group }}"
+    mode: '0775'
+
+- name: Set ownership on /plx/.plex metadata directory
+  ansible.builtin.file:
+    path: "{{ plex_metadata_dir }}"
+    state: directory
     owner: "{{ plex_user }}"
     group: "{{ plex_group }}"
     mode: '0755'
-    recurse: true
 
 # =============================================================================
-# SECTION 5: FIREWALL
-# OL7 uses firewalld — open port 32400
+# SECTION 6: SELINUX
+# Allow nginx to proxy to Plex (httpd → localhost:32400).
+# Common role sets SELinux to permissive, but the boolean is good practice.
 # =============================================================================
 
-- name: Open Plex port in firewalld
-  ansible.posix.firewalld:
-    port: "{{ plex_port }}/tcp"
-    permanent: true
-    state: enabled
-  notify: Restart Plex
+- name: Allow nginx to connect to Plex (SELinux boolean)
+  ansible.posix.seboolean:
+    name: httpd_can_network_connect
+    state: true
+    persistent: true
 
 # =============================================================================
-# SECTION 6: SYSTEMD SERVICE
+# SECTION 7: PLEX CONFIGURATION
+# Deploy Preferences.xml only on fresh builds — never overwrite a running server.
+# The claim token is one-time use; get a fresh one at https://www.plex.tv/claim/
+# =============================================================================
+
+- name: Create Plex config directory
+  ansible.builtin.file:
+    path: "{{ plex_config_dir }}"
+    state: directory
+    owner: "{{ plex_user }}"
+    group: "{{ plex_group }}"
+    mode: '0755'
+
+- name: Deploy Preferences.xml (fresh install only — never overwrites)
+  ansible.builtin.template:
+    src: Preferences.xml.j2
+    dest: "{{ plex_config_dir }}/Preferences.xml"
+    owner: "{{ plex_user }}"
+    group: "{{ plex_group }}"
+    mode: '0644'
+    force: false
+
+# =============================================================================
+# SECTION 8: NGINX REVERSE PROXY
+# Proxies port 80 → 127.0.0.1:32400 with websocket support.
+# =============================================================================
+
+- name: Install nginx
+  ansible.builtin.yum:
+    name: nginx
+    state: present
+
+- name: Deploy Plex nginx reverse proxy config
+  ansible.builtin.template:
+    src: plex.conf.j2
+    dest: /etc/nginx/conf.d/plex.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart nginx
+
+- name: Set nginx server_names_hash_bucket_size
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/nginx.conf
+    insertafter: 'include /etc/nginx/conf.d/\*.conf;'
+    line: '    server_names_hash_bucket_size 64;'
+    regexp: 'server_names_hash_bucket_size'
+
+- name: Enable and start nginx
+  ansible.builtin.service:
+    name: nginx
+    enabled: true
+    state: started
+
+# =============================================================================
+# SECTION 9: PLEX SERVICE
 # =============================================================================
 
 - name: Enable and start Plex Media Server
@@ -146,15 +249,22 @@
     state: started
 
 # =============================================================================
-# SECTION 7: VERIFY
+# SECTION 10: VERIFY
 # =============================================================================
 
-- name: Wait for Plex to be reachable
+- name: Wait for Plex to be reachable on port {{ plex_port }}
   ansible.builtin.wait_for:
     host: "{{ ansible_host }}"
     port: "{{ plex_port }}"
     timeout: 60
 
-- name: Display Plex access URL
+- name: Post-install summary
   ansible.builtin.debug:
-    msg: "Plex is up — http://{{ ansible_host }}:{{ plex_port }}/web"
+    msg:
+      - "Plex is up — http://{{ ansible_host }}:{{ plex_port }}/web"
+      - "nginx proxy  — http://{{ plex_nginx_server_name }}"
+      - ""
+      - "FRESH BUILD NEXT STEPS:"
+      - "  1. Open http://{{ ansible_host }}:{{ plex_port }}/web in a browser"
+      - "  2. Sign in and claim the server (token in Preferences.xml expires — use web UI if already expired)"
+      - "  3. Add media libraries pointing to /plx/<category>"

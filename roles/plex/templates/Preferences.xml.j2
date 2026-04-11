@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Managed by Ansible — roles/plex/templates/Preferences.xml.j2          -->
+<!-- Deployed ONLY on fresh builds (force: false — never overwrites).       -->
+<!-- The claim token is one-time use. If it expired, claim via the web UI.  -->
+<Preferences
+  AcceptedEULA="1"
+  PublishServerOnPlexOnlineKey="1"
+  PlexOnlineToken="{{ vault_plex_claim_token }}"
+  allowedNetworks="{{ plex_allowed_networks | join(',') }}"
+  ManualPortMappingMode="1"
+  FSEventLibraryPartialScanEnabled="1"
+  FSEventLibraryUpdatesEnabled="1"
+  ScheduledLibraryUpdatesEnabled="1"
+  DlnaEnabled="1"
+  EnableIPv6="0"
+/>

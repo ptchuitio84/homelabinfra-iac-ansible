@@ -1,0 +1,13 @@
+# =============================================================================
+# inventory/group_vars/plex_servers/vault.yml — ENCRYPT BEFORE COMMITTING
+# =============================================================================
+# ansible-vault encrypt inventory/group_vars/plex_servers/vault.yml \
+#   --vault-password-file ~/.ansible/vault_pass.txt --encrypt-vault-id default
+#
+# vault_plex_claim_token: one-time use — get a fresh token before each rebuild
+#   at https://www.plex.tv/claim/ (expires after 4 minutes)
+# =============================================================================
+
+---
+vault_plex_servers_password: CHANGEME
+vault_plex_claim_token: CHANGEME

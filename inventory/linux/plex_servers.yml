@@ -1,26 +1,28 @@
 # =============================================================================
 # inventory/linux/plex_servers.yml — Plex Media Server Inventory
 # =============================================================================
-# Defines the Plex media server managed by the plex-ansible repo.
+# Physical server — Dell PowerEdge R510 (bare metal, not a VM).
 #
-# NOTE: The full Plex deployment role lives in a separate repo:
-#   ~/git_prt84/plex-ansible
-# This entry exists here so network-level tasks (VLAN access, firewall,
-# connectivity checks) can reference the Plex server alongside other hosts.
+# HARDWARE:
+#   OS disk:  1x 1TB SSD (sda) — LVM: ol VG (root 50GB, swap 32GB, home 850GB)
+#   Media:    6x 4TB HGST  (sdb-sdg) → vg01/lvplx  → /plx  (~10TB LV)
+#   Storage:  6x 2TB Seagate (sdh-sdm) → vg00/lvdata → /data (~6TB LV)
+#   NICs:     2x 10GbE bonded (bond0) — 10.100.7.10, VLAN 7 (TVNET)
+#   iDRAC:    10.2.0.164 (VLAN 2 — OOBNET)
 #
 # GROUP: plex_servers
-# No dedicated group_vars — uses the ansible_user set per host below.
+# Connection settings: inventory/group_vars/plex_servers/vars.yml
+# Credentials:         inventory/group_vars/plex_servers/vault.yml (encrypted)
 # =============================================================================
 
 ---
 plex_servers:
   hosts:
 
-    # plex01 — Plex Media Server
-    # IP:      10.100.7.10 (VLAN 7 — TVNET)
-    # OS:      Linux (managed separately via plex-ansible repo)
-    # Role:    Streams media to all TVs and devices on TVNET
+    # hmpplxap002 — Plex Media Server
+    # Mgmt IP: 10.100.7.10 (VLAN 7 — TVNET, bond0 dual 10GbE)
+    # OOB IP:  10.2.0.164  (VLAN 2 — OOBNET, iDRAC)
+    # OS:      Oracle Linux 7.9
     # Uplink:  Port-Channel 6 on swplnet252 (Ethernet17-18, dual 10GbE LAG)
-    plex01.nnt.com:
+    hmpplxap002.nnt.com:
       ansible_host: 10.100.7.10
-      ansible_user: root

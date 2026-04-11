@@ -7,3 +7,8 @@
   ansible.builtin.service:
     name: plexmediaserver
     state: restarted
+
+- name: Restart nginx
+  ansible.builtin.service:
+    name: nginx
+    state: restarted

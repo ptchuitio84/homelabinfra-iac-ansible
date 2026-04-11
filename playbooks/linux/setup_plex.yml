@@ -1,20 +1,33 @@
 # =============================================================================
-# playbooks/setup_plex.yml — Deploy Plex Media Server
+# playbooks/linux/setup_plex.yml — Deploy Plex Media Server
 # =============================================================================
-# Deploys Plex Media Server on plex01 (OL7.6, R510 bare metal).
+# Deploys and configures Plex Media Server on hmpplxap002 (OL7.9, R510).
 #
-# BLOCKED: Requires Arista 7048T-A port-channel (Ethernet17-18, LAG to VLAN 7)
-# to be in service before this playbook can run.
+# PREREQUISITES (fresh build only — skip if server already running):
+#   1. Configure network bond:
+#      ansible-playbook playbooks/linux/configure_plex_bond.yml \
+#        --vault-password-file ~/.ansible/vault_pass.txt
 #
-# USAGE (once Arista is up):
-#   ansible-playbook playbooks/setup_plex.yml
+#   2. Provision LVM volumes (/plx and /data):
+#      ansible-playbook playbooks/infra/lvm_provision_plex.yml \
+#        --vault-password-file ~/.ansible/vault_pass.txt
+#
+#   3. Get a fresh Plex claim token at https://www.plex.tv/claim/
+#      Update vault_plex_claim_token in group_vars/plex_servers/vault.yml
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/setup_plex.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+# VAULT REQUIRED: yes
 # =============================================================================
 
 ---
-- name: Deploy Plex Media Server (plex01)
-  hosts: plex01.nnt.com
+- name: Deploy Plex Media Server — hmpplxap002
+  hosts: plex_servers
   become: true
   gather_facts: true
 
   roles:
+    - common
     - plex

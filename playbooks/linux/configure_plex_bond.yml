@@ -1,0 +1,128 @@
+# =============================================================================
+# playbooks/linux/configure_plex_bond.yml — Configure bond0 on hmpplxap002
+# =============================================================================
+# PURPOSE:
+# Configures the dual 10GbE bond (bond0) on a freshly installed hmpplxap002.
+# This playbook is ONLY needed on a fresh OS install. The existing server
+# already has bond0 configured — DO NOT run this on the live server.
+#
+# BOND DESIGN:
+#   bond0      — active-backup mode, miimon 100ms
+#   Members    — two onboard 10GbE NICs (confirm names with: ip link show)
+#   IP         — 10.100.7.10/28, gateway 10.100.7.1 (VRRP VIP)
+#   VLAN       — 7 (TVNET), native on Port-Channel 6 of swplnet252
+#
+# PRE-FLIGHT:
+#   1. Confirm NIC names before running:
+#        ssh root@<console-ip> ip link show
+#   2. Update plex_bond_members in group_vars or pass via -e
+#   3. Run from console/iDRAC — network drops during reconfiguration
+#
+# USAGE (fresh build only):
+#   ansible-playbook playbooks/linux/configure_plex_bond.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     -e "plex_bond_member1=em1 plex_bond_member2=em2"
+#
+# VAULT REQUIRED: yes
+# =============================================================================
+
+---
+- name: Configure bond0 — hmpplxap002 (FRESH BUILD ONLY)
+  hosts: hmpplxap002.nnt.com
+  become: true
+  gather_facts: true
+
+  vars:
+    # !! CONFIRM NIC NAMES BEFORE RUNNING !!
+    # Run 'ip link show' on the server to get actual interface names.
+    # Dell R510 onboard NICs are typically em1/em2 but may vary.
+    plex_bond_member1: em1       # First 10GbE NIC — CONFIRM BEFORE RUNNING
+    plex_bond_member2: em2       # Second 10GbE NIC — CONFIRM BEFORE RUNNING
+    plex_bond_name: bond0
+    plex_bond_ip: 10.100.7.10
+    plex_bond_prefix: 28
+    plex_bond_gateway: 10.100.7.1
+    plex_bond_dns1: 10.10.0.10
+    plex_bond_dns2: 10.10.0.12
+
+  tasks:
+
+    - name: Install bonding kernel module
+      community.general.modprobe:
+        name: bonding
+        state: present
+
+    - name: Ensure bonding loads at boot
+      ansible.builtin.lineinfile:
+        path: /etc/modules-load.d/bonding.conf
+        line: bonding
+        create: true
+
+    - name: Deploy bond0 interface config
+      ansible.builtin.copy:
+        dest: /etc/sysconfig/network-scripts/ifcfg-bond0
+        content: |
+          DEVICE=bond0
+          NAME=bond0
+          TYPE=Bond
+          BONDING_MASTER=yes
+          IPADDR={{ plex_bond_ip }}
+          PREFIX={{ plex_bond_prefix }}
+          GATEWAY={{ plex_bond_gateway }}
+          DNS1={{ plex_bond_dns1 }}
+          DNS2={{ plex_bond_dns2 }}
+          ONBOOT=yes
+          BOOTPROTO=none
+          BONDING_OPTS="mode=active-backup miimon=100"
+          DEFROUTE=yes
+          IPV6INIT=no
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Deploy first member NIC config
+      ansible.builtin.copy:
+        dest: /etc/sysconfig/network-scripts/ifcfg-{{ plex_bond_member1 }}
+        content: |
+          DEVICE={{ plex_bond_member1 }}
+          NAME={{ plex_bond_member1 }}
+          TYPE=Ethernet
+          BOOTPROTO=none
+          ONBOOT=yes
+          MASTER=bond0
+          SLAVE=yes
+          IPV6INIT=no
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Deploy second member NIC config
+      ansible.builtin.copy:
+        dest: /etc/sysconfig/network-scripts/ifcfg-{{ plex_bond_member2 }}
+        content: |
+          DEVICE={{ plex_bond_member2 }}
+          NAME={{ plex_bond_member2 }}
+          TYPE=Ethernet
+          BOOTPROTO=none
+          ONBOOT=yes
+          MASTER=bond0
+          SLAVE=yes
+          IPV6INIT=no
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Restart networking (connection will drop briefly)
+      ansible.builtin.service:
+        name: network
+        state: restarted
+
+    - name: Display bond status
+      ansible.builtin.command:
+        cmd: cat /proc/net/bonding/bond0
+      register: bond_status
+      changed_when: false
+
+    - name: Show bond0 status
+      ansible.builtin.debug:
+        msg: "{{ bond_status.stdout }}"

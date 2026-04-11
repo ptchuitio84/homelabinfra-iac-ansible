@@ -1,0 +1,48 @@
+# Managed by Ansible — do not edit manually
+# roles/plex/templates/plex.conf.j2
+
+upstream plex_backend {
+    server 127.0.0.1:{{ plex_port }};
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    server_name {{ plex_nginx_server_name }};
+
+    # Long timeout for large file transfers and paused streams
+    send_timeout 100m;
+
+    # Plex has heavy JS/XML — gzip saves significant bandwidth
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1000;
+    gzip_proxied any;
+    gzip_types text/plain text/css text/xml application/xml text/javascript application/x-javascript image/svg+xml;
+    gzip_disable "MSIE [1-6]\.";
+
+    # Camera upload and large media file support
+    client_max_body_size 100M;
+
+    # Forward real client IP to Plex
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Sec-WebSocket-Extensions $http_sec_websocket_extensions;
+    proxy_set_header Sec-WebSocket-Key $http_sec_websocket_key;
+    proxy_set_header Sec-WebSocket-Version $http_sec_websocket_version;
+
+    # WebSocket support (required for Plex web player)
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "Upgrade";
+
+    # Stream directly to client — no buffering
+    proxy_redirect off;
+    proxy_buffering off;
+
+    location / {
+        proxy_pass http://plex_backend;
+    }
+}

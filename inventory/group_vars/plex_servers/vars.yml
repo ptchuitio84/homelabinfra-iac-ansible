@@ -1,0 +1,12 @@
+# =============================================================================
+# inventory/group_vars/plex_servers/vars.yml
+# =============================================================================
+# Connection settings for the Plex Media Server (hmpplxap002, OL7.9).
+# Credentials stored in vault.yml (encrypted).
+# =============================================================================
+
+---
+ansible_user: root
+ansible_password: "{{ vault_plex_servers_password }}"
+ansible_connection: ssh
+ansible_python_interpreter: /usr/bin/python3

@@ -15,10 +15,10 @@
   community.general.timezone:
     name: "{{ timezone }}"
 
-# Install all packages in the base_packages list using DNF (OL9 / RHEL package manager).
-# "state: present" means install if missing, leave alone if already installed.
+# Install all packages in the base_packages list.
+# ansible.builtin.package auto-selects yum (OL7) or dnf (OL9) — works on both.
 - name: Install base packages
-  ansible.builtin.dnf:
+  ansible.builtin.package:
     name: "{{ base_packages }}"
     state: present
 

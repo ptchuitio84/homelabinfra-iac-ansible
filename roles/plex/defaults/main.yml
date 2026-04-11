@@ -1,37 +1,67 @@
 # =============================================================================
-# roles/plex/defaults/main.yml — Plex Media Server Role Default Variables
+# roles/plex/defaults/main.yml — Plex Media Server Role Defaults
 # =============================================================================
-# Deploys Plex Media Server on OL7.6 (yum, not dnf).
-# Deployment blocked until port-channel (Arista) is in service.
+# Target: hmpplxap002 — Dell PowerEdge R510, Oracle Linux 7.9 (yum, not dnf)
 #
-# DISK LAYOUT:
-#   OS disk (30GB) — boot + LVM root + swap
-#   Data disk (60GB) — auto-detected, mounted at /var/lib/plexmediaserver
-#   Media — served from TrueNAS NFS/CIFS mount (separate)
+# STORAGE LAYOUT (pre-existing LVM — not managed by this role):
+#   /plx   → vg01/lvplx  (~10TB) — Plex media library
+#   /data  → vg00/lvdata (~6TB)  — File server repo (not managed here)
+#   /var/lib/plexmediaserver → symlink → /plx/.plex  (metadata, survives rebuilds)
 # =============================================================================
 
 ---
-# Plex version — set to 'latest' or pin a specific version
-# Download from: https://www.plex.tv/media-server-downloads/
-# Update this URL when upgrading
-plex_rpm_url: "https://downloads.plex.tv/plex-media-server-new/1.40.1.8227-c0dd5a73e/redhat/plexmediaserver-1.40.1.8227-c0dd5a73e.x86_64.rpm"
-
-# System user Plex runs as (created by RPM install)
+# -----------------------------------------------------------------------------
+# Users and groups
+# -----------------------------------------------------------------------------
+# Pre-create plex user before RPM install to lock in the correct UID/GID.
+# The plexmediaserver RPM will use the existing user rather than auto-assigning.
 plex_user: plex
+plex_uid: 1001
 plex_group: plex
+plex_gid: 1001
 
-# Data directories
-plex_data_dir: /var/lib/plexmediaserver
-plex_config_dir: /var/lib/plexmediaserver/Library
+# plexadmins group — members can read/write /plx directly
+plex_admin_group: plexadmins
+plex_admin_gid: 1002
+plex_admin_members:
+  - plex
+  - prtchuitio
+
+# -----------------------------------------------------------------------------
+# Directories
+# -----------------------------------------------------------------------------
+plex_media_dir: /plx                            # Media library (LVM, pre-existing)
+plex_metadata_dir: /plx/.plex                  # Plex app data (survives OS rebuild)
+plex_data_dir: /var/lib/plexmediaserver        # Symlink → plex_metadata_dir
+plex_config_dir: "/var/lib/plexmediaserver/Library/Application Support/Plex Media Server"
 plex_log_dir: /var/log/plexmediaserver
 
-# Data disk filesystem (auto-detected by size)
-plex_data_fstype: xfs
+# -----------------------------------------------------------------------------
+# Plex official yum repository
+# -----------------------------------------------------------------------------
+plex_repo_name: PlexRepo
+plex_repo_baseurl: "https://downloads.plex.tv/repo/rpm/$basearch/"
+plex_repo_gpgkey: "https://downloads.plex.tv/plex-keys/PlexSign.key"
 
-# Port Plex listens on
+# -----------------------------------------------------------------------------
+# Plex network
+# -----------------------------------------------------------------------------
 plex_port: 32400
 
-# Media mount — TrueNAS share mounted here
-plex_media_mount: /mnt/media
-plex_media_nfs_server: CHANGEME          # Set to TrueNAS IP
-plex_media_nfs_share: CHANGEME           # Set to NFS export path
+# Subnets that can connect to Plex without requiring account authentication.
+# Covers all client VLANs in the lab. Update if VLANs change.
+plex_allowed_networks:
+  - 10.100.5.0/27    # HOMENET     (VLAN 5  — phones, laptops)
+  - 10.100.6.0/26    # HOUSEHOLDNET (VLAN 6 — smart home / IoT)
+  - 10.100.7.0/28    # TVNET       (VLAN 7  — TVs, media devices)
+  - 10.100.100.0/24  # COREMGMTNET (VLAN 100 — admin access)
+  - 10.100.200.0/24  # NANONET     (VLAN 200 — NanoNetech devices)
+
+# Plex claim token — vault variable, one-time use for fresh builds.
+# Get a fresh token at https://www.plex.tv/claim/ (expires in 4 minutes).
+# vault_plex_claim_token is defined in group_vars/plex_servers/vault.yml
+
+# -----------------------------------------------------------------------------
+# nginx reverse proxy
+# -----------------------------------------------------------------------------
+plex_nginx_server_name: plex.nanonetech.com

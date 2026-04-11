@@ -6,7 +6,8 @@
 # or passed at runtime (-e flag) will override these.
 #
 # WHAT THE COMMON ROLE DOES:
-# Sets a consistent baseline on every OL9 VM before any app role runs:
+# Sets a consistent baseline on every Linux host before any app role runs:
+# Supports OL7 (yum) and OL9 (dnf) via ansible.builtin.package.
 #   - Correct timezone and NTP sync
 #   - Required base packages
 #   - SELinux in permissive mode (tighten in a future hardening pass)

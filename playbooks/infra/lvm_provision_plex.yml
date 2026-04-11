@@ -1,0 +1,171 @@
+# =============================================================================
+# playbooks/infra/lvm_provision_plex.yml — LVM Provisioning for hmpplxap002
+# =============================================================================
+# PURPOSE:
+# Builds the two LVM volume groups and logical volumes on a freshly installed
+# hmpplxap002 before the plex role runs.
+#
+# !! DESTRUCTIVE — ONLY RUN ON A FRESH BUILD !!
+# !! Running on a server with existing data WILL DESTROY IT !!
+#
+# DISK LAYOUT (physical server — Dell PowerEdge R510):
+#   vg01 → /plx  (Plex media library, ~10TB LV)
+#     PVs: /dev/sdb /dev/sdc /dev/sdd /dev/sde /dev/sdf /dev/sdg
+#          (6x 4TB HGST HUS724040ALS640)
+#
+#   vg00 → /data (File server repo, ~6TB LV)
+#     PVs: /dev/sdh /dev/sdi /dev/sdj /dev/sdk /dev/sdl /dev/sdm
+#          (6x 2TB Seagate ST32000445SS)
+#
+# PRE-FLIGHT:
+#   1. Confirm disk assignment with: sudo fdisk -l | grep 'Disk /dev/sd'
+#   2. Confirm NO existing data on target disks: sudo pvs, sudo vgs
+#   3. Run with --check first to validate before applying
+#
+# USAGE:
+#   # Dry run first:
+#   ansible-playbook playbooks/infra/lvm_provision_plex.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt --check
+#
+#   # Apply:
+#   ansible-playbook playbooks/infra/lvm_provision_plex.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+# VAULT REQUIRED: yes
+# =============================================================================
+
+---
+- name: LVM Provisioning — hmpplxap002 (FRESH BUILD ONLY)
+  hosts: hmpplxap002.nnt.com
+  become: true
+  gather_facts: false
+
+  vars:
+    # vg01 — Plex media library (/plx)
+    vg01_name: vg01
+    vg01_pvs:
+      - /dev/sdb    # HGST 4TB
+      - /dev/sdc    # HGST 4TB
+      - /dev/sdd    # HGST 4TB
+      - /dev/sde    # HGST 4TB
+      - /dev/sdf    # HGST 4TB
+      - /dev/sdg    # HGST 4TB
+    vg01_lv_name: lvplx
+    vg01_lv_size: 10240g   # 10TB — leaves ~12TB in VG for future growth
+    vg01_mount: /plx
+    vg01_fstype: xfs
+
+    # vg00 — File server repo (/data)
+    vg00_name: vg00
+    vg00_pvs:
+      - /dev/sdh    # Seagate 2TB
+      - /dev/sdi    # Seagate 2TB
+      - /dev/sdj    # Seagate 2TB
+      - /dev/sdk    # Seagate 2TB
+      - /dev/sdl    # Seagate 2TB
+      - /dev/sdm    # Seagate 2TB
+    vg00_lv_name: lvdata
+    vg00_lv_size: 6144g    # 6TB — leaves ~6TB in VG for future growth
+    vg00_mount: /data
+    vg00_fstype: xfs
+
+  tasks:
+
+    - name: Assert existing VGs do not already exist (safety check)
+      ansible.builtin.command:
+        cmd: vgs --noheadings -o vg_name
+      register: existing_vgs
+      changed_when: false
+      failed_when: false
+
+    - name: Abort if vg00 or vg01 already exists
+      ansible.builtin.fail:
+        msg: >
+          VG {{ item }} already exists on this host.
+          This playbook is for fresh builds only. Aborting to prevent data loss.
+      when: item in existing_vgs.stdout
+      loop:
+        - "{{ vg00_name }}"
+        - "{{ vg01_name }}"
+
+    # ── vg01 — Plex media (/plx) ────────────────────────────────────────────
+
+    - name: Create vg01 (Plex media — 6x 4TB HGST)
+      community.general.lvg:
+        vg: "{{ vg01_name }}"
+        pvs: "{{ vg01_pvs | join(',') }}"
+        state: present
+
+    - name: Create lvplx logical volume (10TB)
+      community.general.lvol:
+        vg: "{{ vg01_name }}"
+        lv: "{{ vg01_lv_name }}"
+        size: "{{ vg01_lv_size }}"
+        state: present
+
+    - name: Format lvplx as XFS
+      community.general.filesystem:
+        fstype: "{{ vg01_fstype }}"
+        dev: "/dev/{{ vg01_name }}/{{ vg01_lv_name }}"
+
+    - name: Create /plx mount point
+      ansible.builtin.file:
+        path: "{{ vg01_mount }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Mount /plx and add to fstab
+      ansible.posix.mount:
+        path: "{{ vg01_mount }}"
+        src: "/dev/mapper/{{ vg01_name }}-{{ vg01_lv_name }}"
+        fstype: "{{ vg01_fstype }}"
+        opts: defaults
+        state: mounted
+
+    # ── vg00 — File server (/data) ───────────────────────────────────────────
+
+    - name: Create vg00 (file server — 6x 2TB Seagate)
+      community.general.lvg:
+        vg: "{{ vg00_name }}"
+        pvs: "{{ vg00_pvs | join(',') }}"
+        state: present
+
+    - name: Create lvdata logical volume (6TB)
+      community.general.lvol:
+        vg: "{{ vg00_name }}"
+        lv: "{{ vg00_lv_name }}"
+        size: "{{ vg00_lv_size }}"
+        state: present
+
+    - name: Format lvdata as XFS
+      community.general.filesystem:
+        fstype: "{{ vg00_fstype }}"
+        dev: "/dev/{{ vg00_name }}/{{ vg00_lv_name }}"
+
+    - name: Create /data mount point
+      ansible.builtin.file:
+        path: "{{ vg00_mount }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Mount /data and add to fstab
+      ansible.posix.mount:
+        path: "{{ vg00_mount }}"
+        src: "/dev/mapper/{{ vg00_name }}-{{ vg00_lv_name }}"
+        fstype: "{{ vg00_fstype }}"
+        opts: defaults
+        state: mounted
+
+    - name: Verify mounts
+      ansible.builtin.command:
+        cmd: df -h /plx /data
+      register: mount_verify
+      changed_when: false
+
+    - name: Display mount summary
+      ansible.builtin.debug:
+        msg: "{{ mount_verify.stdout }}"
