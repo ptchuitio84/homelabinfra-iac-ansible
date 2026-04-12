@@ -1,0 +1,12 @@
+# =============================================================================
+# inventory/windows/ad_dns_sync.yml — DNS Zone Sync targets
+# =============================================================================
+# DC01 is the primary DNS server. DNS sync runs here only.
+# WinRM connection settings inherited via active_directory → windows group_vars.
+# =============================================================================
+
+---
+ad_dns_sync:
+  hosts:
+    hmvwapdc001.nanonetech.com:
+      ansible_host: 10.10.0.10

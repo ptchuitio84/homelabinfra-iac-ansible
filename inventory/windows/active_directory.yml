@@ -14,9 +14,9 @@ active_directory:
   hosts:
 
     # DC01 — Primary Domain Controller
-    dc01.nanonetech.com:
+    hmvwapdc001.nanonetech.com:
       ansible_host: 10.10.0.10
 
     # DC02 — Secondary Domain Controller (pending promotion)
-    dc02.nanonetech.com:
+    hmvwapdc002.nanonetech.com:
       ansible_host: 10.10.0.12

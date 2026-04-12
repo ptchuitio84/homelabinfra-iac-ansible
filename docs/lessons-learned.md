@@ -212,3 +212,222 @@ Removing `lookups` means interface metrics carry `ifIndex` as a label rather tha
 | `6fea05a` | Add snmp_exporter role and Cisco SNMP config playbook |
 | `76c8730` | Fix snmp.yml for 0.26.0 auth-split format, add auth param to prometheus snmp job |
 | `81c0323` | snmp_exporter: remove lookups from module — not supported in 0.26.0 |
+
+---
+
+## LL-003 — ansible-core Python Version Matrix vs OL7 Target
+
+**Date:** 2026-04-12
+**Severity:** High — blocked all Ansible automation against hmpplxap002 (OL7.9)
+**Affected:** `playbooks/linux/setup_plex.yml`, all future OL7 targets
+
+---
+
+### Symptom
+
+Playbook failed immediately after gather_facts with:
+```
+Ansible requires Python 3.9 or newer on the target.
+Current version: 3.8.18
+```
+Earlier attempts with Python 3.6 (OL7 default) failed with:
+```
+SyntaxError: future feature annotations is not defined
+```
+
+---
+
+### Root Cause
+
+ansible-core version requirements escalate with each release:
+
+| ansible-core | Controller Python | Target Python |
+|---|---|---|
+| 2.15 | 3.9+ | 3.5+ |
+| 2.16 | 3.10+ | 3.7+ |
+| 2.17+ | 3.11+ | 3.9+ |
+| 2.20 (installed via brew) | 3.12+ | 3.9+ |
+
+OL7 ships Python 3.6. Oracle SCL tops out at rh-python38 for OL7 — there is no rh-python39.
+
+---
+
+### Fix
+
+Pinned ansible-core to 2.16 on the Mac controller via pipx with Python 3.12. Installed rh-python38 from Oracle SCL on the OL7 target via raw bootstrap task. Set `ansible_python_interpreter: /opt/rh/rh-python38/root/usr/bin/python3.8`.
+
+Will be removed when hmpplxap002 is rebuilt on OL9 (pending HBA swap).
+
+---
+
+### Key Takeaways
+
+1. **Check the ansible-core version matrix before targeting old OS.** OL7 is a dead end for ansible-core 2.17+.
+2. **EPEL does not exist on Oracle Linux** — it uses Oracle's own repo structure. `yum-config-manager --enable ol7_developer` only works if the repo file already exists on disk.
+3. **Oracle SCL is the right source for newer Python on OL7** — add the repo file directly in a raw bootstrap task, do not assume it is configured.
+4. **The bootstrap raw task must use `check_mode: false`** — otherwise it is skipped in `--check` mode and all subsequent tasks fail.
+
+---
+
+### Related Commits
+
+| Commit | Description |
+|---|---|
+| `2c9dc31` | Deploy Plex role: OL7 Python bootstrap, metadata migration, nginx setup |
+
+---
+
+## LL-004 — LSI SAS2008 (Falcon) Dropped from OL8/OL9 Kernel
+
+**Date:** 2026-04-12
+**Severity:** High — blocked OL8 and OL9 fresh install on hmpplxap002 (Dell R510)
+**Affected:** hmpplxap002 OS upgrade path
+
+---
+
+### Symptom
+
+OL8.9 and OL9.5 installers both showed zero disks. Installer shell confirmed:
+```
+Warning: Disabled Hardware is detected: mpt3sas:0072:1000 @ 0000:08:00.0
+is no longer enabled in this release.
+```
+`lsblk` in the installer shell returned nothing but loop devices.
+
+---
+
+### Root Cause
+
+The LSI SAS2008 chip (PCI ID 1000:0072, "Falcon") was explicitly removed from the `mpt3sas` driver in RHEL8/OL8. This affects any card using the SAS2008 chip regardless of the card's marketing name. The R510's HBA identified as SAS9211-8i via NVData but uses the SAS2008 chip underneath — same result.
+
+OL7 uses an older kernel where `mpt2sas` still supports this chip. OL8+ does not.
+
+---
+
+### Fix
+
+In progress — SAS9300-8i (SAS3008 chip, supported through OL9) on order. Plan: swap HBA, fresh OL9 install, run Ansible playbooks. Data volumes (vg01, vg00) on separate disks — survive the swap.
+
+---
+
+### Key Takeaways
+
+1. **Check HBA chip model, not card name.** `lspci -k` reveals the kernel driver in use. Cross-reference with RHEL HCL before planning an OS upgrade.
+2. **The card model name and the chip are different things.** SAS9211-8i, SAS9200-8i, and others all use the SAS2008 chip — all unsupported in OL8+.
+3. **OL7 → OL9 has no direct upgrade path.** Leapp supports one major version at a time: OL7 → OL8 → OL9. Leapp OL7 → OL8 would also fail on this hardware since the OL8 upgrade initrd needs the same dropped driver.
+4. **Disk layout saved us.** OS on sda (931GB) completely separate from data disks (vg01 6x4TB, vg00 6x1.8TB). HBA swap + fresh OS install touches only sda.
+
+---
+
+### Related Files
+
+- `sessions/hmpplxap002_ol9_rebuild_runbook_2026-04-12.md` — full rebuild runbook with confirmed disk layout
+
+---
+
+## LL-005 — ansible-core Installation Complexity on macOS (pipx + broken Python 3.14)
+
+**Date:** 2026-04-12
+**Severity:** Medium — 30+ minutes lost navigating Python environment fragmentation
+**Affected:** Ansible controller (prtchuitio-macM4)
+
+---
+
+### Symptom
+
+Multiple dead ends trying to install ansible-core 2.16 on macOS:
+- Xcode pip3 (Python 3.9): topped out at ansible-core 2.15, couldn't find 2.16
+- brew Python 3.14 pip: `ImportError: dlopen pyexpat.cpython-314-darwin.so — Symbol not found: _XML_SetAllocTrackerActivationThreshold`
+- brew Python 3.12 pip: `externally-managed-environment` (PEP 668) error
+- pipx defaulted to broken Python 3.14 shared environment
+
+---
+
+### Fix
+
+```bash
+rm -rf ~/.local/pipx/shared
+PIPX_DEFAULT_PYTHON=/usr/local/bin/python3.12 pipx install 'ansible-core==2.16.*'
+```
+
+---
+
+### Key Takeaways
+
+1. **Use pipx for Ansible on macOS** — isolates it from system Python conflicts.
+2. **Always specify `PIPX_DEFAULT_PYTHON` explicitly** — pipx defaults to whatever Python it finds first, which on macOS in mid-2026 is the broken Python 3.14 (libexpat ABI incompatibility).
+3. **If pipx shared env is broken, wipe it:** `rm -rf ~/.local/pipx/shared` then reinitialize with the correct Python.
+4. **Multiple Python environments coexist on macOS** (Xcode, brew, system). Each has its own pip with different package visibility. `which python3` and `which pip3` are not reliable — always use full paths.
+
+---
+
+## LL-006 — Ansible check_mode Limitations with Sequential Dependencies
+
+**Date:** 2026-04-12
+**Severity:** Medium — required multiple dry-run iterations to get a clean pass
+**Affected:** `roles/plex/tasks/main.yml`
+
+---
+
+### Symptom
+
+Multiple tasks failed in `--check` mode despite being logically correct:
+- `mountpoint` command registered no `rc` → downstream `when` condition errored
+- yum_repository tasks simulated → repo file not on disk → package install failed
+- Package installs simulated → config files missing → lineinfile/template tasks failed
+- Migration symlink failed because removal was simulated → directory still present
+
+---
+
+### Fix Pattern
+
+Add `check_mode: false` to any task that:
+1. Registers a variable needed in a downstream `when` condition (commands, shell)
+2. Creates a file/repo that a subsequent task reads from (yum_repository, package installs that create configs)
+
+For the metadata migration block — it cannot be dry-run at all. Gate the entire block with `when: not ansible_check_mode` and print an explanatory debug notice in check mode.
+
+---
+
+### Key Takeaways
+
+1. **`ansible.builtin.command` and `shell` are skipped in check mode by default.** Any registered variable from a skipped task has no `rc`, `stdout`, etc. — downstream `when` conditions using those values will behave unexpectedly.
+2. **yum_repository tasks are simulated in check mode** — the repo file is not written. Any subsequent package install that depends on that repo will fail in check mode.
+3. **Multi-step destructive operations cannot be meaningfully dry-run.** Design them with `when: not ansible_check_mode` and a notice task so operators know what will happen live.
+4. **`check_mode: false` is the escape hatch** — use it on prerequisite tasks so subsequent tasks have what they need.
+
+---
+
+## LL-007 — du -sb Is Not Reliable for Cross-Filesystem Copy Validation
+
+**Date:** 2026-04-12
+**Severity:** Low — false positive blocked migration, required logic fix
+**Affected:** `roles/plex/tasks/main.yml` metadata migration block
+
+---
+
+### Symptom
+
+`du -sb` comparison between source (`/var/lib/plexmediaserver` on OS disk) and destination (`/plx/.plex` on vg01 xfs) consistently showed destination 291MB larger than source, despite file count matching exactly and no data being missing.
+
+---
+
+### Root Cause
+
+`du -sb` includes directory block metadata in its count. Different filesystem layouts (source vs destination) produce different directory overhead. The difference was consistent and benign — no data loss.
+
+---
+
+### Fix
+
+Changed validation from exact equality to directional check: destination must be >= source. A smaller destination = missing data (abort). A larger destination = filesystem overhead difference (acceptable).
+
+---
+
+### Key Takeaways
+
+1. **Don't use `du` for exact-match copy validation across filesystems.** Use file count as primary, and directional size check (destination ≥ source) as secondary.
+2. **File count match + destination ≥ source = copy is safe to proceed.**
+3. **If the `creates:` guard fires on a copy task, the destination may contain stale data** from a previous partial run. Always verify the destination is clean before re-running a migration. `rm -rf /path/*` does NOT remove hidden dot files — use `rm -rf /path/.[^.]* /path/*` if dot files may exist.
+
+---

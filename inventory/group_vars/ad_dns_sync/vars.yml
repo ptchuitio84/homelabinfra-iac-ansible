@@ -1,0 +1,17 @@
+# =============================================================================
+# inventory/group_vars/ad_dns_sync/vars.yml — DNS Zone Sync configuration
+# =============================================================================
+# Source zone is the master. All records are synced TO each target zone.
+# Add domains to dns_target_zones as new ones are acquired.
+#
+# Credentials: vault_windows_admin_user / vault_windows_admin_password
+# (inherited from group_vars/windows/vault.yml via active_directory membership)
+# =============================================================================
+
+---
+# Source of truth — all A records here are synced to target zones
+dns_source_zone: nnt.com
+
+# Target zones to sync into — add new domains here
+dns_target_zones:
+  - nanonetech.com

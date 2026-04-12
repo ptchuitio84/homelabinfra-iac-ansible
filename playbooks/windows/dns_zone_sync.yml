@@ -1,0 +1,108 @@
+# =============================================================================
+# playbooks/windows/dns_zone_sync.yml — Sync DNS A records across zones
+# =============================================================================
+# Copies all A records from dns_source_zone into each dns_target_zones entry.
+# Source zone is the single source of truth — manage records there only.
+#
+# Sync logic (per target zone):
+#   - Record missing in target  → create it
+#   - Record exists, IP differs → update it
+#   - Record exists, IP matches → skip (idempotent)
+#   - Record in target only     → left alone (no deletion)
+#
+# Add new domains by appending to dns_target_zones in group_vars/ad_dns_sync/vars.yml.
+#
+# USAGE:
+#   ansible-playbook playbooks/windows/dns_zone_sync.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+#   # Dry run (shows what would change):
+#   ansible-playbook playbooks/windows/dns_zone_sync.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --check
+#
+# SCHEDULE: Run via Jenkins on a cron — see jenkins/jobs/dns_zone_sync/
+# VAULT REQUIRED: yes (vault_windows_admin_user / vault_windows_admin_password)
+# =============================================================================
+
+---
+- name: Sync DNS A records — {{ dns_source_zone }} → {{ dns_target_zones | join(', ') }}
+  hosts: ad_dns_sync
+  gather_facts: false
+
+  tasks:
+
+    - name: Sync A records from {{ dns_source_zone }} to target zones
+      ansible.windows.win_powershell:
+        script: |
+          $ErrorActionPreference = 'Stop'
+
+          $sourceZone  = "{{ dns_source_zone }}"
+          $targetZones = @({{ dns_target_zones | map('regex_replace', '^(.*)$', '"\\1"') | join(', ') }})
+
+          # Pull all A records from source zone
+          $sourceRecords = Get-DnsServerResourceRecord -ZoneName $sourceZone -RRType A |
+              Where-Object { $_.HostName -ne '@' }  # skip zone apex
+
+          $results = @()
+
+          foreach ($targetZone in $targetZones) {
+              Write-Output "--- Syncing $sourceZone → $targetZone ---"
+
+              foreach ($record in $sourceRecords) {
+                  $hostname = $record.HostName
+                  $srcIP    = $record.RecordData.IPv4Address.ToString()
+
+                  $existing = Get-DnsServerResourceRecord `
+                      -ZoneName $targetZone `
+                      -Name $hostname `
+                      -RRType A `
+                      -ErrorAction SilentlyContinue
+
+                  if (-not $existing) {
+                      if (-not ${{ ansible_check_mode | lower }}) {
+                          Add-DnsServerResourceRecordA `
+                              -ZoneName $targetZone `
+                              -Name $hostname `
+                              -IPv4Address $srcIP `
+                              -TimeToLive 00:05:00
+                      }
+                      $results += "[ADDED]   $targetZone — $hostname -> $srcIP"
+                  }
+                  elseif ($existing.RecordData.IPv4Address.ToString() -ne $srcIP) {
+                      $dstIP = $existing.RecordData.IPv4Address.ToString()
+                      if (-not ${{ ansible_check_mode | lower }}) {
+                          Remove-DnsServerResourceRecord `
+                              -ZoneName $targetZone `
+                              -Name $hostname `
+                              -RRType A `
+                              -Force
+                          Add-DnsServerResourceRecordA `
+                              -ZoneName $targetZone `
+                              -Name $hostname `
+                              -IPv4Address $srcIP `
+                              -TimeToLive 00:05:00
+                      }
+                      $results += "[UPDATED] $targetZone — $hostname $dstIP -> $srcIP"
+                  }
+                  else {
+                      $results += "[OK]      $targetZone — $hostname -> $srcIP"
+                  }
+              }
+          }
+
+          # Summary output
+          Write-Output ""
+          Write-Output "=== DNS Sync Summary ==="
+          $results | ForEach-Object { Write-Output $_ }
+          Write-Output ""
+          $added   = ($results | Where-Object { $_ -match '^\[ADDED\]'   }).Count
+          $updated = ($results | Where-Object { $_ -match '^\[UPDATED\]' }).Count
+          $ok      = ($results | Where-Object { $_ -match '^\[OK\]'      }).Count
+          Write-Output "Added: $added  Updated: $updated  Unchanged: $ok"
+      register: dns_sync_result
+      changed_when: "'[ADDED]' in dns_sync_result.output | join or '[UPDATED]' in dns_sync_result.output | join"
+
+    - name: DNS sync output
+      ansible.builtin.debug:
+        msg: "{{ dns_sync_result.output }}"
