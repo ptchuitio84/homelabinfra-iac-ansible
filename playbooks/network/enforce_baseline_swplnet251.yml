@@ -24,8 +24,9 @@
   gather_facts: false
 
   vars:
-    config_file: "{{ playbook_dir }}/../../../network/cisco_catalyst_3750g_swplnet001.txt"
-    backup_dir:  "{{ playbook_dir }}/../../../network/backups"
+    network_configs_repo: "{{ lookup('env', 'NETWORK_CONFIGS_REPO') | default('/opt/homelabinfra-network-configs', true) }}"
+    config_file: "{{ network_configs_repo }}/cisco_catalyst_3750g_swplnet001.txt"
+    backup_dir:  "{{ network_configs_repo }}/backups"
 
   tasks:
 
