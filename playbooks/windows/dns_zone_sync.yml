@@ -21,7 +21,7 @@
 #     --vault-password-file ~/.ansible/vault_pass.txt \
 #     --check
 #
-# SCHEDULE: Run via Jenkins on a cron — see jenkins/jobs/dns_zone_sync/
+# SCHEDULE: Run via Jenkins on a cron — see jenkins/windows/nnt-jkn-win-dns-sync.groovy
 # VAULT REQUIRED: yes (vault_windows_admin_user / vault_windows_admin_password)
 # =============================================================================
 
