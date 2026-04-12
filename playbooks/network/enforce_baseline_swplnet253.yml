@@ -56,19 +56,32 @@
         dest: "{{ backup_dir }}/{{ inventory_hostname }}_pre-enforce_{{ lookup('pipe', 'date +%Y-%m-%d_%H%M') }}.txt"
       delegate_to: localhost
 
-    # cli_config pushes config lines via raw SSH — no eAPI pre-flight.
-    - name: Enforce baseline — push only deltas
-      ansible.netcommon.cli_config:
-        config: "{{ lookup('file', config_file) }}"
+    # EOS 4.12 workaround: cli_config internally runs "show version | json"
+    # to detect configure-session support (EOS 4.20+). On EOS 4.12 over SSH
+    # this causes /bin/sh to interpret "json" as a shell command and fail.
+    # Push config manually: configure terminal → lines → end.
+    - name: Enforce baseline — enter configure mode
+      ansible.netcommon.cli_command:
+        command: configure terminal
+
+    - name: Enforce baseline — push config lines
+      ansible.netcommon.cli_command:
+        command: "{{ item }}"
+      loop: >-
+        {{ lookup('file', config_file).splitlines()
+           | reject('match', '^!')
+           | reject('match', '^\s*$')
+           | list }}
       register: enforce_result
+
+    - name: Enforce baseline — exit configure mode
+      ansible.netcommon.cli_command:
+        command: end
       notify: Save startup config
 
     - name: Report enforcement result
       ansible.builtin.debug:
-        msg: >-
-          {{ inventory_hostname }} —
-          {% if enforce_result.changed %}CHANGES APPLIED
-          {% else %}COMPLIANT — no changes needed{% endif %}
+        msg: "{{ inventory_hostname }} — config pushed (EOS 4.12: no delta tracking)"
 
   handlers:
     - name: Save startup config
