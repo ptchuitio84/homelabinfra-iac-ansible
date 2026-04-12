@@ -75,6 +75,7 @@ prometheus_node_targets:
   - "hmvlapmon001.nnt.com:{{ node_exporter_port }}"   # Grafana
   - "hmvlapmon002.nnt.com:{{ node_exporter_port }}"   # Prometheus (self)
   - "hmvlapmon003.nnt.com:{{ node_exporter_port }}"   # Loki
+  - "hmpplxap002.nnt.com:{{ node_exporter_port }}"    # Plex Media Server
 
 # Network devices to scrape via SNMP
 prometheus_snmp_targets:
