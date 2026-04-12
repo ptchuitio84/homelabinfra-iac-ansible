@@ -54,6 +54,15 @@
     state: stopped
   ignore_errors: true
 
+# Mask firewalld so package installs cannot re-enable it.
+# Without masking, installing packages with firewalld as a dependency
+# (e.g. docker, cockpit) silently re-enables it on next boot.
+- name: Mask firewalld to prevent re-enablement
+  ansible.builtin.systemd:
+    name: firewalld
+    masked: true
+  ignore_errors: true
+
 # Set SELinux to permissive mode — logs violations but does not block them.
 # This allows applications to run without SELinux policy tuning during initial
 # lab setup. A future hardening role will move this to "enforcing" with proper policy.
