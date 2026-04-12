@@ -33,6 +33,7 @@
   tasks:
 
     - name: Sync A records from {{ dns_source_zone }} to target zones
+      check_mode: false  # PowerShell handles dry-run logic itself via $ansible_check_mode
       ansible.windows.win_powershell:
         script: |
           $ErrorActionPreference = 'Stop'
