@@ -1,0 +1,16 @@
+# =============================================================================
+# inventory/windows/windows.yml — Windows group parent definition
+# =============================================================================
+# Defines the "windows" parent group so that group_vars/windows/vars.yml
+# (WinRM connection settings) is inherited by all Windows child groups.
+#
+# Add any new Windows groups here as additional children.
+# =============================================================================
+
+---
+windows:
+  children:
+    active_directory:
+    ad_dns_sync:
+    exchange:
+    veeam:
