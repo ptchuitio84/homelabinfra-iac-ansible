@@ -39,7 +39,7 @@
           $ErrorActionPreference = 'Stop'
 
           $sourceZone  = "{{ dns_source_zone }}"
-          $targetZones = @({{ dns_target_zones | map('regex_replace', '^(.*)$', '"\\1"') | join(', ') }})
+          $targetZones = @("{{ dns_target_zones | join('", "') }}")
 
           # Pull all A records from source zone
           $sourceRecords = Get-DnsServerResourceRecord -ZoneName $sourceZone -RRType A |
