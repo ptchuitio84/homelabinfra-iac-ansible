@@ -3,7 +3,7 @@
 # =============================================================================
 # PURPOSE:
 # Pulls the running configuration from every network device, saves it to the
-# nnt-network-configs git repo (/opt/nnt-network-configs), and commits the
+# homelabinfra-network-backups git repo (/opt/homelabinfra-network-backups), and commits the
 # change with a timestamp. Each backup is a git commit — giving you a full
 # audit trail, config diffs, and rollback capability.
 #
@@ -21,7 +21,7 @@
 #   ansible-playbook playbooks/network_backup.yml --limit arista_switches
 #
 # OUTPUT:
-#   /opt/nnt-network-configs/<hostname>.cfg  (committed to GitHub)
+#   /opt/homelabinfra-network-backups/<hostname>.cfg  (committed to GitHub)
 #   One file per device — git history shows every change over time.
 #   View diffs: git log --oneline  /  git diff <commit> <commit>
 #
@@ -41,13 +41,13 @@
         commands: show running-config
       register: ios_config
 
-    # Save the config to the nnt-network-configs repo on the control node.
+    # Save the config to the homelabinfra-network-backups repo on the control node.
     # One file per device — named by hostname, no date suffix needed because
     # git history tracks every version automatically.
-    - name: Save config to nnt-network-configs repo
+    - name: Save config to homelabinfra-network-backups repo
       ansible.builtin.copy:
         content: "{{ ios_config.stdout[0] }}"
-        dest: "/opt/nnt-network-configs/{{ inventory_hostname }}.cfg"
+        dest: "/opt/homelabinfra-network-backups/{{ inventory_hostname }}.cfg"
       delegate_to: localhost
 
 # ── ARISTA EOS 4.28+ (eAPI / httpapi) ────────────────────────────────────────
@@ -61,10 +61,10 @@
         commands: show running-config
       register: eos_config
 
-    - name: Save config to nnt-network-configs repo
+    - name: Save config to homelabinfra-network-backups repo
       ansible.builtin.copy:
         content: "{{ eos_config.stdout[0] }}"
-        dest: "/opt/nnt-network-configs/{{ inventory_hostname }}.cfg"
+        dest: "/opt/homelabinfra-network-backups/{{ inventory_hostname }}.cfg"
       delegate_to: localhost
 
 # ── ARISTA EOS 4.12 (network_cli / SSH) ──────────────────────────────────────
@@ -80,10 +80,10 @@
         command: show running-config
       register: eos_config
 
-    - name: Save config to nnt-network-configs repo
+    - name: Save config to homelabinfra-network-backups repo
       ansible.builtin.copy:
         content: "{{ eos_config.stdout }}"
-        dest: "/opt/nnt-network-configs/{{ inventory_hostname }}.cfg"
+        dest: "/opt/homelabinfra-network-backups/{{ inventory_hostname }}.cfg"
       delegate_to: localhost
 
 # ── COMMIT AND PUSH ───────────────────────────────────────────────────────────
@@ -96,7 +96,7 @@
     - name: Stage all config changes
       ansible.builtin.command:
         cmd: git add -A
-        chdir: /opt/nnt-network-configs
+        chdir: /opt/homelabinfra-network-backups
 
     # Check if there is anything new to commit.
     # "git diff --cached --quiet" exits 0 if nothing staged, 1 if there are changes.
@@ -104,7 +104,7 @@
     - name: Check if there are changes to commit
       ansible.builtin.command:
         cmd: git diff --cached --quiet
-        chdir: /opt/nnt-network-configs
+        chdir: /opt/homelabinfra-network-backups
       register: git_diff
       changed_when: false
       failed_when: false   # exit code 1 = changes exist — not an error
@@ -114,14 +114,14 @@
     - name: Commit config changes
       ansible.builtin.command:
         cmd: "git commit -m 'Network backup: {{ lookup('pipe', 'date +%Y-%m-%dT%H:%M') }}'"
-        chdir: /opt/nnt-network-configs
+        chdir: /opt/homelabinfra-network-backups
       when: git_diff.rc == 1   # rc 1 = changes exist
 
     # Push to GitHub. Uses the github-netconfigs SSH host alias configured
     # in /root/.ssh/config on the control node, which maps to the deploy key
-    # for the nnt-network-configs repo.
+    # for the homelabinfra-network-backups repo.
     - name: Push configs to GitHub
       ansible.builtin.command:
         cmd: git push origin main
-        chdir: /opt/nnt-network-configs
+        chdir: /opt/homelabinfra-network-backups
       when: git_diff.rc == 1   # only push if something was committed
