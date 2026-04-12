@@ -26,7 +26,7 @@
 # =============================================================================
 
 ---
-- name: Sync DNS A records — {{ dns_source_zone }} → {{ dns_target_zones | join(', ') }}
+- name: Sync DNS A and CNAME records — {{ dns_source_zone }} → {{ dns_target_zones | join(', ') }}
   hosts: ad_dns_sync
   gather_facts: false
 
@@ -94,16 +94,92 @@
 
           # Summary output
           Write-Output ""
-          Write-Output "=== DNS Sync Summary ==="
+          Write-Output "=== A Record Sync Summary ==="
           $results | ForEach-Object { Write-Output $_ }
           Write-Output ""
           $added   = ($results | Where-Object { $_ -match '^\[ADDED\]'   }).Count
           $updated = ($results | Where-Object { $_ -match '^\[UPDATED\]' }).Count
           $ok      = ($results | Where-Object { $_ -match '^\[OK\]'      }).Count
           Write-Output "Added: $added  Updated: $updated  Unchanged: $ok"
-      register: dns_sync_result
-      changed_when: "'[ADDED]' in dns_sync_result.output | join or '[UPDATED]' in dns_sync_result.output | join"
+      register: dns_sync_a_result
+      changed_when: "'[ADDED]' in dns_sync_a_result.output | join or '[UPDATED]' in dns_sync_a_result.output | join"
 
-    - name: DNS sync output
+    - name: DNS A record sync output
       ansible.builtin.debug:
-        msg: "{{ dns_sync_result.output }}"
+        msg: "{{ dns_sync_a_result.output }}"
+
+    - name: Sync CNAME records from {{ dns_source_zone }} to target zones
+      check_mode: false
+      ansible.windows.win_powershell:
+        script: |
+          $ErrorActionPreference = 'Stop'
+
+          $sourceZone  = "{{ dns_source_zone }}"
+          $targetZones = @("{{ dns_target_zones | join('", "') }}")
+
+          # Pull all CNAME records from source zone
+          $sourceRecords = Get-DnsServerResourceRecord -ZoneName $sourceZone -RRType CName |
+              Where-Object { $_.HostName -ne '@' }  # skip zone apex
+
+          $results = @()
+
+          foreach ($targetZone in $targetZones) {
+              Write-Output "--- Syncing CNAMEs $sourceZone → $targetZone ---"
+
+              foreach ($record in $sourceRecords) {
+                  $hostname  = $record.HostName
+                  $srcTarget = $record.RecordData.HostNameAlias.TrimEnd('.')
+
+                  $existing = Get-DnsServerResourceRecord `
+                      -ZoneName $targetZone `
+                      -Name $hostname `
+                      -RRType CName `
+                      -ErrorAction SilentlyContinue
+
+                  if (-not $existing) {
+                      if (-not ${{ ansible_check_mode | lower }}) {
+                          Add-DnsServerResourceRecordCName `
+                              -ZoneName $targetZone `
+                              -Name $hostname `
+                              -HostNameAlias $srcTarget `
+                              -TimeToLive 00:05:00
+                      }
+                      $results += "[ADDED]   $targetZone — $hostname -> $srcTarget"
+                  }
+                  elseif ($existing.RecordData.HostNameAlias.TrimEnd('.') -ne $srcTarget) {
+                      $dstTarget = $existing.RecordData.HostNameAlias.TrimEnd('.')
+                      if (-not ${{ ansible_check_mode | lower }}) {
+                          Remove-DnsServerResourceRecord `
+                              -ZoneName $targetZone `
+                              -Name $hostname `
+                              -RRType CName `
+                              -Force
+                          Add-DnsServerResourceRecordCName `
+                              -ZoneName $targetZone `
+                              -Name $hostname `
+                              -HostNameAlias $srcTarget `
+                              -TimeToLive 00:05:00
+                      }
+                      $results += "[UPDATED] $targetZone — $hostname $dstTarget -> $srcTarget"
+                  }
+                  else {
+                      $results += "[OK]      $targetZone — $hostname -> $srcTarget"
+                  }
+              }
+          }
+
+          # Summary output
+          Write-Output ""
+          Write-Output "=== CNAME Sync Summary ==="
+          $results | ForEach-Object { Write-Output $_ }
+          Write-Output ""
+          $added   = ($results | Where-Object { $_ -match '^\[ADDED\]'   }).Count
+          $updated = ($results | Where-Object { $_ -match '^\[UPDATED\]' }).Count
+          $ok      = ($results | Where-Object { $_ -match '^\[OK\]'      }).Count
+          Write-Output "Added: $added  Updated: $updated  Unchanged: $ok"
+      register: dns_sync_cname_result
+      changed_when: "'[ADDED]' in dns_sync_cname_result.output | join or '[UPDATED]' in dns_sync_cname_result.output | join"
+
+    - name: DNS CNAME sync output
+      ansible.builtin.debug:
+        msg: "{{ dns_sync_cname_result.output }}"

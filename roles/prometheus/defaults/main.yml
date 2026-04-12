@@ -56,11 +56,8 @@ prometheus_evaluation_interval: "15s"
 # node_exporter port — must match what's configured on each Linux VM.
 node_exporter_port: 9100
 
-# vmware_exporter port (kept for reference — replaced by Telegraf)
-vmware_exporter_port: 9272
-
-# Telegraf vSphere prometheus_client port — replaces vmware_exporter
-telegraf_prometheus_port: 9273
+# vmware_exporter port
+vmware_exporter_port: 9273
 
 # snmp_exporter port
 snmp_exporter_port: 9116
@@ -81,9 +78,10 @@ prometheus_node_targets:
 prometheus_snmp_targets:
   - "swplnet251.nnt.com"   # Cisco Catalyst 3750G
   - "swplnet252.nnt.com"   # Arista 7050SX
+  - "swplnet253.nnt.com"   # Arista 7048T
 
-# ESXi hosts to scrape via vmware_exporter
-prometheus_vmware_targets:
-  - "hsplv021.nnt.com"
-  - "hsplv022.nnt.com"
-  - "hsplv034.nnt.com"
+# vCenter endpoint for vmware_exporter proxy mode
+prometheus_vmware_vcenter: "hmvlapvc001.nnt.com"
+
+# Host running vmware_exporter
+prometheus_vmware_exporter_host: "hmvlapmon002.nnt.com"

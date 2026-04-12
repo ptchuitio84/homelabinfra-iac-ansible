@@ -6,7 +6,7 @@
 # metrics on port 9272 for Prometheus to scrape.
 #
 # ARCHITECTURE:
-#   Prometheus → scrapes → localhost:9272?target=hsplvXXX.nnt.com
+#   Prometheus → scrapes → localhost:9273?target=hsplvXXX.nnt.com
 #   vmware_exporter → queries → vCenter API → ESXi host metrics
 # =============================================================================
 
@@ -18,7 +18,7 @@ vmware_exporter_vcenter_password: "{{ vault_vcenter_password }}"
 vmware_exporter_ignore_ssl: true    # vCenter uses self-signed cert
 
 # Port vmware_exporter listens on — must match Prometheus scrape config.
-vmware_exporter_port: 9272
+vmware_exporter_port: 9273
 
 # Install paths
 vmware_exporter_venv: /opt/vmware_exporter/venv
