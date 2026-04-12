@@ -26,7 +26,28 @@
 - name: Deploy Plex Media Server — hmpplxap002
   hosts: plex_servers
   become: true
-  gather_facts: true
+  gather_facts: false
+
+  pre_tasks:
+    # OL7 ships Python 3.6 only. ansible-core 2.16 requires Python 3.7+ on the target.
+    # Add Oracle SCL repo and install rh-python38 before anything else.
+    # raw uses SSH directly — no Python needed — so this runs first.
+    - name: Ensure Python 3.8 is installed (OL7 bootstrap — ansible-core 2.16 requires 3.7+)
+      ansible.builtin.raw: |
+        cat > /etc/yum.repos.d/ol7_scl.repo << 'EOF'
+        [ol7_software_collections]
+        name=Software Collection packages for Oracle Linux 7
+        baseurl=https://yum.oracle.com/repo/OracleLinux/OL7/SoftwareCollections/x86_64/
+        gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-oracle
+        gpgcheck=1
+        enabled=1
+        EOF
+        yum install -y rh-python38
+      changed_when: false
+      check_mode: false    # Must run even in --check — nothing else works without it
+
+    - name: Gather facts (Python 3 now available)
+      ansible.builtin.setup:
 
   roles:
     - common

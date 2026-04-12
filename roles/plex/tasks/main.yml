@@ -22,6 +22,7 @@
     cmd: mountpoint -q /plx
   changed_when: false
   failed_when: false
+  check_mode: false
   register: plx_mount_check
 
 - name: Fail if /plx is not mounted
@@ -82,6 +83,7 @@
     gpgcheck: true
     enabled: true
     state: present
+  check_mode: false
 
 - name: Install plexmediaserver
   ansible.builtin.yum:
@@ -107,8 +109,20 @@
     path: "{{ plex_data_dir }}"
   register: plex_data_stat
 
+- name: Notice — metadata migration will run live (skipped in check mode)
+  ansible.builtin.debug:
+    msg: >
+      /var/lib/plexmediaserver is a real directory. On live run, Plex will be stopped,
+      metadata copied to /plx/.plex, original directory removed, and symlink created.
+      This block cannot be dry-run — skipping in check mode.
+  when:
+    - ansible_check_mode
+    - plex_data_stat.stat.exists
+    - not plex_data_stat.stat.islnk
+
 - name: Migrate existing metadata to /plx/.plex (existing server — one-time)
   when:
+    - not ansible_check_mode
     - plex_data_stat.stat.exists
     - not plex_data_stat.stat.islnk
   block:
@@ -121,6 +135,47 @@
       ansible.builtin.command:
         cmd: cp -a {{ plex_data_dir }}/. {{ plex_metadata_dir }}/
         creates: "{{ plex_metadata_dir }}/Library"
+
+    - name: Validate copy — count files in source
+      ansible.builtin.command:
+        cmd: find {{ plex_data_dir }} -type f
+      register: src_files
+      changed_when: false
+
+    - name: Validate copy — count files in destination
+      ansible.builtin.command:
+        cmd: find {{ plex_metadata_dir }} -type f
+      register: dst_files
+      changed_when: false
+
+    - name: Validate copy — get source size (bytes)
+      ansible.builtin.command:
+        cmd: du -sb {{ plex_data_dir }}
+      register: src_size
+      changed_when: false
+
+    - name: Validate copy — get destination size (bytes)
+      ansible.builtin.command:
+        cmd: du -sb {{ plex_metadata_dir }}
+      register: dst_size
+      changed_when: false
+
+    - name: Abort if file count mismatch
+      ansible.builtin.fail:
+        msg: >
+          File count mismatch — source: {{ src_files.stdout_lines | length }},
+          destination: {{ dst_files.stdout_lines | length }}.
+          Original directory preserved. Investigate before retrying.
+      when: src_files.stdout_lines | length != dst_files.stdout_lines | length
+
+    - name: Abort if destination is smaller than source (data loss detected)
+      ansible.builtin.fail:
+        msg: >
+          Destination is smaller than source — possible data loss.
+          Source: {{ src_size.stdout.split()[0] }} bytes,
+          destination: {{ dst_size.stdout.split()[0] }} bytes.
+          Original directory preserved. Investigate before retrying.
+      when: dst_size.stdout.split()[0] | int < src_size.stdout.split()[0] | int
 
     - name: Remove original metadata directory
       ansible.builtin.file:
@@ -178,10 +233,10 @@
 # =============================================================================
 
 - name: Allow nginx to connect to Plex (SELinux boolean)
-  ansible.posix.seboolean:
-    name: httpd_can_network_connect
-    state: true
-    persistent: true
+  ansible.builtin.command:
+    cmd: setsebool -P httpd_can_network_connect on
+  changed_when: false
+  when: ansible_selinux.status == "enabled" and ansible_selinux.mode == "enforcing"
 
 # =============================================================================
 # SECTION 7: PLEX CONFIGURATION
@@ -211,10 +266,22 @@
 # Proxies port 80 → 127.0.0.1:32400 with websocket support.
 # =============================================================================
 
+- name: Add official nginx yum repository
+  ansible.builtin.yum_repository:
+    name: nginx-stable
+    description: nginx stable repo
+    baseurl: http://nginx.org/packages/centos/$releasever/$basearch/
+    gpgcheck: true
+    gpgkey: https://nginx.org/keys/nginx_signing.key
+    enabled: true
+    state: present
+  check_mode: false
+
 - name: Install nginx
   ansible.builtin.yum:
     name: nginx
     state: present
+  check_mode: false
 
 - name: Deploy Plex nginx reverse proxy config
   ansible.builtin.template:
