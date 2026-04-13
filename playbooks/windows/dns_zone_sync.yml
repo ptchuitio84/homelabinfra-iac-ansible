@@ -51,7 +51,7 @@
               Write-Output "--- Syncing $sourceZone → $targetZone ---"
 
               foreach ($record in $sourceRecords) {
-                  $hostname = $record.HostName
+                  $hostname = $record.HostName.TrimEnd('.')
                   $srcIP    = $record.RecordData.IPv4Address.ToString()
 
                   $existing = Get-DnsServerResourceRecord `
@@ -127,7 +127,7 @@
               Write-Output "--- Syncing CNAMEs $sourceZone → $targetZone ---"
 
               foreach ($record in $sourceRecords) {
-                  $hostname  = $record.HostName
+                  $hostname  = $record.HostName.TrimEnd('.')
                   $srcTarget = $record.RecordData.HostNameAlias.TrimEnd('.')
 
                   $existing = Get-DnsServerResourceRecord `
@@ -141,7 +141,7 @@
                           Add-DnsServerResourceRecordCName `
                               -ZoneName $targetZone `
                               -Name $hostname `
-                              -HostNameAlias $srcTarget `
+                              -HostNameAlias "$srcTarget." `
                               -TimeToLive 00:05:00
                       }
                       $results += "[ADDED]   $targetZone — $hostname -> $srcTarget"
@@ -157,7 +157,7 @@
                           Add-DnsServerResourceRecordCName `
                               -ZoneName $targetZone `
                               -Name $hostname `
-                              -HostNameAlias $srcTarget `
+                              -HostNameAlias "$srcTarget." `
                               -TimeToLive 00:05:00
                       }
                       $results += "[UPDATED] $targetZone — $hostname $dstTarget -> $srcTarget"
