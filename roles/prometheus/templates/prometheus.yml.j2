@@ -42,22 +42,12 @@ scrape_configs:
     static_configs:
       - targets: ["hmvlapjkn001.nnt.com:{{ jenkins_metrics_port }}"]
 
-  # ── VMware vCenter (vmware_exporter proxy mode) ───────────────────────────
-  # vmware_exporter on mon002 connects to vCenter and exposes ESXi/VM metrics.
-  # Proxy mode: Prometheus passes vCenter as ?target= so instance label shows
-  # the vCenter host, not the exporter host.
+  # ── VMware vCenter (vmware_exporter direct mode) ──────────────────────────
+  # vmware_exporter on mon002 connects to vCenter via config.yml and exposes
+  # ESXi/VM metrics. Direct scrape — uses default config section.
   - job_name: "vmware"
     static_configs:
-      - targets:
-          - "{{ prometheus_vmware_vcenter }}"
-    metrics_path: /metrics
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: instance
-      - target_label: __address__
-        replacement: "{{ prometheus_vmware_exporter_host }}:{{ vmware_exporter_port }}"
+      - targets: ["{{ prometheus_vmware_exporter_host }}:{{ vmware_exporter_port }}"]
 
   # ── Network devices (snmp_exporter) ───────────────────────────────────────
   # snmp_exporter polls switches via SNMP and exposes interface stats,

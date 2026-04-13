@@ -35,3 +35,6 @@ vmware_exporter_collect_vmguests: true
 vmware_exporter_collect_datastores: true
 vmware_exporter_collect_hosts: true
 vmware_exporter_collect_snapshots: true
+vmware_exporter_fetch_custom_attributes: false
+vmware_exporter_fetch_tags: false
+vmware_exporter_fetch_alarms: false

@@ -8,6 +8,9 @@ default:
   vsphere_password: "{{ vmware_exporter_vcenter_password }}"
   ignore_ssl: {{ vmware_exporter_ignore_ssl | lower }}
   specs_size: 500
+  fetch_custom_attributes: {{ vmware_exporter_fetch_custom_attributes | lower }}
+  fetch_tags: {{ vmware_exporter_fetch_tags | lower }}
+  fetch_alarms: {{ vmware_exporter_fetch_alarms | lower }}
   collect_only:
     vms: {{ vmware_exporter_collect_vms | lower }}
     vmguests: {{ vmware_exporter_collect_vmguests | lower }}
