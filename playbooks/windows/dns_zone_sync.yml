@@ -183,3 +183,16 @@
     - name: DNS CNAME sync output
       ansible.builtin.debug:
         msg: "{{ dns_sync_cname_result.output }}"
+
+    - name: Force AD replication to all DCs
+      ansible.windows.win_powershell:
+        script: |
+          $ErrorActionPreference = 'Stop'
+          Write-Output "Triggering AD replication..."
+          repadmin /syncall /AdeP
+          Write-Output "Replication triggered."
+      register: replication_result
+
+    - name: Replication output
+      ansible.builtin.debug:
+        msg: "{{ replication_result.output }}"
