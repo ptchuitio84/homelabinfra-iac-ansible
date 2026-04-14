@@ -1,0 +1,129 @@
+# =============================================================================
+# playbooks/linux/patch_linux_vms.yml — OS Patching for Linux VMs
+# =============================================================================
+# Patches all OL9 Linux VMs via dnf update, reboots if required, and validates
+# systemd health after reboot. Runs one host at a time (serial: 1) to prevent
+# simultaneous outages.
+#
+# TARGETS (in order):
+#   monitoring group — mon001, mon002, mon003
+#   jenkins group    — jkn001 (patched last; reboots cleanly via Ansible)
+#
+# EXCLUDED:
+#   ansible_nodes (ans001) — runs this playbook; cannot patch itself mid-run
+#   plex_servers           — OL7, pending OL9 rebuild; handled separately
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/patch_linux_vms.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+#   # Dry run (shows what would update, no changes applied):
+#   ansible-playbook playbooks/linux/patch_linux_vms.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt --check
+#
+#   # Single host:
+#   ansible-playbook playbooks/linux/patch_linux_vms.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --limit hmvlapmon001.nnt.com
+#
+# SCHEDULE: Weekly via Jenkins — see jenkins/linux/nnt-jkn-lin-patch.groovy
+# VAULT REQUIRED: yes (host passwords)
+# =============================================================================
+
+---
+- name: Patch Linux VMs — monitoring then jenkins
+  hosts: monitoring:jenkins
+  serial: 1
+  gather_facts: true
+
+  tasks:
+
+    # =========================================================================
+    # SECTION 1: PRE-PATCH
+    # =========================================================================
+
+    - name: Ensure dnf-utils is present (provides needs-restarting)
+      ansible.builtin.dnf:
+        name: dnf-utils
+        state: present
+
+    - name: Record installed package count (pre-patch)
+      ansible.builtin.shell: rpm -qa | wc -l
+      register: pre_pkg_count
+      changed_when: false
+
+    # =========================================================================
+    # SECTION 2: PATCH
+    # =========================================================================
+
+    - name: Run dnf update — all packages
+      ansible.builtin.dnf:
+        name: '*'
+        state: latest
+        update_cache: true
+      register: dnf_result
+
+    # =========================================================================
+    # SECTION 3: REBOOT IF REQUIRED
+    # =========================================================================
+
+    - name: Check if reboot is required (needs-restarting -r)
+      ansible.builtin.command: needs-restarting -r
+      register: reboot_check
+      changed_when: false
+      failed_when: false   # rc=1 = reboot needed; not an error
+
+    - name: Reboot if packages require it
+      ansible.builtin.reboot:
+        reboot_timeout: 300
+        post_reboot_delay: 30
+        msg: "Rebooting after OS patch — triggered by Ansible"
+      when: reboot_check.rc == 1
+
+    # =========================================================================
+    # SECTION 4: VALIDATE
+    # =========================================================================
+
+    - name: Check for failed systemd units
+      ansible.builtin.command: systemctl --failed --no-legend
+      register: failed_units
+      changed_when: false
+      failed_when: failed_units.stdout | length > 0
+
+    - name: Verify Jenkins service (jenkins group only)
+      ansible.builtin.systemd:
+        name: jenkins
+      register: jenkins_svc
+      failed_when: jenkins_svc.status.ActiveState != 'active'
+      when: "'jenkins' in group_names"
+
+    - name: Verify Prometheus service (monitoring group only)
+      ansible.builtin.systemd:
+        name: prometheus
+      register: prometheus_svc
+      failed_when: prometheus_svc.status.ActiveState != 'active'
+      when:
+        - "'monitoring' in group_names"
+        - vm_role is defined and vm_role == 'prometheus'
+
+    - name: Verify Grafana service (monitoring group only)
+      ansible.builtin.systemd:
+        name: grafana-server
+      register: grafana_svc
+      failed_when: grafana_svc.status.ActiveState != 'active'
+      when:
+        - "'monitoring' in group_names"
+        - vm_role is defined and vm_role == 'grafana'
+
+    # =========================================================================
+    # SECTION 5: REPORT
+    # =========================================================================
+
+    - name: Patch summary
+      ansible.builtin.debug:
+        msg:
+          - "Host:          {{ inventory_hostname }}"
+          - "Date:          {{ ansible_date_time.iso8601 }}"
+          - "Changed:       {{ dnf_result.changed }}"
+          - "Reboot needed: {{ 'yes' if reboot_check.rc == 1 else 'no' }}"
+          - "Failed units:  {{ failed_units.stdout if failed_units.stdout else 'none' }}"
