@@ -5,9 +5,13 @@
 //
 // PURPOSE:
 // Enforces the baseline config on swplnet251 (Cisco Catalyst 3750G).
-// Pulls both the Ansible repo and the network configs repo on ans001,
-// then runs the enforce_baseline playbook. Saves to startup-config only
-// if changes were applied.
+// Runs a dry-run first — if drift is detected, pauses for manual approval
+// before applying changes. If compliant, completes automatically.
+//
+// APPROVAL GATE:
+//   - Dry run detects changed lines → pipeline pauses for up to 24h
+//   - Reviewer checks dry-run output in console log → approves or aborts
+//   - No drift detected → gate skipped, pipeline completes automatically
 //
 // SCHEDULE: Daily at 4am. Run manually after editing the baseline in
 //           homelabinfra-network-configs.
@@ -45,7 +49,7 @@ pipeline {
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '30'))
-        timeout(time: 15, unit: 'MINUTES')
+        timeout(time: 1, unit: 'HOURS')  // covers dry-run + enforce; input gate has its own 24h timeout
         timestamps()
     }
 
@@ -65,6 +69,43 @@ pipeline {
                             'cd ${ANSIBLE_REPO_PATH} && git pull && \
                              cd ${NETWORK_CONFIGS_PATH} && git pull'
                     """
+                }
+            }
+        }
+
+        stage('Dry Run — swplnet251') {
+            steps {
+                sshagent(credentials: [env.ANSIBLE_SSH_CRED]) {
+                    script {
+                        def output = sh(
+                            script: """
+                                ssh -o StrictHostKeyChecking=no ${env.ANSIBLE_USER}@${env.ANSIBLE_NODE} \
+                                    'cd ${env.ANSIBLE_REPO_PATH} && ansible-playbook \
+                                        playbooks/network/enforce_baseline_swplnet251.yml \
+                                        --vault-password-file ${env.VAULT_PASS_FILE} \
+                                        --check 2>&1'
+                            """,
+                            returnStdout: true
+                        ).trim()
+                        echo output
+                        // Ansible PLAY RECAP: changed=N where N>0 means drift detected
+                        env.HAS_CHANGES = (output =~ /changed=[1-9]/) ? 'true' : 'false'
+                        echo "Drift detected: ${env.HAS_CHANGES}"
+                    }
+                }
+            }
+        }
+
+        stage('Approval Gate') {
+            when {
+                expression { env.HAS_CHANGES == 'true' }
+            }
+            steps {
+                timeout(time: 24, unit: 'HOURS') {
+                    input(
+                        message: 'swplnet251 — drift detected. Review dry-run output above, then approve to enforce or abort.',
+                        ok: 'Enforce'
+                    )
                 }
             }
         }
@@ -89,6 +130,9 @@ pipeline {
         }
         failure {
             echo 'Pipeline failed — check console output above for details.'
+        }
+        aborted {
+            echo 'Enforcement aborted at approval gate — no changes applied to swplnet251.'
         }
     }
 }

@@ -1,0 +1,51 @@
+# =============================================================================
+# playbooks/linux/setup_jenkins_rbac.yml — Jenkins Role Strategy Plugin Install
+# =============================================================================
+# Installs the Role-based Authorization Strategy plugin on Jenkins.
+# After this runs, configure roles via the Groovy script:
+#   jenkins/infra/configure_rbac.groovy → paste into Script Console
+#
+# PREREQ:
+#   vault_jenkins_admin_user and vault_jenkins_admin_token must be in:
+#   inventory/group_vars/jenkins/vault.yml
+#   (same values as vault_jenkins_prometheus_user/token in monitoring vault)
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/setup_jenkins_rbac.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+# =============================================================================
+
+---
+- name: Install Jenkins Role Strategy plugin
+  hosts: jenkins
+  gather_facts: false
+
+  tasks:
+
+    - name: Install role-strategy plugin
+      community.general.jenkins_plugin:
+        name: role-strategy
+        url: "http://localhost:{{ jenkins_http_port }}"
+        url_username: "{{ vault_jenkins_admin_user }}"
+        url_password: "{{ vault_jenkins_admin_token }}"
+        state: present
+        timeout: 60
+      register: plugin_result
+      notify: Restart Jenkins
+
+    - name: Plugin install result
+      ansible.builtin.debug:
+        msg: "role-strategy plugin: {{ 'installed' if plugin_result.changed else 'already present' }}"
+
+  handlers:
+    - name: Restart Jenkins
+      ansible.builtin.systemd:
+        name: jenkins
+        state: restarted
+
+    - name: Wait for Jenkins to come back up
+      ansible.builtin.wait_for:
+        host: localhost
+        port: "{{ jenkins_http_port }}"
+        timeout: 120
+      listen: Restart Jenkins

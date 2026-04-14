@@ -11,6 +11,8 @@
 //
 // NOTE: This job always pushes config — no delta tracking on EOS 4.12.
 //       It is safe to run repeatedly (EOS ignores no-op lines).
+//       No approval gate: check mode is unreliable on EOS 4.12; the gate
+//       would fire on every scheduled run regardless of actual drift.
 //
 // SCHEDULE: Daily at 4am. Run manually after editing the baseline in
 //           homelabinfra-network-configs.

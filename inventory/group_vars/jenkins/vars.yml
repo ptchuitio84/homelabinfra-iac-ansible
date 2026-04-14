@@ -24,3 +24,7 @@ ansible_ssh_private_key_file: ~/.ssh/id_ed25519
 
 # Use the system Python 3 interpreter (pre-installed on OL9).
 ansible_python_interpreter: /usr/bin/python3
+
+# Jenkins admin account — used by Ansible to install plugins and configure Jenkins.
+# Token is in vault.yml (vault_jenkins_admin_token).
+jenkins_admin_user: "{{ vault_jenkins_admin_user }}"
