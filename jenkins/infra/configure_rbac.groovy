@@ -17,59 +17,53 @@
 //   to add/remove users from operator or viewer roles.
 // =============================================================================
 
+// NOTE: The com.synopsys.arc RoleType import location varies by plugin version.
+// If this script throws MissingPropertyException, configure roles via the UI instead:
+//   Manage Jenkins → Manage and Assign Roles → Manage Roles (pattern: .*)
+//   Manage Jenkins → Manage and Assign Roles → Assign Roles
+
 import jenkins.model.Jenkins
 import com.michelin.cio.hudson.plugins.rolestrategy.RoleBasedAuthorizationStrategy
 import com.michelin.cio.hudson.plugins.rolestrategy.Role
-import com.synopsys.arc.jenkins.plugins.rolestrategy.RoleType
 import hudson.security.Permission
 
 def instance = Jenkins.get()
 
-// --- Permission sets ---
+// Role constructor signature (confirmed via reflection):
+//   Role(String name, String pattern, Set<Permission> perms, String description)
+// Build explicit HashSet<Permission> to avoid Groovy dispatch ambiguity.
 
-// Admin: Hudson.Administer covers everything — no need to enumerate sub-perms
-Set<Permission> adminPerms = [
-    Permission.fromId("hudson.model.Hudson.Administer"),
-].toSet()
+def adminPerms = new HashSet<Permission>()
+adminPerms.add(Permission.fromId("hudson.model.Hudson.Administer"))
 
-// Operator: run pipelines, read logs, cancel builds — no config or admin
-Set<Permission> operatorPerms = [
-    Permission.fromId("hudson.model.Hudson.Read"),
-    Permission.fromId("hudson.model.Item.Read"),
-    Permission.fromId("hudson.model.Item.Build"),
-    Permission.fromId("hudson.model.Item.Cancel"),
-    Permission.fromId("hudson.model.Item.Workspace"),
-    Permission.fromId("hudson.model.Run.Update"),
-    Permission.fromId("hudson.model.View.Read"),
-].toSet()
+def operatorPerms = new HashSet<Permission>()
+["hudson.model.Hudson.Read", "hudson.model.Item.Read", "hudson.model.Item.Build",
+ "hudson.model.Item.Cancel", "hudson.model.Item.Workspace",
+ "hudson.model.Run.Update", "hudson.model.View.Read"].each { id ->
+    operatorPerms.add(Permission.fromId(id))
+}
 
-// Viewer: read-only — can see jobs and builds but cannot trigger anything
-Set<Permission> viewerPerms = [
-    Permission.fromId("hudson.model.Hudson.Read"),
-    Permission.fromId("hudson.model.Item.Read"),
-    Permission.fromId("hudson.model.View.Read"),
-].toSet()
+def viewerPerms = new HashSet<Permission>()
+["hudson.model.Hudson.Read", "hudson.model.Item.Read", "hudson.model.View.Read"].each { id ->
+    viewerPerms.add(Permission.fromId(id))
+}
 
-// --- Role definitions ---
-// Pattern ".*" applies the role to all jobs globally
+// 4-arg constructor: (name, pattern, perms, description)
 def adminRole    = new Role("admin",    ".*", adminPerms,    "Full administrator access")
 def operatorRole = new Role("operator", ".*", operatorPerms, "Run pipelines, read logs — no admin")
-def viewerRole   = new Role("viewer",   ".*", viewerPerms,   "Read-only access to all jobs and views")
+def viewerRole   = new Role("viewer",   ".*", viewerPerms,   "Read-only access")
 
-// --- Build and apply strategy ---
+// Load RoleType dynamically — avoids import package variance between plugin versions
+def roleTypeClass = Class.forName("com.synopsys.arc.jenkins.plugins.rolestrategy.RoleType")
+def globalType    = roleTypeClass.enumConstants.find { it.name() == "Global" }
+
 def strategy = new RoleBasedAuthorizationStrategy()
-strategy.addRole(RoleType.Global, adminRole)
-strategy.addRole(RoleType.Global, operatorRole)
-strategy.addRole(RoleType.Global, viewerRole)
-
-// Assign nnt-jkn-admin to admin role
-// Add other users to operator/viewer via UI: Manage and Assign Roles → Assign Roles
-strategy.assignRole(RoleType.Global, adminRole, "nnt-jkn-admin")
+strategy.addRole(globalType, adminRole)
+strategy.addRole(globalType, operatorRole)
+strategy.addRole(globalType, viewerRole)
+strategy.assignRole(globalType, adminRole, "nnt-jkn-admin")
 
 instance.setAuthorizationStrategy(strategy)
 instance.save()
 
-println "Done."
-println "Roles configured: admin / operator / viewer"
-println "nnt-jkn-admin → admin"
-println "Add other users via: Manage Jenkins → Manage and Assign Roles → Assign Roles"
+println "Done. Roles: admin / operator / viewer. nnt-jkn-admin → admin."
