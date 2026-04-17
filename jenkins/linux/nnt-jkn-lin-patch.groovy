@@ -18,8 +18,9 @@
 // SCHEDULE: Weekly Sunday at 2am.
 //
 // EXECUTION MODEL:
-// Jenkins SSHes into ans001 (10.10.1.31). Ansible connects to each target
-// VM and patches it. Jenkins never connects to target VMs directly.
+// Pipeline runs on the ans001 Jenkins agent (10.10.1.31). Ansible runs
+// directly on ans001 — no SSH hop from Jenkins. When jkn001 reboots during
+// patching, the executor on ans001 stays alive and the build completes cleanly.
 //
 // JENKINS SETUP:
 //   1. New Item → Pipeline → name: nnt-jkn-lin-patch
@@ -33,17 +34,14 @@
 
 pipeline {
 
-    agent any
+    agent { label 'ans001' }
 
     triggers {
         cron('0 2 * * 0')  // Sunday at 2am
     }
 
     environment {
-        ANSIBLE_NODE      = '10.10.1.31'
-        ANSIBLE_USER      = 'root'
         ANSIBLE_REPO_PATH = '/opt/homelabinfra-iac-ansible'
-        ANSIBLE_SSH_CRED  = 'ansible-node-ssh-key'
         VAULT_PASS_FILE   = '/root/.ansible/vault_pass.txt'
     }
 
@@ -63,25 +61,19 @@ pipeline {
 
         stage('Sync repo to control node') {
             steps {
-                sshagent(credentials: [env.ANSIBLE_SSH_CRED]) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no ${ANSIBLE_USER}@${ANSIBLE_NODE} \
-                            'cd ${ANSIBLE_REPO_PATH} && git pull'
-                    """
-                }
+                // Executor runs on ans001 directly — no SSH hop needed
+                sh "cd ${ANSIBLE_REPO_PATH} && git pull"
             }
         }
 
         stage('Patch Linux VMs') {
             steps {
-                sshagent(credentials: [env.ANSIBLE_SSH_CRED]) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no ${ANSIBLE_USER}@${ANSIBLE_NODE} \
-                            'cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
-                                playbooks/linux/patch_linux_vms.yml \
-                                --vault-password-file ${VAULT_PASS_FILE}'
-                    """
-                }
+                // Executor runs on ans001 — run ansible-playbook directly, no SSH hop
+                sh """
+                    cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
+                        playbooks/linux/patch_linux_vms.yml \
+                        --vault-password-file ${VAULT_PASS_FILE}
+                """
             }
         }
     }
