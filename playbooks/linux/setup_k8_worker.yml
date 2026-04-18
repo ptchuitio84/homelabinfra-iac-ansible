@@ -1,0 +1,26 @@
+# =============================================================================
+# playbooks/linux/setup_k8_worker.yml — k8s Worker Node Prerequisites
+# =============================================================================
+# Runs during VM provisioning pipeline to prep a worker node.
+# Does NOT join the k3s cluster — cluster join happens via setup-k3s.sh
+# after all workers are provisioned.
+# =============================================================================
+
+---
+- name: Prepare k8s worker node
+  hosts: all
+  gather_facts: true
+
+  tasks:
+
+    - name: Install nfs-utils
+      ansible.builtin.dnf:
+        name: nfs-utils
+        state: present
+
+    - name: Ensure SSH is open in firewalld
+      ansible.posix.firewalld:
+        service: ssh
+        permanent: true
+        state: enabled
+        immediate: true
