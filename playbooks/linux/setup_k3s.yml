@@ -1,0 +1,22 @@
+# =============================================================================
+# playbooks/linux/setup_k3s.yml — k3s Cluster Deployment
+# =============================================================================
+# Play 1: Install k3s server on control plane, fetch node token.
+# Play 2: Install k3s agents on workers using token from play 1.
+#
+# ORDER MATTERS — control plane must complete before workers run.
+# Run via Jenkins: nnt-jkn-setup-k3s
+# =============================================================================
+
+---
+- name: Deploy k3s control plane
+  hosts: k8s_control_plane
+  gather_facts: true
+  roles:
+    - k3s
+
+- name: Deploy k3s workers
+  hosts: k8s_workers
+  gather_facts: true
+  roles:
+    - k3s

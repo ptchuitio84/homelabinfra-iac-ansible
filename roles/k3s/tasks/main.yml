@@ -1,0 +1,12 @@
+# =============================================================================
+# roles/k3s/tasks/main.yml — k3s Role Entry Point
+# =============================================================================
+
+---
+- name: Deploy k3s control plane
+  ansible.builtin.include_tasks: control_plane.yml
+  when: inventory_hostname in groups['k8s_control_plane']
+
+- name: Deploy k3s worker
+  ansible.builtin.include_tasks: worker.yml
+  when: inventory_hostname in groups['k8s_workers']

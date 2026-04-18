@@ -1,0 +1,34 @@
+# =============================================================================
+# roles/k3s/tasks/worker.yml — k3s Agent Install
+# =============================================================================
+
+- name: Install k3s agent
+  ansible.builtin.shell:
+    cmd: >
+      curl -sfL https://get.k3s.io |
+      INSTALL_K3S_VERSION={{ k3s_version }}
+      K3S_URL=https://{{ hostvars[groups['k8s_control_plane'][0]]['ansible_host'] }}:{{ k3s_api_port }}
+      K3S_TOKEN={{ hostvars[groups['k8s_control_plane'][0]]['k3s_node_token'] }}
+      sh -s - agent
+      --node-ip {{ ansible_host }}
+    creates: /usr/local/bin/k3s
+
+- name: Enable and start k3s-agent
+  ansible.builtin.systemd:
+    name: k3s-agent
+    enabled: true
+    state: started
+
+- name: Open flannel VXLAN port
+  ansible.posix.firewalld:
+    port: "8472/udp"
+    permanent: true
+    state: enabled
+    immediate: true
+
+- name: Open kubelet port
+  ansible.posix.firewalld:
+    port: "10250/tcp"
+    permanent: true
+    state: enabled
+    immediate: true

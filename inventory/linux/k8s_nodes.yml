@@ -1,0 +1,25 @@
+# =============================================================================
+# inventory/linux/k8s_nodes.yml — k3s Cluster Inventory
+# =============================================================================
+# 1 control plane + 2 workers. k3s on OL9.
+# Control plane: hmvlapk8s001 (10.10.1.61)
+# Workers:       hmvlapk8s002 (10.10.1.62), hmvlapk8s003 (10.10.1.63)
+# =============================================================================
+
+---
+k8s_control_plane:
+  hosts:
+    hmvlapk8s001.nnt.com:
+      ansible_host: 10.10.1.61
+
+k8s_workers:
+  hosts:
+    hmvlapk8s002.nnt.com:
+      ansible_host: 10.10.1.62
+    hmvlapk8s003.nnt.com:
+      ansible_host: 10.10.1.63
+
+k8s_nodes:
+  children:
+    k8s_control_plane:
+    k8s_workers:

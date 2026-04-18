@@ -1,0 +1,11 @@
+# =============================================================================
+# roles/k3s/defaults/main.yml — k3s Cluster Defaults
+# =============================================================================
+# Deploys k3s on OL9. Control plane first, workers join via node-token.
+# Traefik disabled — ingress handled separately if needed.
+# =============================================================================
+
+---
+k3s_version:    "v1.32.3+k3s1"
+k3s_api_port:   6443
+k3s_config_dir: /etc/rancher/k3s
