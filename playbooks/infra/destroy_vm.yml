@@ -1,0 +1,30 @@
+# =============================================================================
+# playbooks/infra/destroy_vm.yml — Remove VM from vCenter
+# =============================================================================
+# Powers off and deletes a VM from vCenter. Called on pipeline failure to
+# clean up partially built VMs.
+#
+# USAGE:
+#   ansible-playbook playbooks/infra/destroy_vm.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --extra-vars "vm_name=hmvlapweb001"
+# =============================================================================
+
+---
+- name: Destroy VM — {{ vm_name }}
+  hosts: vcenter
+  gather_facts: false
+
+  tasks:
+
+    - name: Power off and delete VM {{ vm_name }}
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: "{{ vcenter_validate_certs }}"
+        datacenter: "{{ vcenter_datacenter }}"
+        name: "{{ vm_name }}"
+        state: absent
+        force: true
+      delegate_to: localhost

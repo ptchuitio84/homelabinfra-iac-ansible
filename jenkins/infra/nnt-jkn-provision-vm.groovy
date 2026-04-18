@@ -238,7 +238,17 @@ pipeline {
                             || true
                     """
                 }
-                echo "Provisioning failed — ${env.VM_NAME} may be partially built. Check vCenter."
+                if (env.VM_NAME) {
+                    sh """
+                        cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
+                            playbooks/infra/destroy_vm.yml \
+                            --vault-password-file ${VAULT_PASS_FILE} \
+                            --extra-vars "vm_name=${env.VM_NAME}" \
+                            || true
+                    """
+                    echo "vCenter VM ${env.VM_NAME} destroyed."
+                }
+                echo "Provisioning failed — all resources cleaned up."
             }
         }
     }
