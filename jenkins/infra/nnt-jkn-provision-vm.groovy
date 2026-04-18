@@ -100,6 +100,28 @@ pipeline {
             }
         }
 
+        stage('Pre-flight check') {
+            steps {
+                script {
+                    def checkResponse = sh(
+                        script: """
+                            curl -s -H "Authorization: Token ${env.NETBOX_TOKEN}" \
+                                 -H "Content-Type: application/json" \
+                                 "${env.NETBOX_URL}/api/ipam/ip-addresses/?description=${env.VM_NAME}"
+                        """,
+                        returnStdout: true
+                    ).trim()
+
+                    def checkJson = new groovy.json.JsonSlurperClassic().parseText(checkResponse)
+                    if (checkJson.count > 0) {
+                        def existingIP = checkJson.results[0].address
+                        error("ABORTED: ${env.VM_NAME} already has an assigned IP in NetBox (${existingIP}). Delete it first if this is intentional.")
+                    }
+                    echo "Pre-flight passed — ${env.VM_NAME} has no existing IP in NetBox."
+                }
+            }
+        }
+
         stage('Allocate IP from NetBox') {
             steps {
                 script {
