@@ -103,6 +103,22 @@ pipeline {
         stage('Pre-flight check') {
             steps {
                 script {
+                    // Block if a prior build with this VM name succeeded
+                    def build = currentBuild.previousBuild
+                    while (build != null) {
+                        if (build.result == 'SUCCESS') {
+                            def buildVars = build.buildVariables
+                            if (buildVars?.VM_SPEC) {
+                                def priorSpec = new groovy.json.JsonSlurperClassic().parseText(buildVars.VM_SPEC)
+                                if (priorSpec.vm_name == env.VM_NAME) {
+                                    error("ABORTED: ${env.VM_NAME} was successfully provisioned in a prior build. Remove it from vCenter and NetBox first if this is intentional.")
+                                }
+                            }
+                        }
+                        build = build.previousBuild
+                    }
+
+                    // Clean up any stale NetBox IP left over from a failed prior run
                     def checkResponse = sh(
                         script: """
                             curl -s -H "Authorization: Token ${env.NETBOX_TOKEN}" \
@@ -114,10 +130,17 @@ pipeline {
 
                     def checkJson = new groovy.json.JsonSlurperClassic().parseText(checkResponse)
                     if (checkJson.count > 0) {
-                        def existingIP = checkJson.results[0].address
-                        error("ABORTED: ${env.VM_NAME} already has an assigned IP in NetBox (${existingIP}). Delete it first if this is intentional.")
+                        def staleId = checkJson.results[0].id.toString()
+                        def staleIP = checkJson.results[0].address
+                        echo "Stale NetBox IP found for ${env.VM_NAME} (${staleIP}) from failed run — reclaiming."
+                        sh """
+                            curl -s -X DELETE \
+                                 -H "Authorization: Token ${env.NETBOX_TOKEN}" \
+                                 "${env.NETBOX_URL}/api/ipam/ip-addresses/${staleId}/"
+                        """
                     }
-                    echo "Pre-flight passed — ${env.VM_NAME} has no existing IP in NetBox."
+
+                    echo "Pre-flight passed — ${env.VM_NAME} cleared to build."
                 }
             }
         }
@@ -244,6 +267,7 @@ pipeline {
                     sh """
                         cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
                             playbooks/infra/destroy_vm.yml \
+                            -i inventory/ \
                             --vault-password-file ${VAULT_PASS_FILE} \
                             --extra-vars "vm_name=${env.VM_NAME}" \
                             || true
