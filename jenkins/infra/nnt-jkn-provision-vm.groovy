@@ -302,14 +302,21 @@ pipeline {
                     """
                 }
                 if (env.VM_NAME) {
-                    sh """
-                        cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
-                            playbooks/infra/destroy_vm.yml \
-                            --vault-password-file ${VAULT_PASS_FILE} \
-                            --extra-vars "vm_name=${env.VM_NAME}" \
-                            || true
-                    """
-                    echo "vCenter VM ${env.VM_NAME} destroyed."
+                    def destroyResult = sh(
+                        script: """
+                            cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
+                                playbooks/infra/destroy_vm.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE} \
+                                --extra-vars "vm_name=${env.VM_NAME}"
+                        """,
+                        returnStatus: true
+                    )
+                    if (destroyResult == 0) {
+                        echo "vCenter VM ${env.VM_NAME} destroyed."
+                    } else {
+                        echo "WARNING: destroy_vm failed for ${env.VM_NAME} — delete it manually from vCenter before re-running."
+                    }
                 }
                 echo "Provisioning failed — all resources cleaned up."
             }

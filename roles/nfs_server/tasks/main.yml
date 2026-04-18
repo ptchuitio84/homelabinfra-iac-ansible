@@ -12,15 +12,10 @@
 # SECTION 1: DISK SETUP
 # =============================================================================
 
-- name: Create GPT partition table on {{ nfs_export_disk }}
+- name: Create GPT partition on {{ nfs_export_disk }}
   community.general.parted:
     device: "{{ nfs_export_disk }}"
     label: gpt
-    state: present
-
-- name: Create single partition on {{ nfs_export_disk }}
-  community.general.parted:
-    device: "{{ nfs_export_disk }}"
     number: 1
     state: present
     part_end: "100%"

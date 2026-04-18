@@ -22,7 +22,7 @@
 
 ---
 - name: Deploy login banner to all Linux hosts
-  hosts: linux
+  hosts: all
   gather_facts: true
   vars:
     # Use the vm_role host var if set in inventory; fall back to banner_role default ("")
