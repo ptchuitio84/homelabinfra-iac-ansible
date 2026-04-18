@@ -219,7 +219,14 @@ pipeline {
         stage('Wait for VM ready') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
-                    sh "sleep 30 && until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@${env.VM_IP} 'exit' 2>/dev/null; do sleep 10; done"
+                    sh """
+                        sleep 30
+                        while ! ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=5 root@${env.VM_IP} 'exit' 2>/dev/null; do
+                            echo 'Waiting for SSH...'
+                            sleep 10
+                        done
+                        echo 'SSH ready.'
+                    """
                 }
             }
         }
