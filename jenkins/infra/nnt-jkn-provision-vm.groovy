@@ -54,6 +54,7 @@ pipeline {
   "os_template": "PLTMPOL0903302026",
   "esxi_host":   "hsplv021.nnt.com",
   "datastore":   "LUNPLV163001",
+  "gateway":     "10.10.0.1",
   "role":        "webserver"
 }''',
             description: 'VM specification JSON'
@@ -86,6 +87,7 @@ pipeline {
                     env.VM_TEMPLATE = spec.os_template
                     env.VM_HOST     = spec.esxi_host
                     env.VM_DS       = spec.datastore
+                    env.VM_GATEWAY  = spec.gateway ?: '10.10.0.1'
                     env.VM_ROLE     = spec.role
                     echo "Building: ${env.VM_NAME} | ${env.VM_CPU}vCPU ${env.VM_RAM}MB | role: ${env.VM_ROLE}"
                 }
@@ -159,6 +161,7 @@ pipeline {
                         --extra-vars "vm_name=${env.VM_NAME} \
                                       vm_hostname=${env.VM_NAME} \
                                       vm_ip=${env.VM_IP} \
+                                      vm_gateway=${env.VM_GATEWAY} \
                                       vm_vcpus=${env.VM_CPU} \
                                       vm_memory_mb=${env.VM_RAM} \
                                       vm_template=${env.VM_TEMPLATE} \
