@@ -1,0 +1,16 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart Docker
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+
+- name: Restart Harbor
+  ansible.builtin.shell: |
+    cd {{ harbor_install_dir }}
+    docker compose down
+    docker compose up -d
+  changed_when: true

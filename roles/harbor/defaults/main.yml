@@ -1,0 +1,34 @@
+# =============================================================================
+# roles/harbor/defaults/main.yml — Harbor Container Registry Defaults
+# =============================================================================
+# Deploys Harbor on OL9 using Docker CE + docker-compose.
+# TLS via self-signed cert — replace with proper CA cert after cert-manager
+# is deployed on k8s.
+#
+# PASSWORDS: override harbor_admin_password and harbor_db_password via vault.
+# Default passwords below are for initial bootstrap only — change immediately.
+# =============================================================================
+
+---
+harbor_version: "2.11.0"
+
+# Disk layout
+harbor_data_disk:    /dev/sdb
+harbor_data_dir:     /data/harbor
+harbor_cert_dir:     /data/cert
+harbor_install_dir:  /opt/harbor
+
+# Network
+harbor_hostname:     "{{ ansible_fqdn }}"
+harbor_http_port:    80
+harbor_https_port:   443
+
+# TLS — self-signed, valid 10 years
+harbor_cert_days:    3650
+harbor_cert_country: US
+harbor_cert_state:   California
+harbor_cert_org:     NNT Homelab
+
+# Credentials — OVERRIDE via group_vars/harbor/vault.yml
+harbor_admin_password: "REDACTED"
+harbor_db_password:    "REDACTED"

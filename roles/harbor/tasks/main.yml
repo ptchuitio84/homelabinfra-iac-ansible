@@ -1,0 +1,199 @@
+# =============================================================================
+# roles/harbor/tasks/main.yml — Harbor Container Registry Deployment
+# =============================================================================
+# 1. Partition and mount 500GB data disk at /data
+# 2. Install Docker CE + docker-compose-plugin
+# 3. Download and extract Harbor offline installer
+# 4. Generate self-signed TLS certificate
+# 5. Deploy harbor.yml config
+# 6. Run Harbor installer
+# 7. Install systemd service wrapper
+# 8. Open firewall
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: DATA DISK
+# =============================================================================
+
+- name: Create GPT partition on {{ harbor_data_disk }}
+  community.general.parted:
+    device: "{{ harbor_data_disk }}"
+    label: gpt
+    number: 1
+    state: present
+    part_end: "100%"
+
+- name: Format data disk as XFS
+  community.general.filesystem:
+    fstype: xfs
+    dev: "{{ harbor_data_disk }}1"
+    force: false
+
+- name: Create /data mount point
+  ansible.builtin.file:
+    path: /data
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Mount data disk and persist in /etc/fstab
+  ansible.posix.mount:
+    path: /data
+    src: "{{ harbor_data_disk }}1"
+    fstype: xfs
+    opts: defaults
+    state: mounted
+
+- name: Create Harbor subdirectories on data disk
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ harbor_data_dir }}"
+    - "{{ harbor_cert_dir }}"
+
+# =============================================================================
+# SECTION 2: DOCKER CE
+# =============================================================================
+
+- name: Add Docker CE repository
+  ansible.builtin.yum_repository:
+    name: docker-ce
+    description: Docker CE Stable
+    baseurl: https://download.docker.com/linux/rhel/$releasever/$basearch/stable
+    gpgcheck: true
+    gpgkey: https://download.docker.com/linux/rhel/gpg
+    enabled: true
+
+- name: Install Docker CE packages
+  ansible.builtin.dnf:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+
+- name: Enable and start Docker
+  ansible.builtin.systemd:
+    name: docker
+    enabled: true
+    state: started
+
+# =============================================================================
+# SECTION 3: HARBOR INSTALLER
+# =============================================================================
+
+- name: Download Harbor offline installer
+  ansible.builtin.get_url:
+    url: "https://github.com/goharbor/harbor/releases/download/v{{ harbor_version }}/harbor-offline-installer-v{{ harbor_version }}.tgz"
+    dest: "/tmp/harbor-v{{ harbor_version }}.tgz"
+    mode: '0644'
+    timeout: 300
+
+- name: Extract Harbor installer to /opt
+  ansible.builtin.unarchive:
+    src: "/tmp/harbor-v{{ harbor_version }}.tgz"
+    dest: /opt
+    remote_src: true
+    creates: "{{ harbor_install_dir }}/install.sh"
+
+# =============================================================================
+# SECTION 4: TLS CERTIFICATE
+# =============================================================================
+
+- name: Generate self-signed TLS certificate for {{ harbor_hostname }}
+  ansible.builtin.command: >
+    openssl req -x509 -newkey rsa:4096 -sha256 -nodes
+    -keyout {{ harbor_cert_dir }}/{{ harbor_hostname }}.key
+    -out {{ harbor_cert_dir }}/{{ harbor_hostname }}.crt
+    -days {{ harbor_cert_days }}
+    -subj "/C={{ harbor_cert_country }}/ST={{ harbor_cert_state }}/O={{ harbor_cert_org }}/CN={{ harbor_hostname }}"
+    -addext "subjectAltName=DNS:{{ harbor_hostname }},DNS:{{ ansible_hostname }}"
+  args:
+    creates: "{{ harbor_cert_dir }}/{{ harbor_hostname }}.crt"
+
+- name: Set cert permissions
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: '0600'
+  loop:
+    - "{{ harbor_cert_dir }}/{{ harbor_hostname }}.key"
+    - "{{ harbor_cert_dir }}/{{ harbor_hostname }}.crt"
+
+# =============================================================================
+# SECTION 5: HARBOR CONFIGURATION
+# =============================================================================
+
+- name: Deploy harbor.yml
+  ansible.builtin.template:
+    src: harbor.yml.j2
+    dest: "{{ harbor_install_dir }}/harbor.yml"
+    owner: root
+    group: root
+    mode: '0640'
+  notify: Restart Harbor
+
+# =============================================================================
+# SECTION 6: INSTALL AND START HARBOR
+# =============================================================================
+
+- name: Run Harbor installer
+  ansible.builtin.command: "{{ harbor_install_dir }}/install.sh"
+  args:
+    chdir: "{{ harbor_install_dir }}"
+    creates: "{{ harbor_install_dir }}/common/config"
+  register: harbor_install_result
+
+- name: Deploy Harbor systemd service
+  ansible.builtin.template:
+    src: harbor.service.j2
+    dest: /etc/systemd/system/harbor.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd
+
+- name: Enable Harbor service
+  ansible.builtin.systemd:
+    name: harbor
+    enabled: true
+    daemon_reload: true
+
+# =============================================================================
+# SECTION 7: DOCKER TRUST — distribute cert to Docker's trust store
+# so that docker pull/push works without --insecure-registry
+# =============================================================================
+
+- name: Create Docker certs.d directory for Harbor
+  ansible.builtin.file:
+    path: "/etc/docker/certs.d/{{ harbor_hostname }}"
+    state: directory
+    mode: '0755'
+
+- name: Copy Harbor cert into Docker trust store
+  ansible.builtin.copy:
+    src: "{{ harbor_cert_dir }}/{{ harbor_hostname }}.crt"
+    dest: "/etc/docker/certs.d/{{ harbor_hostname }}/ca.crt"
+    remote_src: true
+    mode: '0644'
+  notify: Restart Docker
+
+# =============================================================================
+# SECTION 8: FIREWALL
+# =============================================================================
+
+- name: Open Harbor firewall ports
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - "{{ harbor_http_port }}/tcp"
+    - "{{ harbor_https_port }}/tcp"

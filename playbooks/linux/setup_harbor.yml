@@ -1,0 +1,20 @@
+# =============================================================================
+# playbooks/linux/setup_harbor.yml — Harbor Container Registry
+# =============================================================================
+# Deploys Harbor on a dedicated OL9 VM with Docker CE and self-signed TLS.
+# Access: https://hmvlapreg001.nnt.com
+# Default credentials: admin / REDACTED (change after first login)
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/setup_harbor.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --limit hmvlapreg001
+# =============================================================================
+
+---
+- name: Deploy Harbor container registry
+  hosts: all
+  gather_facts: true
+
+  roles:
+    - harbor
