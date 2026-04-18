@@ -1,0 +1,54 @@
+# =============================================================================
+# playbooks/windows/dns_add_record.yml — Add DNS A record
+# =============================================================================
+# Adds a single A record to nnt.com on the primary DC, then triggers
+# AD replication so all DCs pick it up immediately.
+#
+# USAGE:
+#   ansible-playbook playbooks/windows/dns_add_record.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --extra-vars "dns_record_name=hmvlapweb001 dns_record_ip=10.10.0.42"
+# =============================================================================
+
+---
+- name: Add DNS A record — {{ dns_record_name }}.nnt.com → {{ dns_record_ip }}
+  hosts: ad_dns_sync
+  gather_facts: false
+
+  tasks:
+
+    - name: Add A record to nnt.com
+      ansible.windows.win_powershell:
+        script: |
+          $ErrorActionPreference = 'Stop'
+          $zone     = "nnt.com"
+          $hostname = "{{ dns_record_name }}"
+          $ip       = "{{ dns_record_ip }}"
+
+          $existing = Get-DnsServerResourceRecord `
+              -ZoneName $zone `
+              -Name $hostname `
+              -RRType A `
+              -ErrorAction SilentlyContinue
+
+          if ($existing) {
+              Write-Output "[EXISTS] $hostname.$zone -> $($existing.RecordData.IPv4Address)"
+          } else {
+              Add-DnsServerResourceRecordA `
+                  -ZoneName $zone `
+                  -Name $hostname `
+                  -IPv4Address $ip `
+                  -TimeToLive 00:05:00
+              Write-Output "[ADDED] $hostname.$zone -> $ip"
+          }
+      register: dns_add_result
+
+    - name: DNS add output
+      ansible.builtin.debug:
+        msg: "{{ dns_add_result.output }}"
+
+    - name: Trigger AD replication
+      ansible.windows.win_powershell:
+        script: |
+          repadmin /syncall /AdeP
+          Write-Output "Replication triggered."

@@ -139,6 +139,17 @@ pipeline {
             }
         }
 
+        stage('Create DNS record') {
+            steps {
+                sh """
+                    cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
+                        playbooks/windows/dns_add_record.yml \
+                        --vault-password-file ${VAULT_PASS_FILE} \
+                        --extra-vars "dns_record_name=${env.VM_NAME} dns_record_ip=${env.VM_IP}"
+                """
+            }
+        }
+
         stage('Provision VM') {
             steps {
                 sh """
@@ -185,7 +196,16 @@ pipeline {
                              -H "Authorization: Token ${env.NETBOX_TOKEN}" \
                              "${env.NETBOX_URL}/api/ipam/ip-addresses/${env.NETBOX_IP_ID}/"
                     """
-                    echo "Released NetBox IP ${env.VM_IP} (ID: ${env.NETBOX_IP_ID}) — pipeline failed, IP reclaimed."
+                    echo "Released NetBox IP ${env.VM_IP} (ID: ${env.NETBOX_IP_ID}) — IP reclaimed."
+                }
+                if (env.VM_NAME && env.VM_IP) {
+                    sh """
+                        cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
+                            playbooks/windows/dns_remove_record.yml \
+                            --vault-password-file ${VAULT_PASS_FILE} \
+                            --extra-vars "dns_record_name=${env.VM_NAME} dns_record_ip=${env.VM_IP}" \
+                            || true
+                    """
                 }
                 echo "Provisioning failed — ${env.VM_NAME} may be partially built. Check vCenter."
             }

@@ -1,0 +1,53 @@
+# =============================================================================
+# playbooks/windows/dns_remove_record.yml — Remove DNS A record
+# =============================================================================
+# Removes a single A record from nnt.com. Called on pipeline failure to
+# clean up records created for VMs that didn't finish provisioning.
+#
+# USAGE:
+#   ansible-playbook playbooks/windows/dns_remove_record.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --extra-vars "dns_record_name=hmvlapweb001 dns_record_ip=10.10.0.42"
+# =============================================================================
+
+---
+- name: Remove DNS A record — {{ dns_record_name }}.nnt.com
+  hosts: ad_dns_sync
+  gather_facts: false
+
+  tasks:
+
+    - name: Remove A record from nnt.com
+      ansible.windows.win_powershell:
+        script: |
+          $ErrorActionPreference = 'Stop'
+          $zone     = "nnt.com"
+          $hostname = "{{ dns_record_name }}"
+
+          $existing = Get-DnsServerResourceRecord `
+              -ZoneName $zone `
+              -Name $hostname `
+              -RRType A `
+              -ErrorAction SilentlyContinue
+
+          if ($existing) {
+              Remove-DnsServerResourceRecord `
+                  -ZoneName $zone `
+                  -Name $hostname `
+                  -RRType A `
+                  -Force
+              Write-Output "[REMOVED] $hostname.$zone"
+          } else {
+              Write-Output "[NOT FOUND] $hostname.$zone — nothing to remove"
+          }
+      register: dns_remove_result
+
+    - name: DNS remove output
+      ansible.builtin.debug:
+        msg: "{{ dns_remove_result.output }}"
+
+    - name: Trigger AD replication
+      ansible.windows.win_powershell:
+        script: |
+          repadmin /syncall /AdeP
+          Write-Output "Replication triggered."
