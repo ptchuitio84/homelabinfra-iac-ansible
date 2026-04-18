@@ -35,6 +35,9 @@ trivy:
 jobservice:
   max_job_workers: 10
   logger_sweeper_duration: 1
+  job_loggers:
+    - STD_OUTPUT
+    - FILE
 
 notification:
   webhook_job_max_retry: 3
