@@ -79,7 +79,7 @@ pipeline {
         stage('Parse VM spec') {
             steps {
                 script {
-                    def spec = readJSON text: params.VM_SPEC
+                    def spec = new groovy.json.JsonSlurper().parseText(params.VM_SPEC)
                     env.VM_NAME     = spec.vm_name
                     env.VM_CPU      = spec.cpu.toString()
                     env.VM_RAM      = spec.ram_mb.toString()
@@ -114,7 +114,7 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    def prefixJson = readJSON text: prefixResponse
+                    def prefixJson = new groovy.json.JsonSlurper().parseText(prefixResponse)
                     def prefixId = prefixJson.results[0].id
                     echo "NetBox prefix ID: ${prefixId}"
 
@@ -130,7 +130,7 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    def allocJson = readJSON text: allocResponse
+                    def allocJson = new groovy.json.JsonSlurper().parseText(allocResponse)
                     // Strip CIDR suffix — provision_vm expects bare IP
                     env.VM_IP = allocJson.address.split('/')[0]
                     echo "Allocated IP: ${env.VM_IP}"
