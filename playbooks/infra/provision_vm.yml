@@ -44,3 +44,18 @@
 
   roles:
     - provision_vm
+
+- name: Inject Ansible control node SSH key
+  hosts: "{{ vm_ip }}"
+  gather_facts: false
+  vars:
+    ansible_user: root
+    ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+  tasks:
+    - name: Add ans001 public key to authorized_keys
+      ansible.posix.authorized_key:
+        user: root
+        key: "{{ ansible_control_ssh_pubkey }}"
+        state: present

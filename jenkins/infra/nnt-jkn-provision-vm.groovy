@@ -274,7 +274,6 @@ pipeline {
                     sh """
                         cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
                             playbooks/infra/destroy_vm.yml \
-                            -i inventory/ \
                             --vault-password-file ${VAULT_PASS_FILE} \
                             --extra-vars "vm_name=${env.VM_NAME}" \
                             || true
