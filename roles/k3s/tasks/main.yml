@@ -3,6 +3,10 @@
 # =============================================================================
 
 ---
+- name: Set hostname from inventory
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname | regex_replace('\\..*$', '') }}"
+
 - name: Deploy k3s control plane
   ansible.builtin.include_tasks: control_plane.yml
   when: inventory_hostname in groups['k8s_control_plane']
