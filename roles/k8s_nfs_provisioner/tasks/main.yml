@@ -1,0 +1,11 @@
+# =============================================================================
+# roles/k8s_nfs_provisioner/tasks/main.yml
+# =============================================================================
+
+---
+- name: Prepare node for NFS mounts
+  ansible.builtin.include_tasks: node_prep.yml
+
+- name: Deploy NFS provisioner (control plane only)
+  ansible.builtin.include_tasks: provisioner.yml
+  when: inventory_hostname in groups['k8s_control_plane']

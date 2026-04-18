@@ -1,0 +1,23 @@
+# =============================================================================
+# playbooks/linux/setup_nfs_provisioner.yml — k8s NFS Storage Provisioner
+# =============================================================================
+# Play 1: Install nfs-utils on all k8s nodes (required for NFS mounts).
+# Play 2: Install Helm + deploy nfs-subdir-external-provisioner on control plane.
+#
+# Result: StorageClass "nfs" set as cluster default. Pods requesting
+# PersistentVolumeClaims will automatically get NFS-backed storage from
+# hmvlapnfs001:/exports/k8s.
+# =============================================================================
+
+---
+- name: Prepare all k8s nodes for NFS
+  hosts: k8s_nodes
+  gather_facts: true
+  roles:
+    - k8s_nfs_provisioner
+
+- name: Deploy NFS provisioner on control plane
+  hosts: k8s_control_plane
+  gather_facts: true
+  roles:
+    - k8s_nfs_provisioner

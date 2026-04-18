@@ -1,0 +1,59 @@
+# =============================================================================
+# roles/k8s_nfs_provisioner/tasks/provisioner.yml
+# =============================================================================
+# Installs Helm and deploys nfs-subdir-external-provisioner to the cluster.
+# Runs on the control plane only — all kubectl/helm commands execute there.
+# =============================================================================
+
+---
+- name: Download Helm install script
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    dest: /tmp/get-helm.sh
+    mode: '0700'
+
+- name: Install Helm {{ helm_version }}
+  ansible.builtin.shell:
+    cmd: DESIRED_VERSION={{ helm_version }} /tmp/get-helm.sh
+    creates: /usr/local/bin/helm
+
+- name: Add nfs-subdir-external-provisioner Helm repo
+  ansible.builtin.shell:
+    cmd: helm repo add nfs-subdir-external-provisioner https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+  register: repo_add
+  changed_when: "'already exists' not in repo_add.stdout"
+
+- name: Update Helm repos
+  ansible.builtin.shell:
+    cmd: helm repo update
+  changed_when: false
+
+- name: Deploy nfs-subdir-external-provisioner
+  ansible.builtin.shell:
+    cmd: >
+      helm upgrade --install nfs-provisioner
+      nfs-subdir-external-provisioner/nfs-subdir-external-provisioner
+      --namespace kube-system
+      --set nfs.server={{ nfs_server_ip }}
+      --set nfs.path={{ nfs_export_path }}
+      --set storageClass.name={{ storage_class }}
+      --set storageClass.defaultClass=true
+      --set storageClass.reclaimPolicy=Retain
+      --kubeconfig /etc/rancher/k3s/k3s.yaml
+  register: helm_result
+  changed_when: "'unchanged' not in helm_result.stdout"
+
+- name: Wait for provisioner pod to be ready
+  ansible.builtin.shell:
+    cmd: >
+      k3s kubectl wait pod
+      --for=condition=Ready
+      --selector=app=nfs-subdir-external-provisioner
+      --namespace=kube-system
+      --timeout=120s
+  changed_when: false
+
+- name: Verify StorageClass exists
+  ansible.builtin.shell:
+    cmd: k3s kubectl get storageclass {{ storage_class }}
+  changed_when: false

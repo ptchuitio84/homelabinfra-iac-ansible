@@ -1,0 +1,12 @@
+# =============================================================================
+# roles/k8s_nfs_provisioner/tasks/node_prep.yml
+# =============================================================================
+# Installs nfs-utils on all k8s nodes so the OS can mount NFS volumes.
+# Without this, kubelet can't attach NFS-backed PersistentVolumes to pods.
+# =============================================================================
+
+---
+- name: Install nfs-utils
+  ansible.builtin.dnf:
+    name: nfs-utils
+    state: present
