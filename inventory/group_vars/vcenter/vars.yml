@@ -36,3 +36,7 @@ vcenter_validate_certs: false
 # "local" means Ansible runs the vSphere API calls from the control node itself
 # rather than SSHing into vCenter. Required for all community.vmware modules.
 ansible_connection: local
+
+# Ansible control node (ans001) SSH public key — injected into every provisioned VM.
+# Stored here (not vault) — public keys are not sensitive.
+ansible_control_ssh_pubkey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICwbFIdhARF9cp4FvsmZj3rgLJdkZVb8ffPHG60eaOmK root@hmvlapans001.nnt.com"

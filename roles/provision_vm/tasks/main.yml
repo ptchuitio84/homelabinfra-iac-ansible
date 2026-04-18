@@ -81,7 +81,25 @@
   delegate_to: localhost
 
 # =============================================================================
-# SECTION 3: CONFIRM
+# SECTION 3: INJECT ANSIBLE CONTROL NODE SSH KEY
+# Adds ans001's public key to authorized_keys so Ansible can manage the VM
+# going forward. Key is stored in group_vars/vcenter/vars.yml — rotate by
+# updating that file, no template changes needed.
+# =============================================================================
+
+- name: Inject Ansible control node SSH key into {{ vm_ip }}
+  ansible.posix.authorized_key:
+    user: root
+    key: "{{ ansible_control_ssh_pubkey }}"
+    state: present
+  delegate_to: "{{ vm_ip }}"
+  vars:
+    ansible_user: root
+    ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+# =============================================================================
+# SECTION 4: CONFIRM
 # =============================================================================
 
 - name: VM provisioning complete
