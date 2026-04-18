@@ -176,7 +176,7 @@ pipeline {
                         cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
                             ${playbook} \
                             --vault-password-file ${VAULT_PASS_FILE} \
-                            --limit ${env.VM_IP}
+                            -i ${env.VM_IP},
                     """
                 }
             }
