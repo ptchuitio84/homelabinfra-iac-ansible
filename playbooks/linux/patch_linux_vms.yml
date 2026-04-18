@@ -6,8 +6,12 @@
 # simultaneous outages.
 #
 # TARGETS (in order):
-#   monitoring group — mon001, mon002, mon003
-#   jenkins group    — jkn001 (patched last; reboots cleanly via Ansible)
+#   monitoring group  — mon001, mon002, mon003
+#   jenkins group     — jkn001
+#   nfs_servers group — nfs001
+#   registry group    — reg001
+#   vault_servers     — vlt001
+#   k8s_nodes         — k8s001 (control plane), k8s002, k8s003 (workers)
 #
 # EXCLUDED:
 #   ansible_nodes (ans001) — runs this playbook; cannot patch itself mid-run
@@ -31,8 +35,8 @@
 # =============================================================================
 
 ---
-- name: Patch Linux VMs — monitoring then jenkins
-  hosts: monitoring:jenkins
+- name: Patch Linux VMs
+  hosts: monitoring:jenkins:nfs_servers:registry:vault_servers:k8s_nodes
   serial: 1
   gather_facts: true
 
@@ -114,6 +118,27 @@
       when:
         - "'monitoring' in group_names"
         - vm_role is defined and vm_role == 'grafana'
+
+    - name: Verify k3s service (control plane)
+      ansible.builtin.systemd:
+        name: k3s
+      register: k3s_svc
+      failed_when: k3s_svc.status.ActiveState != 'active'
+      when: inventory_hostname in groups['k8s_control_plane']
+
+    - name: Verify k3s-agent service (workers)
+      ansible.builtin.systemd:
+        name: k3s-agent
+      register: k3s_agent_svc
+      failed_when: k3s_agent_svc.status.ActiveState != 'active'
+      when: inventory_hostname in groups['k8s_workers']
+
+    - name: Verify Vault service
+      ansible.builtin.systemd:
+        name: vault
+      register: vault_svc
+      failed_when: vault_svc.status.ActiveState != 'active'
+      when: "'vault_servers' in group_names"
 
     # =========================================================================
     # SECTION 5: REPORT
