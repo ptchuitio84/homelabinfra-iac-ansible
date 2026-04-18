@@ -1,0 +1,16 @@
+# =============================================================================
+# inventory/linux/registry.yml — Container Registry Inventory
+# =============================================================================
+# Harbor container registry for k8s image storage.
+# UI: https://hmvlapreg001.nnt.com — admin / REDACTED
+# TLS: self-signed cert at /data/cert/hmvlapreg001.nnt.com.crt
+# Storage: 500GB XFS on /dev/sdb → /data/harbor
+# =============================================================================
+
+---
+registry:
+  hosts:
+
+    hmvlapreg001.nnt.com:
+      ansible_host: 10.10.0.43
+      vm_role: harbor
