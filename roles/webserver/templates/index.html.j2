@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ webserver_site_name }}</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f4f4f4; }
+        .box { text-align: center; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h1 { margin: 0 0 0.5rem; }
+        p { color: #666; margin: 0; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>{{ webserver_site_name }}</h1>
+        <p>{{ webserver_server_name }}</p>
+    </div>
+</body>
+</html>

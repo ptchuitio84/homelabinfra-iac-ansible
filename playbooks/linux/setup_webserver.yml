@@ -1,0 +1,19 @@
+# =============================================================================
+# playbooks/linux/setup_webserver.yml — Deploy Static Webserver
+# =============================================================================
+# Deploys nginx as a static site host. Generic role — override
+# webserver_site_name and webserver_server_name per deployment.
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/setup_webserver.yml \
+#     --limit <ip_or_hostname> \
+#     --extra-vars "webserver_site_name=mysite webserver_server_name=mysite.nnt.com"
+# =============================================================================
+
+---
+- name: Deploy static webserver
+  hosts: all
+  gather_facts: true
+
+  roles:
+    - webserver

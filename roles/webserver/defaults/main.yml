@@ -1,0 +1,17 @@
+# =============================================================================
+# roles/webserver/defaults/main.yml — Static Webserver Role Defaults
+# =============================================================================
+# Generic nginx static site role. Installs nginx, deploys a default landing
+# page, opens firewall ports, and configures SELinux.
+#
+# Override webserver_site_name and webserver_server_name per deployment
+# via group_vars or --extra-vars.
+# =============================================================================
+
+---
+webserver_site_name: "default"
+webserver_server_name: "{{ ansible_hostname }}.nnt.com"
+webserver_http_port: 80
+webserver_https_port: 443
+webserver_root: "/var/www/{{ webserver_site_name }}"
+webserver_index: "index.html"

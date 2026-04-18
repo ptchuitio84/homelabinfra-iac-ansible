@@ -1,0 +1,58 @@
+# =============================================================================
+# roles/webserver/tasks/main.yml — Static Webserver Deployment
+# =============================================================================
+
+---
+- name: Install nginx
+  ansible.builtin.dnf:
+    name: nginx
+    state: present
+
+- name: Create site root directory
+  ansible.builtin.file:
+    path: "{{ webserver_root }}"
+    state: directory
+    owner: nginx
+    group: nginx
+    mode: '0755'
+
+- name: Deploy nginx site config
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/conf.d/{{ webserver_site_name }}.conf
+    mode: '0644'
+  notify: Restart nginx
+
+- name: Deploy default index page
+  ansible.builtin.template:
+    src: index.html.j2
+    dest: "{{ webserver_root }}/{{ webserver_index }}"
+    owner: nginx
+    group: nginx
+    mode: '0644'
+
+- name: Remove default nginx config
+  ansible.builtin.file:
+    path: /etc/nginx/conf.d/default.conf
+    state: absent
+  notify: Restart nginx
+
+- name: Open firewall ports
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - "{{ webserver_http_port }}/tcp"
+    - "{{ webserver_https_port }}/tcp"
+
+- name: Allow nginx to serve files (SELinux)
+  ansible.builtin.command: setsebool -P httpd_can_network_connect 1
+  changed_when: true
+
+- name: Enable and start nginx
+  ansible.builtin.systemd:
+    name: nginx
+    enabled: true
+    state: started
