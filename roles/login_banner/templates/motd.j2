@@ -1,0 +1,20 @@
+################################################################################
+#                                                                              #
+#                           {{ banner_org }}                                   #
+#                                                                              #
+################################################################################
+
+  Hostname : {{ ansible_hostname }}.{{ ansible_domain | default('nnt.com') }}
+  IP       : {{ ansible_default_ipv4.address | default('unknown') }}
+  OS       : {{ ansible_distribution }} {{ ansible_distribution_version }}
+  Kernel   : {{ ansible_kernel }}
+  Env      : {{ banner_env }}{% if banner_role %} | Role: {{ banner_role }}{% endif %}
+
+################################################################################
+#                                                                              #
+#  WARNING: Authorized access only. All activity on this system is monitored  #
+#  and logged. Unauthorized access or use is strictly prohibited and may be   #
+#  subject to civil and criminal penalties.                                    #
+#                                                                              #
+################################################################################
+

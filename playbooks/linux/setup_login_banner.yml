@@ -1,0 +1,32 @@
+# =============================================================================
+# playbooks/linux/setup_login_banner.yml — Deploy Login Banner
+# =============================================================================
+# Applies the login_banner role to all Linux hosts.
+# Run this against existing VMs to deploy the banner fleet-wide.
+# Newly provisioned VMs get it automatically via the provision pipeline.
+#
+# USAGE (all hosts):
+#   ansible-playbook playbooks/linux/setup_login_banner.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+# USAGE (single host):
+#   ansible-playbook playbooks/linux/setup_login_banner.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --limit hmvlapweb001
+#
+# USAGE (override env/role per run):
+#   ansible-playbook playbooks/linux/setup_login_banner.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --extra-vars "banner_env=PROD banner_role=prometheus"
+# =============================================================================
+
+---
+- name: Deploy login banner to all Linux hosts
+  hosts: linux
+  gather_facts: true
+  vars:
+    # Use the vm_role host var if set in inventory; fall back to banner_role default ("")
+    banner_role: "{{ vm_role | default('') }}"
+
+  roles:
+    - login_banner

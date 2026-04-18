@@ -1,0 +1,50 @@
+# =============================================================================
+# roles/login_banner/tasks/main.yml — Login Banner Deployment
+# =============================================================================
+# Deploys two banners:
+#   /etc/motd        — shown after successful login (post-auth)
+#   /etc/issue.net   — shown before authentication via sshd Banner directive
+#
+# Configures sshd to display /etc/issue.net pre-auth and reloads the service.
+# =============================================================================
+
+---
+# OL9 ships a dynamic motd generator via pam_motd — disable it so our
+# static template is the only thing shown, not a mix of both.
+- name: Disable dynamic MOTD (pam_motd)
+  ansible.builtin.file:
+    path: /etc/motd.d
+    state: absent
+
+- name: Deploy /etc/motd (post-login banner)
+  ansible.builtin.template:
+    src: motd.j2
+    dest: /etc/motd
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Deploy /etc/issue.net (pre-auth SSH banner)
+  ansible.builtin.template:
+    src: issue_net.j2
+    dest: /etc/issue.net
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Set sshd Banner directive to /etc/issue.net
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?Banner'
+    line: 'Banner /etc/issue.net'
+    state: present
+    backup: true
+  notify: Reload sshd
+
+- name: Disable sshd PrintLastLog (cleans up login output)
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PrintLastLog'
+    line: 'PrintLastLog no'
+    state: present
+  notify: Reload sshd

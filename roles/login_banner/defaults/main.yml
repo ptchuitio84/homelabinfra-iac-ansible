@@ -1,0 +1,13 @@
+# =============================================================================
+# roles/login_banner/defaults/main.yml — Login Banner Defaults
+# =============================================================================
+# Deploys /etc/motd (post-login) and /etc/issue.net (pre-auth SSH banner).
+# Configures sshd to display /etc/issue.net before authentication.
+#
+# Override banner_env and banner_role per host/group via group_vars or --extra-vars.
+# =============================================================================
+
+---
+banner_org:  "NNT Homelab"
+banner_env:  "LAB"           # LAB | DEV | PROD
+banner_role: ""              # e.g. webserver, prometheus, jenkins — leave blank if unknown

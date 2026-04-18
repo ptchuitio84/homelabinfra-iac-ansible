@@ -247,6 +247,18 @@ pipeline {
             }
         }
 
+        stage('Apply base config') {
+            steps {
+                sh """
+                    cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
+                        playbooks/linux/setup_login_banner.yml \
+                        --vault-password-file ${VAULT_PASS_FILE} \
+                        --extra-vars "banner_role=${env.VM_ROLE}" \
+                        -i ${env.VM_IP},
+                """
+            }
+        }
+
         stage('Configure service') {
             steps {
                 script {

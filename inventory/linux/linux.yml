@@ -1,0 +1,20 @@
+# =============================================================================
+# inventory/linux/linux.yml — Linux Parent Group
+# =============================================================================
+# Aggregates all Linux host groups under a single "linux" group.
+# Use this as the target for fleet-wide Linux playbooks (banners, hardening, etc.)
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/setup_login_banner.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+# =============================================================================
+
+---
+linux:
+  children:
+    ansible_nodes:
+    jenkins:
+    monitoring:
+    netbox:
+    plex_servers:
+    mailcleaner:
