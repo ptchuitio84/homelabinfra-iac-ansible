@@ -221,7 +221,7 @@ pipeline {
                 timeout(time: 5, unit: 'MINUTES') {
                     sh """
                         sleep 30
-                        while ! ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=5 root@${env.VM_IP} 'exit' 2>/dev/null; do
+                        while ! ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=5 root@${env.VM_IP} 'exit' 2>/dev/null; do
                             echo 'Waiting for SSH...'
                             sleep 10
                         done
