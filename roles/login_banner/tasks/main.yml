@@ -9,12 +9,20 @@
 # =============================================================================
 
 ---
-# OL9 ships a dynamic motd generator via pam_motd — disable it so our
-# static template is the only thing shown, not a mix of both.
-- name: Disable dynamic MOTD (pam_motd)
+# OL9/RHEL: dynamic motd lives in /etc/motd.d/
+# Debian: dynamic motd lives in /etc/update-motd.d/
+# Remove whichever applies so our static template is the only thing shown.
+- name: Disable dynamic MOTD — RedHat (/etc/motd.d)
   ansible.builtin.file:
     path: /etc/motd.d
     state: absent
+  when: ansible_os_family == "RedHat"
+
+- name: Disable dynamic MOTD — Debian (/etc/update-motd.d)
+  ansible.builtin.file:
+    path: /etc/update-motd.d
+    state: absent
+  when: ansible_os_family == "Debian"
 
 - name: Deploy /etc/motd (post-login banner)
   ansible.builtin.template:

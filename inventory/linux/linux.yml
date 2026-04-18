@@ -17,4 +17,5 @@ linux:
     monitoring:
     netbox:
     plex_servers:
-    mailcleaner:
+    # mailcleaner excluded — Debian Squeeze / Python 2.6 / OpenSSH 5.5, not compatible with ansible-core
+    # Manage manually via: ssh mailcleaner
