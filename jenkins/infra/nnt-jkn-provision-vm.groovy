@@ -48,14 +48,15 @@ pipeline {
             name: 'VM_SPEC',
             defaultValue: '''\
 {
-  "vm_name":     "hmvlapweb001",
-  "cpu":         2,
-  "ram_mb":      4096,
-  "os_template": "PLTMPOL0903302026",
-  "esxi_host":   "hsplv021.nnt.com",
-  "datastore":   "LUNPLV163001",
-  "gateway":     "10.10.0.1",
-  "role":        "webserver"
+  "vm_name":        "hmvlapweb001",
+  "cpu":            2,
+  "ram_mb":         4096,
+  "os_template":    "PLTMPOL0903302026",
+  "esxi_host":      "hsplv021.nnt.com",
+  "datastore":      "LUNPLV163001",
+  "gateway":        "10.10.0.1",
+  "extra_disk_gb":  0,
+  "role":           "webserver"
 }''',
             description: 'VM specification JSON'
         )
@@ -87,9 +88,10 @@ pipeline {
                     env.VM_TEMPLATE = spec.os_template
                     env.VM_HOST     = spec.esxi_host
                     env.VM_DS       = spec.datastore
-                    env.VM_GATEWAY  = spec.gateway ?: '10.10.0.1'
-                    env.VM_ROLE     = spec.role
-                    echo "Building: ${env.VM_NAME} | ${env.VM_CPU}vCPU ${env.VM_RAM}MB | role: ${env.VM_ROLE}"
+                    env.VM_GATEWAY       = spec.gateway ?: '10.10.0.1'
+                    env.VM_EXTRA_DISK_GB = (spec.extra_disk_gb ?: 0).toString()
+                    env.VM_ROLE          = spec.role
+                    echo "Building: ${env.VM_NAME} | ${env.VM_CPU}vCPU ${env.VM_RAM}MB | extra_disk: ${env.VM_EXTRA_DISK_GB}GB | role: ${env.VM_ROLE}"
                 }
             }
         }
@@ -227,7 +229,8 @@ pipeline {
                                       vm_memory_mb=${env.VM_RAM} \
                                       vm_template=${env.VM_TEMPLATE} \
                                       vm_esxi_host=${env.VM_HOST} \
-                                      vm_datastore=${env.VM_DS}"
+                                      vm_datastore=${env.VM_DS} \
+                                      vm_extra_disk_gb=${env.VM_EXTRA_DISK_GB}"
                 """
             }
         }

@@ -1,0 +1,92 @@
+# =============================================================================
+# roles/nfs_server/tasks/main.yml — NFS Server Deployment
+# =============================================================================
+# 1. Partitions and formats the second disk (/dev/sdb)
+# 2. Mounts it persistently at /exports/k8s
+# 3. Installs and configures NFS server
+# 4. Opens firewall ports
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: DISK SETUP
+# =============================================================================
+
+- name: Create GPT partition table on {{ nfs_export_disk }}
+  community.general.parted:
+    device: "{{ nfs_export_disk }}"
+    label: gpt
+    state: present
+
+- name: Create single partition on {{ nfs_export_disk }}
+  community.general.parted:
+    device: "{{ nfs_export_disk }}"
+    number: 1
+    state: present
+    part_end: "100%"
+
+- name: Format partition as {{ nfs_export_fstype }}
+  community.general.filesystem:
+    fstype: "{{ nfs_export_fstype }}"
+    dev: "{{ nfs_export_disk }}1"
+    force: false
+
+- name: Create NFS export mount point
+  ansible.builtin.file:
+    path: "{{ nfs_export_mount }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Mount export disk and persist in /etc/fstab
+  ansible.posix.mount:
+    path: "{{ nfs_export_mount }}"
+    src: "{{ nfs_export_disk }}1"
+    fstype: "{{ nfs_export_fstype }}"
+    opts: defaults
+    state: mounted
+
+# =============================================================================
+# SECTION 2: NFS SERVER
+# =============================================================================
+
+- name: Install NFS server packages
+  ansible.builtin.dnf:
+    name:
+      - nfs-utils
+      - rpcbind
+    state: present
+
+- name: Deploy /etc/exports
+  ansible.builtin.template:
+    src: exports.j2
+    dest: /etc/exports
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload NFS exports
+
+- name: Enable and start NFS services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - rpcbind
+    - nfs-server
+
+# =============================================================================
+# SECTION 3: FIREWALL
+# =============================================================================
+
+- name: Open NFS firewall services
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - nfs
+    - rpc-bind
+    - mountd

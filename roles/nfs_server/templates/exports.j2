@@ -1,0 +1,7 @@
+# /etc/exports — NFS Export Configuration
+# Managed by Ansible — do not edit manually
+#
+# Export: {{ nfs_export_mount }}
+# Clients: {{ nfs_allowed_clients }}
+
+{{ nfs_export_mount }}    {{ nfs_allowed_clients }}({{ nfs_export_options }})

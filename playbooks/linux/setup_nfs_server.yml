@@ -1,0 +1,19 @@
+# =============================================================================
+# playbooks/linux/setup_nfs_server.yml — NFS Server Configuration
+# =============================================================================
+# Configures a dedicated NFS server for k8s persistent volume storage.
+# Expects a second 250GB disk attached at provision time.
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/setup_nfs_server.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --limit hmvlapnfs001
+# =============================================================================
+
+---
+- name: Configure NFS server
+  hosts: all
+  gather_facts: true
+
+  roles:
+    - nfs_server

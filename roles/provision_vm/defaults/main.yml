@@ -44,6 +44,8 @@ vm_datastore: LUNPLV163001              # e.g. datastore1, SAN_LUN01 — overrid
 # =============================================================================
 vm_vcpus: 2
 vm_memory_mb: 4096                   # 4GB default
+vm_os_disk_gb: 60                    # OS disk size — matches template
+vm_extra_disk_gb: 0                  # Secondary data disk — 0 means none attached
 
 # =============================================================================
 # Networking — VLAN 10 (INFRACORENET, 10.10.0.0/23)

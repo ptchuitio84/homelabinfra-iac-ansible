@@ -1,0 +1,18 @@
+# =============================================================================
+# roles/nfs_server/defaults/main.yml — NFS Server Role Defaults
+# =============================================================================
+# Configures a dedicated NFS server for k8s persistent volume storage.
+# Expects a second disk (/dev/sdb) attached at provision time — formats it
+# as XFS and mounts it as the NFS export root.
+# =============================================================================
+
+---
+nfs_export_disk: /dev/sdb
+nfs_export_mount: /exports/k8s
+nfs_export_fstype: xfs
+
+# Clients allowed to mount — default to entire homelab subnet
+nfs_allowed_clients: "10.10.0.0/23"
+
+# NFS export options
+nfs_export_options: "rw,sync,no_subtree_check,no_root_squash"
