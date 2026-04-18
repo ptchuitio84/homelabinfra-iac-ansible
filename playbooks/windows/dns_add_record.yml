@@ -32,7 +32,22 @@
               -ErrorAction SilentlyContinue
 
           if ($existing) {
-              Write-Output "[EXISTS] $hostname.$zone -> $($existing.RecordData.IPv4Address)"
+              $currentIP = $existing.RecordData.IPv4Address.ToString()
+              if ($currentIP -eq $ip) {
+                  Write-Output "[OK] $hostname.$zone -> $ip (unchanged)"
+              } else {
+                  Remove-DnsServerResourceRecord `
+                      -ZoneName $zone `
+                      -Name $hostname `
+                      -RRType A `
+                      -Force
+                  Add-DnsServerResourceRecordA `
+                      -ZoneName $zone `
+                      -Name $hostname `
+                      -IPv4Address $ip `
+                      -TimeToLive 00:05:00
+                  Write-Output "[UPDATED] $hostname.$zone -> $currentIP -> $ip"
+              }
           } else {
               Add-DnsServerResourceRecordA `
                   -ZoneName $zone `
