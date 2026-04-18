@@ -7,6 +7,18 @@
   ansible.builtin.hostname:
     name: "{{ inventory_hostname | regex_replace('\\..*$', '') }}"
 
+- name: Install nfs-utils (required for NFS-backed PersistentVolumes)
+  ansible.builtin.dnf:
+    name: nfs-utils
+    state: present
+
+- name: Ensure SSH is open in firewalld
+  ansible.posix.firewalld:
+    service: ssh
+    permanent: true
+    state: enabled
+    immediate: true
+
 - name: Deploy k3s control plane
   ansible.builtin.include_tasks: control_plane.yml
   when: inventory_hostname in groups['k8s_control_plane']
