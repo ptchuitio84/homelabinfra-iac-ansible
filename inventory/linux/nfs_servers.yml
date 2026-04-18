@@ -1,0 +1,15 @@
+# =============================================================================
+# inventory/linux/nfs_servers.yml — NFS Server Inventory
+# =============================================================================
+# Dedicated NFS storage servers for k8s persistent volumes.
+# Export path: /exports/k8s — mounted by nfs-subdir-external-provisioner.
+# Backed by 250GB thin-provisioned disk on LUNPLV163001.
+# =============================================================================
+
+---
+nfs_servers:
+  hosts:
+
+    hmvlapnfs001.nnt.com:
+      ansible_host: 10.10.0.42
+      vm_role: nfs_server
