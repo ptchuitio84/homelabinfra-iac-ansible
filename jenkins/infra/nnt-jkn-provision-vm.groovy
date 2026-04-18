@@ -132,8 +132,9 @@ pipeline {
 
                     def allocJson = new groovy.json.JsonSlurperClassic().parseText(allocResponse)
                     // Strip CIDR suffix — provision_vm expects bare IP
-                    env.VM_IP = allocJson.address.split('/')[0]
-                    echo "Allocated IP: ${env.VM_IP}"
+                    env.VM_IP    = allocJson.address.split('/')[0]
+                    env.NETBOX_IP_ID = allocJson.id.toString()
+                    echo "Allocated IP: ${env.VM_IP} (NetBox ID: ${env.NETBOX_IP_ID})"
                 }
             }
         }
@@ -177,7 +178,17 @@ pipeline {
             echo "VM ${env.VM_NAME} provisioned at ${env.VM_IP} and configured as ${env.VM_ROLE}."
         }
         failure {
-            echo "Provisioning failed — ${env.VM_NAME} may be partially built. Check NetBox and vCenter."
+            script {
+                if (env.NETBOX_IP_ID) {
+                    sh """
+                        curl -s -X DELETE \
+                             -H "Authorization: Token ${env.NETBOX_TOKEN}" \
+                             "${env.NETBOX_URL}/api/ipam/ip-addresses/${env.NETBOX_IP_ID}/"
+                    """
+                    echo "Released NetBox IP ${env.VM_IP} (ID: ${env.NETBOX_IP_ID}) — pipeline failed, IP reclaimed."
+                }
+                echo "Provisioning failed — ${env.VM_NAME} may be partially built. Check vCenter."
+            }
         }
     }
 }
