@@ -1,0 +1,58 @@
+# =============================================================================
+# roles/vault/tasks/main.yml — HashiCorp Vault Deployment
+# =============================================================================
+# 1. Add HashiCorp repo and install Vault
+# 2. Configure file storage backend
+# 3. Enable and start vault systemd service
+# 4. Open firewall port
+#
+# POST-DEPLOY: Vault starts sealed. SSH in and run:
+#   export VAULT_ADDR='http://127.0.0.1:8200'
+#   vault operator init
+# Save the unseal keys and root token — they cannot be recovered.
+# =============================================================================
+
+---
+- name: Add HashiCorp repository
+  ansible.builtin.yum_repository:
+    name: hashicorp
+    description: HashiCorp Stable
+    baseurl: https://rpm.releases.hashicorp.com/RHEL/$releasever/$basearch/stable
+    gpgcheck: true
+    gpgkey: https://rpm.releases.hashicorp.com/gpg
+    enabled: true
+
+- name: Install Vault
+  ansible.builtin.dnf:
+    name: "vault-{{ vault_version }}"
+    state: present
+
+- name: Create Vault data directory
+  ansible.builtin.file:
+    path: "{{ vault_data_dir }}"
+    state: directory
+    owner: vault
+    group: vault
+    mode: '0750'
+
+- name: Deploy vault.hcl config
+  ansible.builtin.template:
+    src: vault.hcl.j2
+    dest: "{{ vault_config_dir }}/vault.hcl"
+    owner: vault
+    group: vault
+    mode: '0640'
+  notify: Restart Vault
+
+- name: Enable and start Vault
+  ansible.builtin.systemd:
+    name: vault
+    enabled: true
+    state: started
+
+- name: Open Vault firewall port
+  ansible.posix.firewalld:
+    port: "{{ vault_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true

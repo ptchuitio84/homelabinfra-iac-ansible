@@ -1,0 +1,18 @@
+# =============================================================================
+# vault.hcl — HashiCorp Vault Configuration
+# Managed by Ansible — do not edit manually
+# =============================================================================
+
+ui = {{ vault_ui | lower }}
+
+storage "file" {
+  path = "{{ vault_data_dir }}"
+}
+
+listener "tcp" {
+  address     = "{{ vault_listen_addr }}:{{ vault_port }}"
+  tls_disable = true
+}
+
+api_addr     = "http://{{ ansible_default_ipv4.address }}:{{ vault_port }}"
+cluster_addr = "http://{{ ansible_default_ipv4.address }}:{{ vault_port | int + 1 }}"
