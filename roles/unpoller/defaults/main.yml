@@ -1,0 +1,42 @@
+# =============================================================================
+# roles/unpoller/defaults/main.yml — UnPoller Role Defaults
+# =============================================================================
+# Deploys UnPoller on mon003 to scrape UniFi controller metrics and expose
+# them for Prometheus. Pre-built Grafana dashboards available (IDs below).
+#
+# ARCHITECTURE:
+#   Prometheus (mon002:9090) → scrapes → unpoller (mon003:9130)
+#   unpoller → polls → UniFi Network Application (10.100.100.222:8443)
+#
+# CREDENTIALS:
+#   vault_unifi_user     — in inventory/group_vars/monitoring/vault.yml
+#   vault_unifi_password — in inventory/group_vars/monitoring/vault.yml
+#
+# GRAFANA DASHBOARDS (import by ID):
+#   11315 — UniFi Poller: Client DPI
+#   11310 — UniFi Poller: USW Insights
+#   11312 — UniFi Poller: UAP Insights
+#   11314 — UniFi Poller: Site DPI
+# =============================================================================
+
+---
+# UnPoller version to install
+unpoller_version: "2.39.0"
+
+# Port UnPoller Prometheus metrics endpoint listens on
+unpoller_port: 9130
+
+# System user/group
+unpoller_user: unpoller
+unpoller_group: unpoller
+
+# Install paths
+unpoller_install_dir: /opt/unpoller
+unpoller_config_dir: /etc/unpoller
+unpoller_config_file: "{{ unpoller_config_dir }}/up.conf"
+unpoller_log_dir: /var/log/unpoller
+
+# UniFi controller connection
+unifi_controller_url: "https://10.100.100.222:8443"
+unifi_controller_verify_ssl: false   # self-signed cert on local controller
+unifi_site: "default"                # UniFi site name — change if not default

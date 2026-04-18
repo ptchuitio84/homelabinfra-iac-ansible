@@ -1,0 +1,60 @@
+# =============================================================================
+# roles/netbox/defaults/main.yml — NetBox Role Defaults
+# =============================================================================
+# Deploys NetBox on hmvlapntb001 as a systemd service behind nginx.
+# NetBox serves as the IPAM/DCIM source of truth for the lab.
+#
+# ARCHITECTURE:
+#   nginx (:80) → gunicorn (:8001) → NetBox (Django)
+#   NetBox → PostgreSQL (local) + Redis (local)
+#
+# CREDENTIALS (in inventory/group_vars/netbox/vault.yml):
+#   vault_netbox_secret_key     — Django secret key (generate with openssl rand -hex 50)
+#   vault_netbox_db_password    — PostgreSQL netbox user password
+#   vault_netbox_admin_password — Initial superuser password
+#
+# POST-INSTALL:
+#   http://hmvlapntb001.nnt.com/
+# =============================================================================
+
+---
+# NetBox version
+netbox_version: "4.2.6"
+
+# System user
+netbox_user: netbox
+netbox_group: netbox
+
+# Install paths
+netbox_install_dir: /opt/netbox
+netbox_venv: /opt/netbox/venv
+netbox_config_dir: /opt/netbox/netbox/netbox
+netbox_log_dir: /var/log/netbox
+
+# PostgreSQL
+netbox_db_name: netbox
+netbox_db_user: netbox
+netbox_db_host: localhost
+
+# Redis
+netbox_redis_host: localhost
+netbox_redis_port: 6379
+
+# NetBox application settings
+netbox_allowed_hosts:
+  - "hmvlapntb001.nnt.com"
+  - "netbox.nnt.com"
+  - "10.10.1.71"
+  - "localhost"
+
+netbox_time_zone: "America/New_York"
+netbox_language_code: "en-us"
+
+# Superuser created on first run
+netbox_admin_user: admin
+netbox_admin_email: admin@nnt.com
+
+# nginx
+netbox_http_port: 80
+netbox_gunicorn_port: 8001
+netbox_gunicorn_workers: 3

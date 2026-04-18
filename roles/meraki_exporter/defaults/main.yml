@@ -1,0 +1,41 @@
+# =============================================================================
+# roles/meraki_exporter/defaults/main.yml — Meraki Exporter Role Defaults
+# =============================================================================
+# Deploys a custom Prometheus exporter on mon003 that polls the Meraki
+# Dashboard API and exposes MX appliance metrics for Prometheus to scrape.
+#
+# ARCHITECTURE:
+#   Prometheus (mon002:9090) → scrapes → meraki_exporter (mon003:9822)
+#   meraki_exporter → polls → Meraki Dashboard API (api.meraki.com)
+#
+# CREDENTIALS:
+#   vault_meraki_api_key — in inventory/group_vars/monitoring/vault.yml
+#   meraki_org_id        — in inventory/group_vars/monitoring/vars.yml
+#
+# METRICS EXPOSED:
+#   meraki_device_up                — MX online status (1=online, 0=offline)
+#   meraki_appliance_uplink_status  — WAN uplink active status (1=active, 0=not)
+#   meraki_network_client_count     — clients seen in last 5 minutes per network
+# =============================================================================
+
+---
+# Port the exporter listens on — must match Prometheus scrape config.
+meraki_exporter_port: 9822
+
+# How often to poll the Meraki API (seconds).
+# Keep >= 60 to stay well under API rate limits.
+meraki_exporter_poll_interval: 60
+
+# System user/group the exporter runs as.
+meraki_exporter_user: meraki_exporter
+meraki_exporter_group: meraki_exporter
+
+# Install paths
+meraki_exporter_install_dir: /opt/meraki_exporter
+meraki_exporter_venv: /opt/meraki_exporter/venv
+meraki_exporter_script: /opt/meraki_exporter/meraki_exporter.py
+meraki_exporter_log_dir: /var/log/meraki_exporter
+
+# Meraki org ID — not sensitive, set in group_vars/monitoring/vars.yml
+# Find it: Meraki Dashboard → Organization → Settings → Organization ID
+meraki_org_id: ""

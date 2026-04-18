@@ -60,6 +60,7 @@
       - "pyVmomi==7.0.3"
       - requests
       - vmware_exporter
+      - "Twisted==22.10.0"   # Twisted 23+ breaks BranchingDeferred in vmware_exporter
     virtualenv: /opt/vmware_exporter/venv
     virtualenv_command: "python3 -m venv"
     state: present

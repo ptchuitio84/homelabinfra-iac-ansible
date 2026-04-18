@@ -69,3 +69,17 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: "localhost:{{ snmp_exporter_port }}"
+
+  # ── UniFi APs (unpoller) ──────────────────────────────────────────────────
+  # unpoller on mon003 polls the UniFi Network Application and exposes
+  # AP, client, and site metrics for the 3x AP Pro 6/7 units.
+  - job_name: "unifi"
+    static_configs:
+      - targets: ["{{ prometheus_unpoller_host }}:{{ unpoller_port }}"]
+
+  # ── Meraki MX64 (meraki_exporter) ─────────────────────────────────────────
+  # meraki_exporter on mon003 polls the Meraki Dashboard API and exposes
+  # MX appliance uplink status, device health, and client counts.
+  - job_name: "meraki"
+    static_configs:
+      - targets: ["{{ prometheus_meraki_exporter_host }}:{{ meraki_exporter_port }}"]

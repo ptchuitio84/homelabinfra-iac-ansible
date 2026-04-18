@@ -1,0 +1,15 @@
+# =============================================================================
+# roles/meraki_exporter/handlers/main.yml
+# =============================================================================
+
+---
+- name: Restart meraki_exporter
+  ansible.builtin.systemd:
+    name: meraki_exporter
+    state: restarted
+
+- name: Reload systemd and restart meraki_exporter
+  ansible.builtin.systemd:
+    name: meraki_exporter
+    daemon_reload: true
+    state: restarted

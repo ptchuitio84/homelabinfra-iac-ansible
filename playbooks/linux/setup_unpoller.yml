@@ -1,0 +1,33 @@
+# =============================================================================
+# playbooks/linux/setup_unpoller.yml — Deploy UnPoller (UniFi Exporter)
+# =============================================================================
+# Deploys UnPoller on hmvlapmon003 as a systemd service.
+# UnPoller polls the UniFi Network Application and exposes metrics on :9130.
+#
+# PREREQS:
+#   vault_unifi_user     — add to inventory/group_vars/monitoring/vault.yml
+#   vault_unifi_password — add to inventory/group_vars/monitoring/vault.yml
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/setup_unpoller.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --limit hmvlapmon003.nnt.com
+#
+# POST-DEPLOY:
+#   Verify: curl http://hmvlapmon003.nnt.com:9130/metrics | grep unifi
+#   Logs:   tail -f /var/log/unpoller/unpoller.log
+#
+# GRAFANA DASHBOARDS (import by ID):
+#   11315 — Client DPI
+#   11310 — USW Insights
+#   11312 — UAP Insights  ← most relevant (3x AP Pro)
+#   11314 — Site DPI
+# =============================================================================
+
+---
+- name: Deploy UnPoller UniFi exporter
+  hosts: hmvlapmon003.nnt.com
+  gather_facts: false
+
+  roles:
+    - unpoller

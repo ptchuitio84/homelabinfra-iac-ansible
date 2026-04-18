@@ -1,0 +1,31 @@
+# =============================================================================
+# playbooks/linux/setup_netbox.yml — Deploy NetBox IPAM/DCIM
+# =============================================================================
+# Deploys NetBox on hmvlapntb001 as the lab source of truth for IP management
+# and VM inventory. Used by Jenkins provisioning pipelines to allocate IPs.
+#
+# PREREQS:
+#   Add to inventory/group_vars/netbox/vault.yml:
+#     vault_netbox_secret_key     — openssl rand -hex 50
+#     vault_netbox_db_password    — strong password
+#     vault_netbox_admin_password — initial admin UI password
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/setup_netbox.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+# POST-DEPLOY:
+#   http://hmvlapntb001.nnt.com — log in as admin
+#   Set up prefixes for IPAM:
+#     IPAM → Prefixes → Add
+#     10.10.0.0/23 — INFRACORENET (Windows/Domain)
+#     10.10.1.0/23 — INFRACORENET (Linux VMs)  ← primary for provisioning
+# =============================================================================
+
+---
+- name: Deploy NetBox IPAM/DCIM
+  hosts: hmvlapntb001.nnt.com
+  gather_facts: true
+
+  roles:
+    - netbox

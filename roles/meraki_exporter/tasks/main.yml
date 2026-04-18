@@ -1,0 +1,94 @@
+# =============================================================================
+# roles/meraki_exporter/tasks/main.yml — Meraki Exporter Deployment Tasks
+# =============================================================================
+
+---
+- name: Create meraki_exporter system group
+  ansible.builtin.group:
+    name: "{{ meraki_exporter_group }}"
+    system: true
+    state: present
+
+- name: Create meraki_exporter system user
+  ansible.builtin.user:
+    name: "{{ meraki_exporter_user }}"
+    group: "{{ meraki_exporter_group }}"
+    system: true
+    shell: /sbin/nologin
+    home: "{{ meraki_exporter_install_dir }}"
+    create_home: false
+    state: present
+
+- name: Create install directory
+  ansible.builtin.file:
+    path: "{{ meraki_exporter_install_dir }}"
+    state: directory
+    owner: "{{ meraki_exporter_user }}"
+    group: "{{ meraki_exporter_group }}"
+    mode: '0755'
+
+- name: Create log directory
+  ansible.builtin.file:
+    path: "{{ meraki_exporter_log_dir }}"
+    state: directory
+    owner: "{{ meraki_exporter_user }}"
+    group: "{{ meraki_exporter_group }}"
+    mode: '0755'
+
+- name: Install Python 3.11 (Meraki SDK requires 3.10+; OL9 ships 3.9)
+  ansible.builtin.dnf:
+    name: python3.11
+    state: present
+
+- name: Create Python virtual environment using Python 3.11
+  ansible.builtin.command:
+    cmd: python3.11 -m venv {{ meraki_exporter_venv }}
+    creates: "{{ meraki_exporter_venv }}/bin/activate"
+
+- name: Install Python dependencies in venv
+  ansible.builtin.pip:
+    name:
+      - meraki
+      - prometheus_client
+    virtualenv: "{{ meraki_exporter_venv }}"
+    virtualenv_python: python3.11
+    state: present
+
+- name: Set venv ownership
+  ansible.builtin.file:
+    path: "{{ meraki_exporter_venv }}"
+    owner: "{{ meraki_exporter_user }}"
+    group: "{{ meraki_exporter_group }}"
+    recurse: true
+
+- name: Deploy exporter script
+  ansible.builtin.template:
+    src: meraki_exporter.py.j2
+    dest: "{{ meraki_exporter_script }}"
+    owner: "{{ meraki_exporter_user }}"
+    group: "{{ meraki_exporter_group }}"
+    mode: '0750'
+  notify: Restart meraki_exporter
+
+- name: Deploy systemd service unit
+  ansible.builtin.template:
+    src: meraki_exporter.service.j2
+    dest: /etc/systemd/system/meraki_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd and restart meraki_exporter
+
+- name: Open firewall port for meraki_exporter
+  ansible.posix.firewalld:
+    port: "{{ meraki_exporter_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+
+- name: Enable and start meraki_exporter service
+  ansible.builtin.systemd:
+    name: meraki_exporter
+    enabled: true
+    state: started
+    daemon_reload: true

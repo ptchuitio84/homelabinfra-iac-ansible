@@ -1,0 +1,273 @@
+# =============================================================================
+# roles/netbox/tasks/main.yml — NetBox Deployment Tasks
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: SYSTEM DEPENDENCIES
+# =============================================================================
+
+- name: Install system dependencies
+  ansible.builtin.dnf:
+    name:
+      - python3.11
+      - python3.11-devel
+      - postgresql-server
+      - postgresql-devel
+      - redis
+      - nginx
+      - gcc
+      - libxml2-devel
+      - libxslt-devel
+      - libffi-devel
+      - openssl-devel
+      - git
+    state: present
+
+- name: Initialize PostgreSQL database cluster
+  ansible.builtin.command:
+    cmd: postgresql-setup --initdb
+    creates: /var/lib/pgsql/data/PG_VERSION
+
+- name: Enable and start PostgreSQL
+  ansible.builtin.systemd:
+    name: postgresql
+    enabled: true
+    state: started
+
+- name: Enable and start Redis
+  ansible.builtin.systemd:
+    name: redis
+    enabled: true
+    state: started
+
+# =============================================================================
+# SECTION 2: POSTGRESQL SETUP
+# =============================================================================
+
+- name: Create NetBox PostgreSQL database
+  community.postgresql.postgresql_db:
+    name: "{{ netbox_db_name }}"
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Create NetBox PostgreSQL user
+  community.postgresql.postgresql_user:
+    name: "{{ netbox_db_user }}"
+    password: "{{ vault_netbox_db_password }}"
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Grant NetBox user privileges on database
+  community.postgresql.postgresql_privs:
+    db: "{{ netbox_db_name }}"
+    privs: ALL
+    type: database
+    role: "{{ netbox_db_user }}"
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Allow netbox user to authenticate via md5 (pg_hba.conf)
+  community.postgresql.postgresql_pg_hba:
+    dest: /var/lib/pgsql/data/pg_hba.conf
+    contype: host
+    databases: "{{ netbox_db_name }}"
+    users: "{{ netbox_db_user }}"
+    address: 127.0.0.1/32
+    method: md5
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Reload PostgreSQL to apply pg_hba changes
+  ansible.builtin.systemd:
+    name: postgresql
+    state: reloaded
+
+# =============================================================================
+# SECTION 3: NETBOX USER AND DIRECTORIES
+# =============================================================================
+
+- name: Create netbox system group
+  ansible.builtin.group:
+    name: "{{ netbox_group }}"
+    system: true
+    state: present
+
+- name: Create netbox system user
+  ansible.builtin.user:
+    name: "{{ netbox_user }}"
+    group: "{{ netbox_group }}"
+    system: true
+    shell: /sbin/nologin
+    home: "{{ netbox_install_dir }}"
+    create_home: false
+    state: present
+
+- name: Create log directory
+  ansible.builtin.file:
+    path: "{{ netbox_log_dir }}"
+    state: directory
+    owner: "{{ netbox_user }}"
+    group: "{{ netbox_group }}"
+    mode: '0755'
+
+# =============================================================================
+# SECTION 4: DOWNLOAD AND INSTALL NETBOX
+# =============================================================================
+
+- name: Download NetBox {{ netbox_version }}
+  ansible.builtin.get_url:
+    url: "https://github.com/netbox-community/netbox/archive/refs/tags/v{{ netbox_version }}.tar.gz"
+    dest: "/tmp/netbox-{{ netbox_version }}.tar.gz"
+    mode: '0644'
+
+- name: Extract NetBox archive
+  ansible.builtin.unarchive:
+    src: "/tmp/netbox-{{ netbox_version }}.tar.gz"
+    dest: /opt/
+    remote_src: true
+    creates: "/opt/netbox-{{ netbox_version }}"
+
+- name: Symlink netbox directory
+  ansible.builtin.file:
+    src: "/opt/netbox-{{ netbox_version }}"
+    dest: "{{ netbox_install_dir }}"
+    state: link
+    force: true
+
+- name: Create Python 3.11 virtual environment
+  ansible.builtin.command:
+    cmd: python3.11 -m venv {{ netbox_venv }}
+    creates: "{{ netbox_venv }}/bin/activate"
+
+- name: Install NetBox Python dependencies
+  ansible.builtin.pip:
+    requirements: "{{ netbox_install_dir }}/requirements.txt"
+    virtualenv: "{{ netbox_venv }}"
+    state: present
+
+- name: Install psycopg2 (PostgreSQL adapter)
+  ansible.builtin.pip:
+    name: psycopg2-binary
+    virtualenv: "{{ netbox_venv }}"
+    state: present
+
+# =============================================================================
+# SECTION 5: CONFIGURATION
+# =============================================================================
+
+- name: Deploy NetBox configuration
+  ansible.builtin.template:
+    src: configuration.py.j2
+    dest: "{{ netbox_config_dir }}/configuration.py"
+    owner: "{{ netbox_user }}"
+    group: "{{ netbox_group }}"
+    mode: '0640'
+  notify: Restart netbox
+
+- name: Set ownership of NetBox install directory
+  ansible.builtin.file:
+    path: "/opt/netbox-{{ netbox_version }}"
+    owner: "{{ netbox_user }}"
+    group: "{{ netbox_group }}"
+    state: directory
+    recurse: true
+
+- name: Run database migrations
+  ansible.builtin.command:
+    cmd: "{{ netbox_venv }}/bin/python {{ netbox_install_dir }}/netbox/manage.py migrate"
+  become: true
+  become_user: "{{ netbox_user }}"
+  changed_when: true
+
+- name: Create superuser (non-interactive)
+  ansible.builtin.shell: |
+    {{ netbox_venv }}/bin/python {{ netbox_install_dir }}/netbox/manage.py shell -c "
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    if not User.objects.filter(username='{{ netbox_admin_user }}').exists():
+        User.objects.create_superuser('{{ netbox_admin_user }}', '{{ netbox_admin_email }}', '{{ vault_netbox_admin_password }}')
+        print('created')
+    else:
+        print('exists')
+    "
+  become: true
+  become_user: "{{ netbox_user }}"
+  register: superuser_result
+  changed_when: "'created' in superuser_result.stdout"
+
+- name: Collect static files
+  ansible.builtin.command:
+    cmd: "{{ netbox_venv }}/bin/python {{ netbox_install_dir }}/netbox/manage.py collectstatic --no-input"
+  become: true
+  become_user: "{{ netbox_user }}"
+  changed_when: true
+
+# =============================================================================
+# SECTION 6: SYSTEMD SERVICES
+# =============================================================================
+
+- name: Deploy NetBox gunicorn service
+  ansible.builtin.template:
+    src: netbox.service.j2
+    dest: /etc/systemd/system/netbox.service
+    mode: '0644'
+  notify: Reload systemd and restart netbox
+
+- name: Deploy NetBox RQ worker service
+  ansible.builtin.template:
+    src: netbox-rq.service.j2
+    dest: /etc/systemd/system/netbox-rq.service
+    mode: '0644'
+  notify: Reload systemd and restart netbox-rq
+
+- name: Enable and start netbox services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop:
+    - netbox
+    - netbox-rq
+
+# =============================================================================
+# SECTION 7: NGINX
+# =============================================================================
+
+- name: Deploy nginx configuration
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/conf.d/netbox.conf
+    mode: '0644'
+  notify: Restart nginx
+
+- name: Remove default nginx config
+  ansible.builtin.file:
+    path: /etc/nginx/conf.d/default.conf
+    state: absent
+  notify: Restart nginx
+
+- name: Open firewall ports
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - "80/tcp"
+    - "443/tcp"
+
+- name: Enable and start nginx
+  ansible.builtin.systemd:
+    name: nginx
+    enabled: true
+    state: started
+
+- name: Allow nginx to connect to network (SELinux)
+  ansible.builtin.command: setsebool -P httpd_can_network_connect 1
+  changed_when: true

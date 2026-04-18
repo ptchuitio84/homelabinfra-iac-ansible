@@ -1,0 +1,26 @@
+# =============================================================================
+# roles/netbox/handlers/main.yml
+# =============================================================================
+
+---
+- name: Restart netbox
+  ansible.builtin.systemd:
+    name: netbox
+    state: restarted
+
+- name: Reload systemd and restart netbox
+  ansible.builtin.systemd:
+    name: netbox
+    daemon_reload: true
+    state: restarted
+
+- name: Reload systemd and restart netbox-rq
+  ansible.builtin.systemd:
+    name: netbox-rq
+    daemon_reload: true
+    state: restarted
+
+- name: Restart nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: restarted

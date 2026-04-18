@@ -1,0 +1,15 @@
+# =============================================================================
+# roles/unpoller/handlers/main.yml
+# =============================================================================
+
+---
+- name: Restart unpoller
+  ansible.builtin.systemd:
+    name: unpoller
+    state: restarted
+
+- name: Reload systemd and restart unpoller
+  ansible.builtin.systemd:
+    name: unpoller
+    daemon_reload: true
+    state: restarted

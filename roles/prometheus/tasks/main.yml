@@ -61,11 +61,16 @@
   ansible.builtin.command: mount {{ _prometheus_data_device }} {{ prometheus_data_dir }}
   when: prometheus_disk_mounted.rc != 0
 
-- name: Ensure {{ _prometheus_data_device }} is in fstab
+- name: Get UUID of {{ _prometheus_data_device }}
+  ansible.builtin.command: blkid -s UUID -o value {{ _prometheus_data_device }}
+  register: prometheus_disk_uuid
+  changed_when: false
+
+- name: Ensure {{ _prometheus_data_device }} is in fstab by UUID
   ansible.builtin.lineinfile:
     path: /etc/fstab
-    regexp: "^{{ _prometheus_data_device }}\\s"
-    line: "{{ _prometheus_data_device }} {{ prometheus_data_dir }} {{ prometheus_data_fstype }} defaults 0 0"
+    regexp: "{{ prometheus_data_dir }}"
+    line: "UUID={{ prometheus_disk_uuid.stdout }} {{ prometheus_data_dir }} {{ prometheus_data_fstype }} defaults 0 0"
     state: present
 
 # =============================================================================

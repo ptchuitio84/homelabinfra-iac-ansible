@@ -85,3 +85,11 @@ prometheus_vmware_vcenter: "hmvlapvc001.nnt.com"
 
 # Host running vmware_exporter
 prometheus_vmware_exporter_host: "hmvlapmon002.nnt.com"
+
+# Meraki exporter — runs on mon003, scrapes Meraki Dashboard API for MX metrics
+meraki_exporter_port: 9822
+prometheus_meraki_exporter_host: "hmvlapmon003.nnt.com"
+
+# UnPoller — runs on mon003, scrapes UniFi controller for AP/client metrics
+unpoller_port: 9130
+prometheus_unpoller_host: "hmvlapmon003.nnt.com"

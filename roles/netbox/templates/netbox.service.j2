@@ -1,0 +1,26 @@
+[Unit]
+Description=NetBox WSGI Service
+Documentation=https://docs.netbox.dev/
+After=network-online.target postgresql.service redis.service
+Requires=postgresql.service redis.service
+
+[Service]
+Type=simple
+User={{ netbox_user }}
+Group={{ netbox_group }}
+WorkingDirectory={{ netbox_install_dir }}/netbox
+ExecStart={{ netbox_venv }}/bin/gunicorn \
+    --pid /var/tmp/netbox.pid \
+    --pythonpath {{ netbox_install_dir }}/netbox \
+    --workers {{ netbox_gunicorn_workers }} \
+    --bind 127.0.0.1:{{ netbox_gunicorn_port }} \
+    --timeout 120 \
+    --log-level info \
+    --access-logfile {{ netbox_log_dir }}/access.log \
+    --error-logfile {{ netbox_log_dir }}/error.log \
+    netbox.wsgi
+Restart=on-failure
+RestartSec=30s
+
+[Install]
+WantedBy=multi-user.target

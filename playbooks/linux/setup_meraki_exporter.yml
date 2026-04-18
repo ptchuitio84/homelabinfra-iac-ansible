@@ -1,0 +1,29 @@
+# =============================================================================
+# playbooks/linux/setup_meraki_exporter.yml — Deploy Meraki Prometheus Exporter
+# =============================================================================
+# Deploys the Meraki exporter on hmvlapmon003 as a systemd service.
+# Exporter polls the Meraki Dashboard API and exposes MX64 metrics on :9822.
+#
+# PREREQS:
+#   vault_meraki_api_key  — add to inventory/group_vars/monitoring/vault.yml
+#   meraki_org_id         — add to inventory/group_vars/monitoring/vars.yml
+#   (Find org ID: Meraki Dashboard → Organization → Settings)
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/setup_meraki_exporter.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --limit hmvlapmon003.nnt.com
+#
+# POST-DEPLOY:
+#   Verify: curl http://hmvlapmon003.nnt.com:9822/metrics | grep meraki
+#   Logs:   journalctl -u meraki_exporter -f
+#           tail -f /var/log/meraki_exporter/meraki_exporter.log
+# =============================================================================
+
+---
+- name: Deploy Meraki Prometheus exporter
+  hosts: hmvlapmon003.nnt.com
+  gather_facts: false
+
+  roles:
+    - meraki_exporter
