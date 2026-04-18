@@ -15,6 +15,15 @@
   hosts: vcenter
   gather_facts: false
 
+  # Hardcode vcenter vars as fallback — group_vars/vcenter/vars.yml may not
+  # load in all execution contexts (e.g. Jenkins post-failure cleanup).
+  vars:
+    vcenter_hostname:       "{{ hostvars[inventory_hostname]['ansible_host'] }}"
+    vcenter_username:       "{{ vault_vcenter_username }}"
+    vcenter_password:       "{{ vault_vcenter_password }}"
+    vcenter_validate_certs: false
+    vcenter_datacenter:     NNTDC
+
   tasks:
 
     - name: Power off and delete VM {{ vm_name }}

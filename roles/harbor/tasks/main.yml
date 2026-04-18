@@ -16,6 +16,10 @@
 # SECTION 1: DATA DISK
 # =============================================================================
 
+- name: Wipe stale partition signatures from {{ harbor_data_disk }}
+  ansible.builtin.command: wipefs -a {{ harbor_data_disk }}
+  changed_when: true
+
 - name: Create GPT partition on {{ harbor_data_disk }}
   community.general.parted:
     device: "{{ harbor_data_disk }}"

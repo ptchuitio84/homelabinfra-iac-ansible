@@ -12,6 +12,10 @@
 # SECTION 1: DISK SETUP
 # =============================================================================
 
+- name: Wipe stale partition signatures from {{ nfs_export_disk }}
+  ansible.builtin.command: wipefs -a {{ nfs_export_disk }}
+  changed_when: true
+
 - name: Create GPT partition on {{ nfs_export_disk }}
   community.general.parted:
     device: "{{ nfs_export_disk }}"
