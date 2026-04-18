@@ -118,6 +118,22 @@ pipeline {
                         build = build.previousBuild
                     }
 
+                    // Block if VM already exists in vCenter (catches leftover from failed runs
+                    // that destroyed the NetBox IP but not the vCenter VM, or manual builds)
+                    def vcenterCheck = sh(
+                        script: """
+                            cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
+                                playbooks/infra/check_vm_exists.yml \
+                                --vault-password-file ${VAULT_PASS_FILE} \
+                                --extra-vars "vm_name=${env.VM_NAME}" 2>&1 || true
+                        """,
+                        returnStdout: true
+                    ).trim()
+                    if (vcenterCheck.contains("ABORTED: VM")) {
+                        error("ABORTED: VM '${env.VM_NAME}' already exists in vCenter. Delete it first or use a different vm_name.")
+                    }
+                    echo "vCenter check passed — ${env.VM_NAME} does not exist."
+
                     // Clean up any stale NetBox IP left over from a failed prior run
                     def checkResponse = sh(
                         script: """

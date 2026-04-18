@@ -1,0 +1,37 @@
+# =============================================================================
+# playbooks/infra/check_vm_exists.yml — vCenter VM Existence Check
+# =============================================================================
+# Queries vCenter for a VM by name. Fails with a clear error if found.
+# Called from the pipeline pre-flight stage to block accidental re-provisions.
+#
+# USAGE:
+#   ansible-playbook playbooks/infra/check_vm_exists.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --extra-vars "vm_name=hmvlapweb001"
+# =============================================================================
+
+---
+- name: Check vCenter for existing VM — {{ vm_name }}
+  hosts: vcenter
+  gather_facts: false
+
+  tasks:
+
+    - name: Query vCenter for VM {{ vm_name }}
+      community.vmware.vmware_guest_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: "{{ vcenter_validate_certs }}"
+        datacenter: "{{ vcenter_datacenter }}"
+        name: "{{ vm_name }}"
+      delegate_to: localhost
+      register: vm_info
+      ignore_errors: true
+
+    - name: Fail if VM already exists in vCenter
+      ansible.builtin.fail:
+        msg: >
+          ABORTED: VM '{{ vm_name }}' already exists in vCenter.
+          Delete it manually before re-provisioning, or use a different vm_name.
+      when: vm_info is not failed
