@@ -1,0 +1,16 @@
+# =============================================================================
+# inventory/linux/vault_servers.yml — HashiCorp Vault Inventory
+# =============================================================================
+# Vault with file storage backend, HTTP listener on 8200.
+# TLS: HTTP only for now — enable after cert-manager on k8s.
+# POST-DEPLOY: vault operator init was run 2026-04-18, sealed=false.
+# UNSEAL KEYS + ROOT TOKEN: stored offline (not in repo).
+# =============================================================================
+
+---
+vault_servers:
+  hosts:
+
+    hmvlapvlt001.nnt.com:
+      ansible_host: 10.10.0.44
+      vm_role: vault
