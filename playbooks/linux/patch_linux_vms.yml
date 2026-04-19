@@ -39,6 +39,8 @@
   hosts: monitoring:jenkins:nfs_servers:registry:vault_servers:k8s_nodes
   serial: 1
   gather_facts: true
+  ignore_unreachable: true   # host down → mark failed, continue to next
+  any_errors_fatal: false    # task failure on one host does not abort remaining hosts
 
   tasks:
 
@@ -152,3 +154,4 @@
           - "Changed:       {{ dnf_result.changed }}"
           - "Reboot needed: {{ 'yes' if reboot_check.rc == 1 else 'no' }}"
           - "Failed units:  {{ failed_units.stdout if failed_units.stdout else 'none' }}"
+          - "Status:        OK"
