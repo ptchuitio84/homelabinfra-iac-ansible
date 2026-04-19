@@ -17,7 +17,7 @@ k8s_workers:
     hmvlapk8s002.nnt.com:
       ansible_host: hmvlapk8s002.nnt.com
     hmvlapk8s003.nnt.com:
-      ansible_host: hmvlapk8s003.nnt.com:
+      ansible_host: hmvlapk8s003.nnt.com
 
 k8s_nodes:
   children:
