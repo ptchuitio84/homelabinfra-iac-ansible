@@ -1,0 +1,85 @@
+# =============================================================================
+# playbooks/linux/setup_monitoring_stack.yml — Full Monitoring Stack Rebuild
+# =============================================================================
+# Deploys the complete monitoring stack in dependency order.
+# Idempotent — safe to re-run at any time for full rebuild or config refresh.
+#
+# STACK:
+#   mon001 (10.10.1.51) — Grafana + node_exporter
+#   mon002 (10.10.1.52) — Prometheus + node_exporter + snmp_exporter + vmware_exporter
+#   mon003 (10.10.1.53) — Meraki exporter + UnPoller + node_exporter + Loki
+#
+# ORDER MATTERS:
+#   1. node_exporter on all nodes (base metric collection)
+#   2. Prometheus on mon002 (must be up before Grafana connects to it)
+#   3. Supporting exporters on mon002 (snmp, vmware)
+#   4. Grafana on mon001 (connects to Prometheus datasource)
+#   5. Exporters on mon003 (meraki, unpoller, loki)
+#
+# USAGE:
+#   ./scripts/setup-monitoring-stack.sh
+#   ansible-playbook -i inventory/ playbooks/linux/setup_monitoring_stack.yml
+#   --limit hmvlapmon002.nnt.com   # single host
+# =============================================================================
+
+---
+
+# =============================================================================
+# PLAY 1: Base — node_exporter on all monitoring nodes
+# =============================================================================
+- name: Deploy node_exporter on all monitoring nodes
+  hosts: monitoring
+  gather_facts: true
+  roles:
+    - node_exporter
+
+# =============================================================================
+# PLAY 2: mon002 — Prometheus + exporters
+# =============================================================================
+- name: Deploy Prometheus
+  hosts: hmvlapmon002.nnt.com
+  gather_facts: true
+  roles:
+    - prometheus
+
+- name: Deploy SNMP exporter
+  hosts: hmvlapmon002.nnt.com
+  gather_facts: true
+  roles:
+    - snmp_exporter
+
+- name: Deploy VMware exporter
+  hosts: hmvlapmon002.nnt.com
+  gather_facts: true
+  roles:
+    - vmware_exporter
+
+# =============================================================================
+# PLAY 3: mon001 — Grafana (after Prometheus is up)
+# =============================================================================
+- name: Deploy Grafana
+  hosts: hmvlapmon001.nnt.com
+  gather_facts: true
+  roles:
+    - grafana
+
+# =============================================================================
+# PLAY 4: mon003 — Meraki exporter + UnPoller + Loki
+# =============================================================================
+- name: Deploy Meraki exporter
+  hosts: hmvlapmon003.nnt.com
+  gather_facts: true
+  roles:
+    - meraki_exporter
+
+- name: Deploy UnPoller
+  hosts: hmvlapmon003.nnt.com
+  gather_facts: true
+  roles:
+    - unpoller
+
+- name: Deploy Loki
+  hosts: hmvlapmon003.nnt.com
+  gather_facts: true
+  roles:
+    - loki
