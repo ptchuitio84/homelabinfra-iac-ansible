@@ -1,0 +1,22 @@
+# =============================================================================
+# inventory/windows/ca.yml — Active Directory Certificate Services (ADCS)
+# =============================================================================
+# Subordinate CA anchored to AD (nanonetech.com).
+# Issues TLS certs for: Harbor, Vault, k8s ingress, Linux hosts via ADCS.
+# Windows auto-enrollment via GPO. Linux trust via /etc/pki/ca-trust/.
+#
+# Storage:
+#   C: (30GB) — OS
+#   D: (100GB) — CA database, issued certs, CRL, OCSP data
+#                Sized to be backed up and transferred independently.
+#
+# Connection: WinRM — inherits group_vars/windows/vars.yml
+# =============================================================================
+
+---
+certificate_authority:
+  hosts:
+
+    hmvwapca001.nanonetech.com:
+      ansible_host: 10.10.0.14
+      vm_role: adcs

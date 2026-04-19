@@ -12,5 +12,6 @@ windows:
   children:
     active_directory:
     ad_dns_sync:
+    certificate_authority:
     exchange:
     veeam:
