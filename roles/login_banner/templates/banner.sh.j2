@@ -5,7 +5,7 @@
 # =============================================================================
 
 # Static values — baked in at deploy time
-_HOSTNAME="{{ ansible_hostname }}.{{ ansible_domain | default('nnt.com') }}"
+_HOSTNAME="{{ ansible_fqdn | default(ansible_hostname) }}"
 _IP="{{ ansible_default_ipv4.address | default('unknown') }}"
 _OS="{{ ansible_distribution }} {{ ansible_distribution_version }}"
 _KERNEL="{{ ansible_kernel }}"
@@ -20,10 +20,11 @@ _MEM_USED=$(free -h 2>/dev/null | awk '/^Mem:/{print $3}')
 _MEM_TOTAL=$(free -h 2>/dev/null | awk '/^Mem:/{print $2}')
 _MEM_PCT=$(free 2>/dev/null | awk '/^Mem:/{printf "%.0f", $3/$2*100}')
 
-# Disk — all real mounts (exclude pseudo filesystems)
+# Disk — real mounts only (exclude pseudo filesystems and k8s volume paths)
 _DISK_INFO=$(df -h --output=target,used,size,pcent \
     -x tmpfs -x devtmpfs -x overlay -x efivarfs -x squashfs 2>/dev/null \
   | tail -n +2 \
+  | grep -v 'kubernetes\|kubelet\|containerd\|docker\|pods/' \
   | awk '{printf "  %-22s %6s used / %6s total (%s)\n", $1, $2, $3, $4}')
 
 cat <<EOF
