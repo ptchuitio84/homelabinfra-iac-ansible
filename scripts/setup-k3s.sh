@@ -10,6 +10,10 @@
 
 cd "$(dirname "$0")/.." || exit 1
 
+# Clear fact cache — stale facts from a previous host at the same hostname
+# will cause wrong IPs to be passed to --node-ip during k3s install.
+rm -rf /tmp/ansible_facts/
+
 ansible-playbook \
   -i inventory/ \
   --vault-password-file ~/.ansible/vault_pass.txt \
