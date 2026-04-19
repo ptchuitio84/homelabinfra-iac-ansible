@@ -209,6 +209,13 @@
     port: "{{ prometheus_port }}"
     timeout: 30
 
+- name: Open Prometheus port in firewalld
+  ansible.posix.firewalld:
+    port: "{{ prometheus_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+
 - name: Display Prometheus access URL
   ansible.builtin.debug:
     msg: "Prometheus is up — http://{{ ansible_host }}:{{ prometheus_port }}"
