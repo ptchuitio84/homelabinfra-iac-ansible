@@ -1,31 +1,37 @@
 # =============================================================================
 # playbooks/linux/setup_login_banner.yml — Deploy Login Banner
 # =============================================================================
-# Applies the login_banner role to all Linux hosts.
-# Run this against existing VMs to deploy the banner fleet-wide.
-# Newly provisioned VMs get it automatically via the provision pipeline.
+# Applies the login_banner role to all managed Linux VMs.
+# Skips unreachable or failing hosts and continues to the next.
 #
-# USAGE (all hosts):
-#   ansible-playbook playbooks/linux/setup_login_banner.yml \
-#     --vault-password-file ~/.ansible/vault_pass.txt
+# EXCLUDED (intentional — not Linux VMs):
+#   Windows hosts    — no /etc, no profile.d
+#   vCenter (vc001)  — VCSA appliance, read-only /etc
+#   Network gear     — Cisco/Arista/Meraki, not Linux
+#   mailcleaner01    — Python 2.6, excluded from management
+#   ESXi hosts       — managed separately
 #
-# USAGE (single host):
-#   ansible-playbook playbooks/linux/setup_login_banner.yml \
-#     --vault-password-file ~/.ansible/vault_pass.txt \
-#     --limit hmvlapweb001
-#
-# USAGE (override env/role per run):
-#   ansible-playbook playbooks/linux/setup_login_banner.yml \
-#     --vault-password-file ~/.ansible/vault_pass.txt \
-#     --extra-vars "banner_env=PROD banner_role=prometheus"
+# USAGE:
+#   ./scripts/deploy-banner.sh                              # all Linux VMs
+#   ./scripts/deploy-banner.sh --limit hmvlapmon002.nnt.com # single host
 # =============================================================================
 
 ---
-- name: Deploy login banner to all Linux hosts
-  hosts: all
+- name: Deploy login banner to all Linux VMs
+  hosts: >-
+    ansible_nodes:
+    monitoring:
+    jenkins:
+    nfs_servers:
+    registry:
+    vault_servers:
+    k8s_nodes:
+    netbox:
+    plex_servers
   gather_facts: true
+  ignore_unreachable: true
+  any_errors_fatal: false
   vars:
-    # Use the vm_role host var if set in inventory; fall back to banner_role default ("")
     banner_role: "{{ vm_role | default('') }}"
 
   roles:
