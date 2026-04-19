@@ -1,0 +1,6 @@
+---
+- name: Deploy Grafana
+  hosts: all
+  gather_facts: true
+  roles:
+    - grafana

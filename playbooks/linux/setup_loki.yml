@@ -1,0 +1,6 @@
+---
+- name: Deploy Loki
+  hosts: all
+  gather_facts: true
+  roles:
+    - loki
