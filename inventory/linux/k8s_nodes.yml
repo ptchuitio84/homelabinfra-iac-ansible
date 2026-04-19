@@ -10,14 +10,14 @@
 k8s_control_plane:
   hosts:
     hmvlapk8s001.nnt.com:
-      ansible_host: 10.10.1.61
+      ansible_host: hmvlapk8s001.nnt.com
 
 k8s_workers:
   hosts:
     hmvlapk8s002.nnt.com:
-      ansible_host: 10.10.1.62
+      ansible_host: hmvlapk8s002.nnt.com
     hmvlapk8s003.nnt.com:
-      ansible_host: 10.10.1.63
+      ansible_host: hmvlapk8s003.nnt.com:
 
 k8s_nodes:
   children:
