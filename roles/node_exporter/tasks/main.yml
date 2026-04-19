@@ -91,6 +91,13 @@
     port: "{{ node_exporter_port }}"
     timeout: 30
 
+- name: Open node_exporter port in firewalld
+  ansible.posix.firewalld:
+    port: "{{ node_exporter_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+
 - name: Display node_exporter status
   ansible.builtin.debug:
     msg: "node_exporter is up — http://{{ ansible_host }}:{{ node_exporter_port }}/metrics"
