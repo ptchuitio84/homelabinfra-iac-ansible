@@ -172,7 +172,7 @@
 # on every run so the vault value is always authoritative.
 - name: Enforce Grafana admin password via CLI
   ansible.builtin.command:
-    cmd: grafana-cli admin reset-admin-password "{{ grafana_admin_password }}"
+    cmd: grafana cli --homepath /usr/share/grafana admin reset-admin-password "{{ grafana_admin_password }}"
   no_log: true
   changed_when: true
 
