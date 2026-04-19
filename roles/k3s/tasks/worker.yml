@@ -10,7 +10,7 @@
       K3S_URL=https://{{ hostvars[groups['k8s_control_plane'][0]]['ansible_host'] }}:{{ k3s_api_port }}
       K3S_TOKEN={{ hostvars[groups['k8s_control_plane'][0]]['k3s_node_token'] }}
       sh -s - agent
-      --node-ip {{ ansible_host }}
+      --node-ip {{ ansible_default_ipv4.address }}
     creates: /usr/local/bin/k3s
 
 - name: Enable and start k3s-agent

@@ -18,7 +18,7 @@
       sh -s - server
       --disable traefik
       --write-kubeconfig-mode 644
-      --node-ip {{ ansible_host }}
+      --node-ip {{ ansible_default_ipv4.address }}
     creates: /usr/local/bin/k3s
 
 - name: Enable and start k3s
