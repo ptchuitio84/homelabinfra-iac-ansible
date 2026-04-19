@@ -1,0 +1,58 @@
+#!/bin/bash
+# =============================================================================
+# /etc/profile.d/00-banner.sh — Dynamic login banner
+# Deployed by Ansible — do not edit manually
+# =============================================================================
+
+# Static values — baked in at deploy time
+_HOSTNAME="{{ ansible_hostname }}.{{ ansible_domain | default('nnt.com') }}"
+_IP="{{ ansible_default_ipv4.address | default('unknown') }}"
+_OS="{{ ansible_distribution }} {{ ansible_distribution_version }}"
+_KERNEL="{{ ansible_kernel }}"
+_ENV="{{ banner_env }}{% if banner_role %} | Role: {{ banner_role }}{% endif %}"
+
+# Dynamic values — gathered at login time
+_UPTIME=$(uptime -p 2>/dev/null | sed 's/^up //' || echo "unknown")
+_LOAD=$(awk '{print $1", "$2", "$3}' /proc/loadavg 2>/dev/null || echo "unknown")
+_CPU_CORES=$(nproc 2>/dev/null || echo "?")
+_CPU_MODEL=$(awk -F': ' '/^model name/{print $2; exit}' /proc/cpuinfo 2>/dev/null | sed 's/  */ /g' || echo "unknown")
+_MEM_USED=$(free -h 2>/dev/null | awk '/^Mem:/{print $3}')
+_MEM_TOTAL=$(free -h 2>/dev/null | awk '/^Mem:/{print $2}')
+_MEM_PCT=$(free 2>/dev/null | awk '/^Mem:/{printf "%.0f", $3/$2*100}')
+
+# Disk — all real mounts (exclude pseudo filesystems)
+_DISK_INFO=$(df -h --output=target,used,size,pcent \
+    -x tmpfs -x devtmpfs -x overlay -x efivarfs -x squashfs 2>/dev/null \
+  | tail -n +2 \
+  | awk '{printf "  %-22s %6s used / %6s total (%s)\n", $1, $2, $3, $4}')
+
+cat <<EOF
+################################################################################
+#                                                                              #
+#  {{ "%-76s" | format(banner_org) | truncate(76, False, '') }}  #
+#                                                                              #
+################################################################################
+
+  Hostname : $_HOSTNAME
+  IP       : $_IP
+  OS       : $_OS
+  Kernel   : $_KERNEL
+  Env      : $_ENV
+
+  Uptime   : $_UPTIME
+  CPU      : $_CPU_CORES vCPU — $_CPU_MODEL
+  Load     : $_LOAD (1m, 5m, 15m)
+  Memory   : $_MEM_USED used / $_MEM_TOTAL total (${_MEM_PCT}%)
+
+  Disk:
+$_DISK_INFO
+
+################################################################################
+#                                                                              #
+#  WARNING: Authorized access only. All activity on this system is monitored  #
+#  and logged. Unauthorized access or use is strictly prohibited and may be   #
+#  subject to civil and criminal penalties.                                    #
+#                                                                              #
+################################################################################
+
+EOF

@@ -11,7 +11,7 @@
 ---
 # OL9/RHEL: dynamic motd lives in /etc/motd.d/
 # Debian: dynamic motd lives in /etc/update-motd.d/
-# Remove whichever applies so our static template is the only thing shown.
+# Remove whichever applies — our profile.d script is the sole banner source.
 - name: Disable dynamic MOTD — RedHat (/etc/motd.d)
   ansible.builtin.file:
     path: /etc/motd.d
@@ -24,13 +24,23 @@
     state: absent
   when: ansible_os_family == "Debian"
 
-- name: Deploy /etc/motd (post-login banner)
-  ansible.builtin.template:
-    src: motd.j2
+# Clear /etc/motd so PAM doesn't print a stale static banner before our script runs.
+- name: Clear /etc/motd
+  ansible.builtin.copy:
+    content: ""
     dest: /etc/motd
     owner: root
     group: root
     mode: '0644'
+
+# profile.d script runs at every interactive login — gathers live stats at login time.
+- name: Deploy dynamic login banner (/etc/profile.d/00-banner.sh)
+  ansible.builtin.template:
+    src: banner.sh.j2
+    dest: /etc/profile.d/00-banner.sh
+    owner: root
+    group: root
+    mode: '0755'
 
 - name: Deploy /etc/issue.net (pre-auth SSH banner)
   ansible.builtin.template:
