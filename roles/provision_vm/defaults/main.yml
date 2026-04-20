@@ -52,6 +52,7 @@ vm_extra_disk_gb: 0                  # Secondary data disk — 0 means none atta
 vm_portgroup: VLAN010_CORE_UP010
 vm_ip: CHANGEME                      # Static IP (e.g. 10.10.1.51)
 vm_netmask: 255.255.254.0            # /23
+vm_prefix: 23                        # CIDR prefix — must match vm_netmask
 vm_gateway: 10.10.0.1
 vm_dns_servers:
   - 10.10.0.10

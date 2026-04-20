@@ -59,3 +59,52 @@
         user: root
         key: "{{ ansible_control_ssh_pubkey }}"
         state: present
+
+# =============================================================================
+# PLAY 3: ENFORCE STATIC NETWORK CONFIG
+# VMware Guest Customization sets the IP at first boot but does not always
+# create a persistent NetworkManager connection profile on OL9. This play
+# uses nmcli to write a proper NM keyfile that survives all future reboots.
+# Fixes: ipv4.method reverting to auto after reboot (seen on multiple VMs).
+# =============================================================================
+- name: Enforce persistent static network configuration
+  hosts: "{{ vm_ip }}"
+  gather_facts: false
+  vars:
+    ansible_user: root
+    ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+  tasks:
+    # Delete any leftover DHCP/auto connections on the same interface.
+    # VMware clones leave a bare "ens192" (ipv4.method auto) alongside the
+    # "System ens192" Guest Customization creates. NM can activate the DHCP
+    # one on reboot, wiping the static IP. Delete it — only one connection
+    # per interface.
+    - name: Remove duplicate DHCP connections on ethernet interfaces
+      ansible.builtin.shell: |
+        nmcli -t -f NAME,TYPE con show \
+          | awk -F: '/ethernet/{print $1}' \
+          | while IFS= read -r CONN; do
+              METHOD=$(nmcli -t -f ipv4.method con show "$CONN" 2>/dev/null | awk -F: '{print $2}')
+              [ "$METHOD" = "auto" ] && nmcli con delete "$CONN"
+            done
+      changed_when: true
+      failed_when: false
+
+    - name: Lock in static IP via nmcli
+      ansible.builtin.shell: |
+        set -e
+        CONN=$(nmcli -t -f NAME,TYPE con show | awk -F: '/ethernet/{print $1; exit}')
+        nmcli con mod "$CONN" \
+          ipv4.method manual \
+          ipv4.addresses "{{ vm_ip }}/{{ vm_prefix }}" \
+          ipv4.gateway "{{ vm_gateway }}" \
+          ipv4.dns "{{ vm_dns_servers | join(',') }}" \
+          connection.autoconnect yes
+        nmcli con up "$CONN"
+      changed_when: true
+
+    - name: Confirm network config is persisted
+      ansible.builtin.debug:
+        msg: "Static IP {{ vm_ip }}/{{ vm_prefix }} locked in — duplicate DHCP connections removed"
