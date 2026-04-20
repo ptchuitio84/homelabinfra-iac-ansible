@@ -84,7 +84,7 @@
         reboot_timeout: 300
         post_reboot_delay: 30
         msg: "Rebooting after OS patch — triggered by Ansible"
-      when: reboot_check.rc == 1
+      when: reboot_check.rc is defined and reboot_check.rc == 1
 
     # =========================================================================
     # SECTION 4: VALIDATE
