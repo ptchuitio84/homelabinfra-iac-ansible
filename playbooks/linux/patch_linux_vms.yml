@@ -121,10 +121,15 @@
         - "'monitoring' in group_names"
         - vm_role is defined and vm_role == 'grafana'
 
+    # k3s takes time to fully initialize post-reboot — poll until active
+    # rather than checking once. retries=10, delay=30 = up to 5 min wait.
     - name: Verify k3s service (control plane)
       ansible.builtin.systemd:
         name: k3s
       register: k3s_svc
+      until: k3s_svc.status.ActiveState == 'active'
+      retries: 10
+      delay: 30
       failed_when: k3s_svc.status.ActiveState != 'active'
       when: inventory_hostname in groups['k8s_control_plane']
 
@@ -132,6 +137,9 @@
       ansible.builtin.systemd:
         name: k3s-agent
       register: k3s_agent_svc
+      until: k3s_agent_svc.status.ActiveState == 'active'
+      retries: 10
+      delay: 30
       failed_when: k3s_agent_svc.status.ActiveState != 'active'
       when: inventory_hostname in groups['k8s_workers']
 
