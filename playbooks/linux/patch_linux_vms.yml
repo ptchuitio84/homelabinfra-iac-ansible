@@ -81,8 +81,8 @@
 
     - name: Reboot if packages require it
       ansible.builtin.reboot:
-        reboot_timeout: 300
-        post_reboot_delay: 30
+        reboot_timeout: 600   # k8s nodes take longer — k3s init adds ~2-3min to boot
+        post_reboot_delay: 60  # give services time to start before validation tasks run
         msg: "Rebooting after OS patch — triggered by Ansible"
       when: reboot_check.rc is defined and reboot_check.rc == 1
 
