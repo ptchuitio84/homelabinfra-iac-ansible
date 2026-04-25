@@ -115,7 +115,9 @@ The lab runs 14 Linux VMs, 4 Windows VMs, 3 ESXi hosts, and 4 network devices ac
 
 **Linux services:** Ansible control node, Jenkins, Grafana, Prometheus, Loki, NFS, Harbor, Vault, Minio, Terraform/OpenTofu execution node, k3s (×3), Nginx, NetBox
 
-**Windows services:** Active Directory / DNS, ADCS Root CA (offline-capable), ADCS Sub-CA (issuing), Exchange Server, vCenter 7
+**Windows services:** Active Directory / DNS, ADCS Root CA (offline-capable), ADCS Sub-CA (issuing), Exchange Server
+
+**VMware appliances:** vCenter 7 (VCSA — Photon OS appliance, not a Windows VM)
 
 **Network:** Meraki MX64 (edge/WAN), Arista 7050SX (L3 spine, VRRP master), Arista 7048T (VRRP secondary), Cisco Catalyst 3750G (VRRP backup)
 
