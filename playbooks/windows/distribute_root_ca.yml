@@ -1,0 +1,130 @@
+# =============================================================================
+# playbooks/windows/distribute_root_ca.yml — Root CA Trust Distribution
+# =============================================================================
+# PURPOSE:
+#   1. Exports the Root CA certificate from HMVWAPCA001 (adcs_root) to a temp
+#      path on the Windows host, then fetches it to the Ansible control node.
+#   2. Pushes the root cert to all Linux hosts and updates the ca-trust store.
+#
+# After this runs, all Linux hosts will trust TLS certs issued by the
+# NNT-NANONETECH-Sub-CA (signed by NNT-NANONETECH-CA root).
+#
+# USAGE:
+#   ansible-playbook playbooks/windows/distribute_root_ca.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+# OUTPUT:
+#   Root cert fetched to: /tmp/NNT-NANONETECH-CA.cer on the control node
+#   Installed to: /etc/pki/ca-trust/source/anchors/NNT-NANONETECH-CA.crt
+#   on all managed Linux hosts.
+#
+# VAULT REQUIRED: yes (windows admin creds)
+# =============================================================================
+
+---
+
+# =============================================================================
+# PLAY 1: Export root CA cert from CA001 and fetch to control node
+# =============================================================================
+- name: Export root CA cert from HMVWAPCA001
+  hosts: hmvwapca001.nanonetech.com
+  gather_facts: false
+
+  tasks:
+
+    - name: Ensure C:\Temp exists on CA001
+      ansible.windows.win_file:
+        path: C:\Temp
+        state: directory
+
+    - name: Export root CA certificate from Trusted Root store
+      ansible.windows.win_shell: |
+        $cert = Get-ChildItem -Path Cert:\LocalMachine\Root |
+                Where-Object { $_.Subject -match 'NANONETECH' } |
+                Select-Object -First 1
+        Export-Certificate -Cert $cert -FilePath 'C:\Temp\NNT-NANONETECH-CA.cer' -Type CERT
+      register: cert_export
+
+    - name: Confirm cert file was created
+      ansible.windows.win_stat:
+        path: C:\Temp\NNT-NANONETECH-CA.cer
+      register: cert_stat
+      failed_when: not cert_stat.stat.exists
+
+    - name: Fetch cert to Ansible control node
+      ansible.builtin.fetch:
+        src: C:\Temp\NNT-NANONETECH-CA.cer
+        dest: /tmp/NNT-NANONETECH-CA.cer
+        flat: true
+
+    - name: Clean up temp cert on CA001
+      ansible.windows.win_file:
+        path: C:\Temp\NNT-NANONETECH-CA.cer
+        state: absent
+
+
+# =============================================================================
+# PLAY 2: Push root CA cert to all managed Linux hosts
+# =============================================================================
+- name: Distribute root CA cert to Linux hosts
+  hosts: >-
+    ansible_nodes:
+    monitoring:
+    jenkins:
+    nfs_servers:
+    registry:
+    vault_servers:
+    k8s_nodes:
+    netbox:
+    webservers
+  serial: 0           # run all in parallel — read-only trust store update
+  gather_facts: false
+  ignore_unreachable: true
+  any_errors_fatal: false
+
+  tasks:
+
+    - name: Ensure ca-trust anchors directory exists
+      ansible.builtin.file:
+        path: /etc/pki/ca-trust/source/anchors
+        state: directory
+        mode: '0755'
+
+    # certutil exports DER-encoded .cer — copy it to the remote host first,
+    # then convert to PEM in place for update-ca-trust.
+    - name: Copy DER cert to remote host
+      ansible.builtin.copy:
+        src: /tmp/NNT-NANONETECH-CA.cer
+        dest: /tmp/NNT-NANONETECH-CA.cer
+        mode: '0644'
+
+    - name: Convert DER cert to PEM and place in trust anchors
+      ansible.builtin.shell: |
+        openssl x509 -inform DER \
+          -in /tmp/NNT-NANONETECH-CA.cer \
+          -out /etc/pki/ca-trust/source/anchors/NNT-NANONETECH-CA.crt
+      args:
+        creates: /etc/pki/ca-trust/source/anchors/NNT-NANONETECH-CA.crt
+      register: cert_convert
+
+    - name: Set correct permissions on cert file
+      ansible.builtin.file:
+        path: /etc/pki/ca-trust/source/anchors/NNT-NANONETECH-CA.crt
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Update ca-trust store
+      ansible.builtin.command: update-ca-trust
+      when: cert_convert.changed
+      changed_when: true
+
+    # Confirm the cert is valid PEM and shows the expected CA subject
+    - name: Verify cert is valid PEM and shows expected CA subject
+      ansible.builtin.shell: |
+        openssl x509 -noout -subject \
+          -in /etc/pki/ca-trust/source/anchors/NNT-NANONETECH-CA.crt \
+          | grep -i "NANONETECH"
+      register: verify_result
+      changed_when: false
+      failed_when: verify_result.rc != 0

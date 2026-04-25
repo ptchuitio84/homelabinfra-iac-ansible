@@ -1,0 +1,11 @@
+# =============================================================================
+# group_vars/all/vars.yml — Variables available to ALL hosts
+# =============================================================================
+# Credentials and settings that cross OS boundaries (Windows + Linux).
+# Sensitive values are in vault.yml alongside this file.
+# =============================================================================
+
+---
+# Public key of ans001 — injected into authorized_keys on every provisioned VM.
+# Used by provision_vm.yml Play 2. Public key — not sensitive, no vault needed.
+ansible_control_ssh_pubkey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICwbFIdhARF9cp4FvsmZj3rgLJdkZVb8ffPHG60eaOmK root@hmvlapans001.nnt.com"

@@ -1,0 +1,32 @@
+# =============================================================================
+# /etc/sssd/sssd.conf — Managed by Ansible (roles/ad_join)
+# =============================================================================
+
+[sssd]
+domains = {{ ad_domain }}
+config_file_version = 2
+services = nss, pam
+
+[domain/{{ ad_domain }}]
+ad_domain = {{ ad_domain }}
+krb5_realm = {{ ad_realm }}
+realmd_tags = manages-system joined-with-adcli
+cache_credentials = {{ ad_cache_credentials }}
+id_provider = ad
+auth_provider = ad
+access_provider = ad
+chpass_provider = ad
+sudo_provider = none
+fallback_homedir = {{ ad_homedir }}
+default_shell = /bin/bash
+ldap_id_mapping = True
+use_fully_qualified_names = {{ ad_use_fqn }}
+ad_gpo_access_control = {{ ad_gpo_access_control }}
+
+# Speeds up login — skip reverse DNS lookups for every auth
+rdns_resolution = False
+
+# Replace spaces in AD group/user names with underscores so sudoers and
+# shell tools can reference them without escaping. SSSD also lowercases names.
+# "NNT Linux Admins" → "nnt_linux_admins" on Linux.
+override_space = _

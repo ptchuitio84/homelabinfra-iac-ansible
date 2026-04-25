@@ -1,0 +1,243 @@
+# =============================================================================
+# playbooks/infra/issue_harbor_cert.yml — Issue CA-signed TLS cert for Harbor
+# =============================================================================
+# PURPOSE:
+#   1. Generate private key + CSR on hmvlapreg001 with correct SANs
+#   2. Submit CSR to NNT-NANONETECH-Sub-CA (hmvwapca002) via certreq
+#   3. Deploy signed cert + key to Harbor, replacing the self-signed cert
+#   4. Re-run Harbor prepare and restart
+#   5. Push Harbor cert to Docker trust store on k8s nodes
+#
+# PREREQUISITES:
+#   - EDITF_ATTRIBUTESUBJECTALTNAME2 enabled on Sub-CA (done)
+#   - Web Server template published on Sub-CA (done)
+#   - Root CA cert trusted on all Linux hosts (done)
+#
+# USAGE:
+#   ansible-playbook playbooks/infra/issue_harbor_cert.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+# VAULT REQUIRED: yes (Windows admin creds for certreq submission)
+# =============================================================================
+
+---
+
+# =============================================================================
+# PLAY 1: Generate private key + CSR on Harbor host
+# =============================================================================
+- name: Generate CSR on hmvlapreg001
+  hosts: hmvlapreg001.nnt.com
+  gather_facts: true
+
+  vars:
+    harbor_cert_dir:  /data/cert
+    harbor_hostname:  "{{ ansible_fqdn }}"
+    harbor_ip:        "{{ ansible_default_ipv4.address }}"
+    csr_path:         /tmp/harbor.csr
+    key_path:         "{{ harbor_cert_dir }}/{{ harbor_hostname }}.key"
+    cert_path:        "{{ harbor_cert_dir }}/{{ harbor_hostname }}.crt"
+
+  tasks:
+
+    - name: Deploy OpenSSL SAN config for Harbor CSR
+      ansible.builtin.copy:
+        dest: /tmp/harbor-san.cnf
+        mode: '0644'
+        content: |
+          [req]
+          default_bits       = 4096
+          prompt             = no
+          default_md         = sha256
+          distinguished_name = dn
+          req_extensions     = req_ext
+
+          [dn]
+          C  = US
+          ST = California
+          O  = NNT Homelab
+          CN = {{ harbor_hostname }}
+
+          [req_ext]
+          subjectAltName = @alt_names
+
+          [alt_names]
+          DNS.1 = {{ harbor_hostname }}
+          DNS.2 = {{ ansible_hostname }}
+          IP.1  = {{ harbor_ip }}
+
+    - name: Generate 4096-bit RSA private key
+      ansible.builtin.command: >
+        openssl genrsa -out {{ key_path }} 4096
+      args:
+        creates: "{{ key_path }}"
+
+    - name: Set private key permissions
+      ansible.builtin.file:
+        path: "{{ key_path }}"
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Generate CSR with SAN extensions
+      ansible.builtin.command: >
+        openssl req -new
+        -key {{ key_path }}
+        -out {{ csr_path }}
+        -config /tmp/harbor-san.cnf
+      changed_when: true
+
+    - name: Fetch CSR to Ansible control node
+      ansible.builtin.fetch:
+        src: "{{ csr_path }}"
+        dest: /tmp/harbor.csr
+        flat: true
+
+
+# =============================================================================
+# PLAY 2: Submit CSR to Sub-CA and retrieve signed cert
+# =============================================================================
+- name: Issue Harbor cert from NNT-NANONETECH-Sub-CA
+  hosts: hmvwapca002.nanonetech.com
+  gather_facts: false
+
+  tasks:
+
+    - name: Ensure C:\Temp exists
+      ansible.windows.win_file:
+        path: C:\Temp
+        state: directory
+
+    - name: Copy CSR to Sub-CA
+      ansible.windows.win_copy:
+        src: /tmp/harbor.csr
+        dest: C:\Temp\harbor.csr
+
+    - name: Submit CSR to CA and issue cert
+      ansible.windows.win_shell: |
+        certreq -f -submit `
+          -config "hmvwapca002.nanonetech.com\NNT-NANONETECH-Sub-CA" `
+          -attrib "CertificateTemplate:WebServer" `
+          C:\Temp\harbor.csr `
+          C:\Temp\harbor.cer
+      register: certreq_result
+
+    - name: Show certreq output
+      ansible.builtin.debug:
+        var: certreq_result.stdout_lines
+
+    - name: Confirm cert was issued
+      ansible.windows.win_stat:
+        path: C:\Temp\harbor.cer
+      register: cert_stat
+      failed_when: not cert_stat.stat.exists
+
+    - name: Fetch signed cert to Ansible control node
+      ansible.builtin.fetch:
+        src: C:\Temp\harbor.cer
+        dest: /tmp/harbor.cer
+        flat: true
+
+    - name: Clean up temp files on CA
+      ansible.windows.win_file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - C:\Temp\harbor.csr
+        - C:\Temp\harbor.cer
+
+
+# =============================================================================
+# PLAY 3: Deploy signed cert to Harbor and restart
+# =============================================================================
+- name: Deploy CA-signed cert to Harbor
+  hosts: hmvlapreg001.nnt.com
+  gather_facts: true
+
+  vars:
+    harbor_cert_dir:  /data/cert
+    harbor_hostname:  "{{ ansible_fqdn }}"
+    harbor_install_dir: /opt/harbor
+    cert_path:        "{{ harbor_cert_dir }}/{{ harbor_hostname }}.crt"
+
+  tasks:
+
+    - name: Copy signed cert from control node to Harbor host
+      ansible.builtin.copy:
+        src: /tmp/harbor.cer
+        dest: /tmp/harbor.cer
+        mode: '0644'
+
+    - name: Install cert into Harbor cert directory
+      ansible.builtin.copy:
+        src: /tmp/harbor.cer
+        dest: "{{ cert_path }}"
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Set cert permissions
+      ansible.builtin.file:
+        path: "{{ cert_path }}"
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Verify cert subject and SAN
+      ansible.builtin.command: >
+        openssl x509 -noout -subject -ext subjectAltName
+        -in {{ cert_path }}
+      register: cert_info
+      changed_when: false
+
+    - name: Show cert details
+      ansible.builtin.debug:
+        var: cert_info.stdout_lines
+
+    - name: Re-run Harbor prepare to apply new cert
+      ansible.builtin.command: "{{ harbor_install_dir }}/prepare"
+      args:
+        chdir: "{{ harbor_install_dir }}"
+      changed_when: true
+
+    - name: Stop Harbor
+      ansible.builtin.command: docker compose down
+      args:
+        chdir: "{{ harbor_install_dir }}"
+      changed_when: true
+
+    - name: Start Harbor
+      ansible.builtin.command: docker compose up -d
+      args:
+        chdir: "{{ harbor_install_dir }}"
+      changed_when: true
+
+    - name: Update Docker trust store on Harbor host
+      ansible.builtin.copy:
+        src: "{{ cert_path }}"
+        dest: "/etc/docker/certs.d/{{ harbor_hostname }}/ca.crt"
+        remote_src: true
+        mode: '0644'
+
+    - name: Restart Docker on Harbor host
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+
+
+# =============================================================================
+# PLAY 4: Restart containerd on k8s nodes
+# =============================================================================
+# k3s uses containerd, not Docker. The root CA was already pushed to the
+# system trust store on all hosts. Harbor's cert chains to Root CA via Sub-CA,
+# so containerd trusts it automatically. Just restart to flush cached state.
+- name: Restart containerd on k8s nodes
+  hosts: k8s_nodes
+  gather_facts: false
+  ignore_unreachable: true
+
+  tasks:
+
+    - name: Restart k3s to flush containerd cert cache
+      ansible.builtin.systemd:
+        name: "{{ 'k3s' if inventory_hostname in groups['k8s_control_plane'] else 'k3s-agent' }}"
+        state: restarted

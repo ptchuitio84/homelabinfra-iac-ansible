@@ -1,0 +1,31 @@
+# =============================================================================
+# roles/ad_join/defaults/main.yml
+# =============================================================================
+
+---
+ad_domain:        nanonetech.com
+ad_realm:         NNT.COM
+ad_join_user:     "{{ vault_ad_join_user }}"
+ad_join_password: "{{ vault_ad_join_password }}"
+
+# Target OU for computer objects. Joins go here instead of default CN=Computers.
+ad_computer_ou: "OU=Linux Hosts,OU=Virtual,OU=Servers,OU=Prod,OU=Assets,OU=NNT,DC=nanonetech,DC=com"
+
+# AD security group that gets unrestricted sudo on all Linux hosts.
+# Create this group in AD before running the playbook.
+# AD group sAMAccountName (spaces become underscores via override_space in sssd.conf)
+# AD group: "NNT Linux Admins" → Linux sees: "NNT_Linux_Admins"
+ad_sudo_group: "nnt linux admins"
+
+# Login as 'patrick' not 'patrick@nanonetech.com'
+ad_use_fqn: "False"
+
+# Home dir template for AD users
+ad_homedir: /home/%u
+
+# Cache credentials so hosts survive temporary DC outages
+ad_cache_credentials: "True"
+
+# permissive = log GPO violations, don't enforce.
+# Set to 'enforcing' later once GPOs are in place.
+ad_gpo_access_control: permissive

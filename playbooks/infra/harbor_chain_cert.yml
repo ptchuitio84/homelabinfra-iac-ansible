@@ -1,0 +1,110 @@
+# =============================================================================
+# playbooks/infra/harbor_chain_cert.yml — Bundle Sub-CA into Harbor cert chain
+# =============================================================================
+# Harbor currently serves only its own cert. Clients that have the Root CA
+# trusted but not the Sub-CA can't build the chain. Fix: export the Sub-CA
+# cert and bundle it with the Harbor cert into a full chain file.
+#
+# Chain order: Harbor cert → Sub-CA cert
+# Clients only need the Root CA in their trust store to verify.
+#
+# USAGE:
+#   ansible-playbook playbooks/infra/harbor_chain_cert.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+# =============================================================================
+
+---
+
+# =============================================================================
+# PLAY 1: Export Sub-CA cert from hmvwapca002
+# =============================================================================
+- name: Export Sub-CA cert from NNT-NANONETECH-Sub-CA
+  hosts: hmvwapca002.nanonetech.com
+  gather_facts: false
+
+  tasks:
+
+    - name: Ensure C:\Temp exists
+      ansible.windows.win_file:
+        path: C:\Temp
+        state: directory
+
+    - name: Export Sub-CA cert from Intermediate CA store
+      ansible.windows.win_shell: |
+        $cert = Get-ChildItem -Path Cert:\LocalMachine\CA |
+                Where-Object { $_.Subject -match 'NANONETECH-Sub-CA' } |
+                Select-Object -First 1
+        Export-Certificate -Cert $cert -FilePath 'C:\Temp\SubCA.cer' -Type CERT
+
+    - name: Fetch Sub-CA cert to control node
+      ansible.builtin.fetch:
+        src: C:\Temp\SubCA.cer
+        dest: /tmp/SubCA.cer
+        flat: true
+
+    - name: Clean up temp cert on CA
+      ansible.windows.win_file:
+        path: C:\Temp\SubCA.cer
+        state: absent
+
+
+# =============================================================================
+# PLAY 2: Bundle Harbor cert + Sub-CA cert into full chain on Harbor host
+# =============================================================================
+- name: Build full cert chain on Harbor host
+  hosts: hmvlapreg001.nnt.com
+  gather_facts: true
+
+  vars:
+    harbor_cert_dir:    /data/cert
+    harbor_hostname:    "{{ ansible_fqdn }}"
+    harbor_install_dir: /opt/harbor
+    cert_path:          "{{ harbor_cert_dir }}/{{ harbor_hostname }}.crt"
+
+  tasks:
+
+    - name: Copy Sub-CA cert to Harbor host
+      ansible.builtin.copy:
+        src: /tmp/SubCA.cer
+        dest: /tmp/SubCA.cer
+        mode: '0644'
+
+    - name: Convert Sub-CA cert from DER to PEM
+      ansible.builtin.shell: |
+        openssl x509 -inform DER -in /tmp/SubCA.cer -out /tmp/SubCA.pem
+      changed_when: true
+
+    - name: Bundle Harbor cert + Sub-CA cert into chain file
+      ansible.builtin.shell: |
+        cat {{ cert_path }} /tmp/SubCA.pem > {{ cert_path }}.chain
+        mv {{ cert_path }}.chain {{ cert_path }}
+      changed_when: true
+
+    - name: Verify chain contains both certs
+      ansible.builtin.shell: |
+        openssl crl2pkcs7 -nocrl -certfile {{ cert_path }} | \
+        openssl pkcs7 -print_certs -noout
+      register: chain_info
+      changed_when: false
+
+    - name: Show chain contents
+      ansible.builtin.debug:
+        var: chain_info.stdout_lines
+
+    - name: Re-run Harbor prepare
+      ansible.builtin.command: "{{ harbor_install_dir }}/prepare"
+      args:
+        chdir: "{{ harbor_install_dir }}"
+      changed_when: true
+
+    - name: Stop Harbor
+      ansible.builtin.command: docker compose down
+      args:
+        chdir: "{{ harbor_install_dir }}"
+      changed_when: true
+
+    - name: Start Harbor
+      ansible.builtin.command: docker compose up -d
+      args:
+        chdir: "{{ harbor_install_dir }}"
+      changed_when: true

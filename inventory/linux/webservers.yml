@@ -1,0 +1,11 @@
+# =============================================================================
+# inventory/linux/webservers.yml — Nginx Static Webservers
+# =============================================================================
+
+---
+webservers:
+  hosts:
+
+    hmvlapweb001.nnt.com:
+      ansible_host: 10.10.0.41
+      vm_role: webserver

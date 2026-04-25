@@ -1,0 +1,161 @@
+# =============================================================================
+# roles/ad_join/tasks/main.yml — AD Domain Join for OL9 Linux hosts
+# =============================================================================
+
+---
+
+# =========================================================================
+# SECTION 1: PACKAGES
+# =========================================================================
+
+- name: Install AD integration packages
+  ansible.builtin.dnf:
+    name:
+      - realmd
+      - sssd
+      - sssd-ad
+      - sssd-tools
+      - adcli
+      - oddjob
+      - oddjob-mkhomedir
+      - samba-common-tools
+      - krb5-workstation
+    state: present
+
+# =========================================================================
+# SECTION 2: DOMAIN JOIN
+# =========================================================================
+
+- name: Check if already joined to domain
+  ansible.builtin.command: realm list
+  register: realm_list
+  changed_when: false
+
+- name: Verify domain is discoverable (DNS + DC reachability check)
+  ansible.builtin.command: realm discover {{ ad_domain }}
+  register: realm_discover
+  changed_when: false
+  when: ad_domain not in realm_list.stdout
+  # Failure here = DNS can't resolve the domain or DC is unreachable.
+  # Check: /etc/resolv.conf nameserver points to the DC.
+
+- name: Join domain {{ ad_domain }}
+  ansible.builtin.shell: >
+    realm join
+    --user={{ ad_join_user }}
+    --computer-ou="{{ ad_computer_ou }}"
+    {{ ad_domain }}
+  args:
+    stdin: "{{ ad_join_password }}"
+  no_log: true
+  when: ad_domain not in realm_list.stdout
+  notify:
+    - Restart sssd
+    - Restart oddjobd
+
+# =========================================================================
+# SECTION 3: SSSD CONFIGURATION
+# =========================================================================
+
+- name: Deploy sssd.conf
+  ansible.builtin.template:
+    src: sssd.conf.j2
+    dest: /etc/sssd/sssd.conf
+    owner: root
+    group: root
+    mode: '0600'    # sssd refuses to start if permissions are too open
+  notify: Restart sssd
+
+- name: Enable and start sssd
+  ansible.builtin.systemd:
+    name: sssd
+    enabled: true
+    state: started
+
+- name: Enable and start oddjobd (auto home dir creation)
+  ansible.builtin.systemd:
+    name: oddjobd
+    enabled: true
+    state: started
+
+# =========================================================================
+# SECTION 4: PAM — enable SSSD auth + auto home dir creation
+# =========================================================================
+
+- name: Configure PAM to use SSSD with mkhomedir
+  ansible.builtin.command: authselect select sssd with-mkhomedir --force
+  register: authselect_result
+  changed_when: "'already selected' not in authselect_result.stdout"
+
+# =========================================================================
+# SECTION 5: SUDO VIA AD GROUP
+# =========================================================================
+
+- name: Deploy sudoers rule for AD admin group
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/ad-admins
+    content: |
+      # AD group "NNT Linux Admins" — spaces escaped for sudoers
+      %{{ ad_sudo_group | replace(' ', '\ ') }} ALL=(ALL:ALL) NOPASSWD: ALL
+    owner: root
+    group: root
+    mode: '0440'
+    validate: visudo -cf %s
+
+# =========================================================================
+# SECTION 6: SSH — allow password auth for AD admin group
+# =========================================================================
+# OL9 defaults to PasswordAuthentication no. AD users auth via password
+# through PAM/SSSD. Use a Match block to enable it only for the AD sudo
+# group — root and local accounts remain key-only.
+
+- name: Enable password authentication in sshd_config
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication yes'
+  notify: Restart sshd
+
+# OL9 ships drop-in configs that override sshd_config. Fix all of them.
+- name: Override PasswordAuthentication in 50-redhat.conf
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config.d/50-redhat.conf
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication yes'
+    create: false
+  notify: Restart sshd
+
+- name: Override PasswordAuthentication in 50-cloud-init.conf
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config.d/50-cloud-init.conf
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication yes'
+    create: false
+  notify: Restart sshd
+
+# =========================================================================
+# SECTION 7: FIREWALLD — allow Kerberos and LDAP traffic outbound
+# =========================================================================
+# These are typically open by default but ensure no firewall rule blocks
+# Kerberos (88/tcp+udp) and LDAP (389/tcp) to the DC.
+# OL9 firewalld default zone allows all outbound — nothing to open here
+# unless a restrictive output policy is set. Skipping — add if needed.
+
+# =========================================================================
+# SECTION 7: VALIDATE
+# =========================================================================
+
+- name: Flush handlers before validation
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify domain join is active
+  ansible.builtin.command: realm list
+  register: realm_verify
+  changed_when: false
+  failed_when: ad_domain not in realm_verify.stdout
+
+- name: Verify SSSD is resolving domain groups
+  ansible.builtin.command: getent group "domain users@{{ ad_domain }}"
+  register: id_result
+  changed_when: false
+  failed_when: id_result.rc != 0

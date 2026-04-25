@@ -36,7 +36,7 @@
 
 ---
 - name: Patch Linux VMs
-  hosts: monitoring:jenkins:nfs_servers:registry:vault_servers:k8s_nodes
+  hosts: monitoring:jenkins:nfs_servers:registry:vault_servers:k8s_nodes:webservers
   serial: 1
   gather_facts: true
   ignore_unreachable: true   # host down → mark failed, continue to next

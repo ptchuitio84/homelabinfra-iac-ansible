@@ -1,0 +1,45 @@
+# =============================================================================
+# playbooks/linux/join_domain.yml — Join all Linux hosts to nanonetech.com
+# =============================================================================
+# Joins all managed OL9 Linux VMs to the AD domain, configures SSSD for
+# centralized auth, and grants sudo to the "NNT Linux Admins" AD group.
+#
+# PREREQUISITES:
+#   1. AD group "NNT Linux Admins" exists in nanonetech.com
+#   2. Your admin account is a member of "NNT Linux Admins"
+#   3. DNS on each Linux host resolves nanonetech.com (DC is nameserver)
+#   4. vault_windows_admin_user / vault_windows_admin_password in vault
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/join_domain.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+#   # Single host:
+#   ansible-playbook playbooks/linux/join_domain.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --limit hmvlapmon001.nnt.com
+#
+# IDEMPOTENT: yes — skips join if host is already a domain member.
+#
+# VAULT REQUIRED: yes (vault_windows_admin_user / vault_windows_admin_password)
+# =============================================================================
+
+---
+- name: Join Linux hosts to nanonetech.com
+  hosts: >-
+    ansible_nodes:
+    monitoring:
+    jenkins:
+    nfs_servers:
+    registry:
+    vault_servers:
+    k8s_nodes:
+    netbox:
+    webservers
+  serial: 5              # 5 at a time — avoids hammering the DC with simultaneous joins
+  gather_facts: false
+  ignore_unreachable: true
+  any_errors_fatal: false
+
+  roles:
+    - ad_join
