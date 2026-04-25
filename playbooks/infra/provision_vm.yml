@@ -45,8 +45,17 @@
   roles:
     - provision_vm
 
+  post_tasks:
+    - name: Register new VM in dynamic inventory for post-provision plays
+      ansible.builtin.add_host:
+        name: "{{ vm_ip }}"
+        groups: new_vm
+        ansible_user: root
+        ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
 - name: Inject Ansible control node SSH key
-  hosts: "{{ vm_ip }}"
+  hosts: new_vm
   gather_facts: false
   vars:
     ansible_user: root
@@ -68,7 +77,7 @@
 # Fixes: ipv4.method reverting to auto after reboot (seen on multiple VMs).
 # =============================================================================
 - name: Enforce persistent static network configuration
-  hosts: "{{ vm_ip }}"
+  hosts: new_vm
   gather_facts: false
   vars:
     ansible_user: root
