@@ -12,7 +12,20 @@
 
 ---
 # =============================================================================
-# SECTION 1: DATA DISK SETUP
+# SECTION 1: SYSTEM USER
+# Must exist before any directory ownership is set.
+# =============================================================================
+
+- name: Create minio system user
+  ansible.builtin.user:
+    name: "{{ minio_user }}"
+    system: true
+    shell: /sbin/nologin
+    home: /var/lib/minio
+    create_home: false
+
+# =============================================================================
+# SECTION 2: DATA DISK SETUP
 # Uses UUID in fstab — device names are non-deterministic on VMware SCSI.
 # =============================================================================
 
@@ -54,18 +67,6 @@
     fstype: xfs
     opts: defaults
     state: mounted
-
-# =============================================================================
-# SECTION 2: SYSTEM USER
-# =============================================================================
-
-- name: Create minio system user
-  ansible.builtin.user:
-    name: "{{ minio_user }}"
-    system: true
-    shell: /sbin/nologin
-    home: /var/lib/minio
-    create_home: false
 
 - name: Set ownership of data directory
   ansible.builtin.file:
