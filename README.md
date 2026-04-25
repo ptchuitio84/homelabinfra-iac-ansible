@@ -2,9 +2,12 @@
 
 Managing infrastructure by hand doesn't scale — and it doesn't teach you anything repeatable. This repository is the configuration management and automation layer for a production-grade private cloud built on VMware, Ansible, and Jenkins. Every host is provisioned from code, configured from code, monitored from code, and patched from code. Nothing in this environment exists outside of version control.
 
+The scope is not typical for a homelab: two-tier PKI with an offline root CA and a VMCA-subordinate issuing CA, five-exporter observability covering Linux, VMware, multi-vendor switching, Meraki WAN, and UniFi wireless, three-vendor network automation (Cisco IOS, Arista EOS, Meraki REST API), Jenkins pipelines with NetBox IP allocation and AD DNS registration, HashiCorp Vault for runtime secret delivery, S3-compatible object storage, and a Terraform/OpenTofu execution plane with Vault-sourced credentials and Minio remote state. 25+ idempotent Ansible roles. Every non-obvious design decision is documented with its rationale.
+
 Built to close the gap between hyperscale operational experience and hands-on infrastructure engineering — and to prove that the two aren't mutually exclusive. Designed and built in roughly 10 days of focused evening work using AI-assisted development (Claude Code), applying 15 years of infrastructure pattern recognition to a greenfield environment from scratch.
 
 **Companion repositories:**
+- [`homelabinfra-iac-terraform`](https://github.com/ptchuitio84/homelabinfra-iac-terraform) — Declarative vSphere provisioning with OpenTofu/Terraform. Vault-sourced credentials, Minio remote state backend. Separate repo, separate failure domain, separate execution node (`hmvlaptfm001`).
 - [`homelabinfra-iac-network`](https://github.com/ptchuitio84/homelabinfra-network-configs) — Network device configs for Cisco IOS, Arista EOS, and Meraki. Configuration-as-code for all switching infrastructure, backed up to git on a daily schedule via Jenkins.
 - [`homelabinfra-network-backups`](https://github.com/ptchuitio84/homelabinfra-network-backups) — Timestamped running config snapshots committed automatically by the daily backup pipeline.
 - [`plex-ansible`](https://github.com/ptchuitio84/plex-ansible) — Isolated Ansible automation for Plex Media Server deployment and management.
@@ -108,9 +111,9 @@ Production changes run through Jenkins pipelines with audit trails. Direct `ansi
 
 ## Infrastructure Overview
 
-The lab runs 12 Linux VMs, 4 Windows VMs, 3 ESXi hosts, and 4 network devices across two DNS domains (`nnt.com` for Linux/infrastructure, `nanonetech.com` for Windows/AD). Full inventory detail is in [`inventory/`](./inventory/).
+The lab runs 14 Linux VMs, 4 Windows VMs, 3 ESXi hosts, and 4 network devices across two DNS domains (`nnt.com` for Linux/infrastructure, `nanonetech.com` for Windows/AD). Full inventory detail is in [`inventory/`](./inventory/).
 
-**Linux services:** Ansible control node, Jenkins, Grafana, Prometheus, Loki, NFS, Harbor, Vault, k3s (×3), Nginx, NetBox
+**Linux services:** Ansible control node, Jenkins, Grafana, Prometheus, Loki, NFS, Harbor, Vault, Minio, Terraform/OpenTofu execution node, k3s (×3), Nginx, NetBox
 
 **Windows services:** Active Directory / DNS, ADCS Root CA (offline-capable), ADCS Sub-CA (issuing), Exchange Server, vCenter 7
 
@@ -183,6 +186,7 @@ Ansible playbooks are not run by hand in production. Everything that touches liv
 | `nnt-jkn-net-backup` | Daily (scheduled) | Pull running configs from all network devices, commit to git with timestamp |
 | `nnt-jkn-net-enforce-swplnet251/252/253` | On demand | Push and verify baseline config against a specific switch |
 | `nnt-jkn-win-dns-sync` | On demand | Sync DNS A records from NetBox IPAM to Active Directory DNS |
+| `nnt-jkn-terraform-apply` | On demand | Run `tofu`/`terraform` plan, apply, or destroy against `homelabinfra-iac-terraform` — executes on `tfm001`, Vault token injected at runtime |
 
 **Why Jenkins for infrastructure automation instead of a SaaS CI platform?**
 All pipelines target on-premises infrastructure — vCenter, WinRM endpoints, SSH, network device SSH — none of which are reachable from a cloud-hosted runner without a VPN or tunnel. A self-hosted Jenkins instance on the same L2 segment eliminates that dependency entirely. Jenkins also gives full control over pipeline agent configuration, credentials management, and job scheduling with no per-minute billing.
@@ -192,6 +196,8 @@ All pipelines target on-premises infrastructure — vCenter, WinRM endpoints, SS
 ## Observability Stack
 
 All metrics, logs, and dashboards are self-hosted. No telemetry leaves the lab. The stack is designed so that a failure in any single component does not take down the others.
+
+Most monitoring setups stop at `node_exporter`. This one covers five distinct signal sources — Linux host metrics, VMware/ESXi hypervisor metrics via the vCenter API, SNMP polling for multi-vendor switching hardware, Meraki WAN telemetry via REST API, and UniFi wireless metrics. Each exporter required its own integration work: SNMP MIB configuration for Cisco and Arista, a custom Meraki REST→Prometheus bridge with SDK version constraints, vCenter API credential management for vmware_exporter. The result is a single Grafana instance with complete visibility from physical NIC to application layer across every infrastructure tier.
 
 **Metrics pipeline:**
 ```
@@ -219,11 +225,15 @@ Prometheus is write-heavy (constant scrape cycles, TSDB compaction). Grafana is 
 
 ## Platform Services
 
-**HashiCorp Vault** — Secrets management for the lab. Initialized and unsealed. Unseal keys stored offline, not in this repository. Intended use: dynamic secrets issuance, PKI intermediate CA, TLS cert storage for platform services, and app-layer secrets for Kubernetes workloads.
+**HashiCorp Vault** — Secrets management for the lab. Initialized and unsealed. Unseal keys stored offline, not in this repository. Integrated as a runtime credential source for Ansible (via `community.hashi_vault` lookup) and Terraform (via the `hashicorp/vault` provider) — neither tool has credentials in its config files. Vault is the single credential store for the environment; rotation happens in one place and propagates automatically on the next plan/apply.
+
+**Minio** — S3-compatible object storage (`hmvlapmin001`, 10.10.0.47). Provides three buckets: `terraform-state` (Terraform/OpenTofu remote state backend), `loki` (Loki log storage), and `velero` (k8s backup target). Deployed as a single-node instance on a dedicated 100GB XFS data disk. Minio is what makes the rest of the IaC stack possible — without it, Terraform state is local and fragile.
+
+**Terraform/OpenTofu Execution Node** — Dedicated VM (`hmvlaptfm001`, 10.10.0.48) running both `tofu` and `terraform` binaries side-by-side. Registered as Jenkins agent `tfm001`. All declarative provisioning operations run here — isolated from the Ansible control plane. Vault credentials are injected at pipeline runtime via `VAULT_TOKEN`; no credentials are baked into the node. See [`homelabinfra-iac-terraform`](https://github.com/ptchuitio84/homelabinfra-iac-terraform) for the Terraform repo.
 
 **Harbor Container Registry** — Self-hosted OCI-compliant registry. TLS cert issued by NNT-NANONETECH-Sub-CA and trusted by all lab hosts. All container images used by Kubernetes workloads are pulled from Harbor. There is no runtime dependency on Docker Hub, quay.io, or any external registry — a WAN outage does not affect running or rescheduled workloads.
 
-**NetBox** — IPAM and DCIM source of truth. Every IP allocation is tracked in NetBox. The `nnt-jkn-win-dns-sync` pipeline reads NetBox and pushes DNS A records to Active Directory DNS, eliminating manual DNS management and keeping IPAM and DNS in sync automatically.
+**NetBox** — IPAM and DCIM source of truth. Every IP allocation is tracked in NetBox. The `nnt-jkn-win-dns-sync` pipeline reads NetBox and pushes DNS A records to Active Directory DNS, eliminating manual DNS management and keeping IPAM and DNS in sync automatically. The VM provisioning pipeline (`nnt-jkn-provision-vm`) allocates IPs from NetBox at runtime — every new VM gets the next available address from the prefix automatically, with reclamation on failure.
 
 **NFS Server** — Dedicated NFS server providing 250GB XFS persistent volume storage for the k3s cluster, consumed via `nfs-subdir-external-provisioner`. The cluster's default StorageClass — any workload requesting a PVC gets a dynamically provisioned subdirectory with no manual intervention.
 
@@ -323,6 +333,8 @@ ansible-playbook playbooks/linux/patch_linux_vms.yml \
 
 ## Roles Reference
 
+27 roles covering the full stack — from iDRAC fan speed management on physical hosts to Exchange Server configuration on Windows, with every role idempotent, pipeline-triggered, and documented with its design rationale. Each role is a self-contained, re-runnable unit: run it against a live host at any time without side effects.
+
 | Role | Purpose | Target |
 |---|---|---|
 | `common` | NTP (chrony), timezone, SELinux, base packages, login banner | All Linux VMs |
@@ -351,6 +363,8 @@ ansible-playbook playbooks/linux/patch_linux_vms.yml \
 | `windows_dc` | AD DS promotion, DNS zone config | DC VMs |
 | `exchange` | Exchange Server configuration | exc001 |
 | `mailcleaner` | Mailcleaner mail filter (Debian, SSH workarounds) | mailcleaner VM |
+| `minio` | Minio S3-compatible object storage, XFS data disk, bucket creation, Vault credential integration | min001 |
+| `terraform_node` | OpenTofu + Terraform binaries, Java 17 (Jenkins agent), VAULT_ADDR global config, repo clone | tfm001 |
 | `idrac_fan_controller` | Dell iDRAC fan speed override via IPMI | Physical hosts |
 
 ---
