@@ -1,0 +1,15 @@
+# =============================================================================
+# inventory/linux/terraform_nodes.yml — Terraform/OpenTofu Execution Node
+# =============================================================================
+# Dedicated VM for all Terraform and OpenTofu operations.
+# Isolated from ans001 — separate failure domain, separate credential scope.
+# Registered as Jenkins agent 'tfm001' for nnt-jkn-terraform-apply pipeline.
+# =============================================================================
+
+---
+terraform_nodes:
+  hosts:
+
+    hmvlaptfm001.nnt.com:
+      ansible_host: 10.10.0.48
+      vm_role: terraform_node

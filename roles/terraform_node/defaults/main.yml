@@ -1,0 +1,28 @@
+# =============================================================================
+# roles/terraform_node/defaults/main.yml — Terraform Node Defaults
+# =============================================================================
+# Installs both OpenTofu and Terraform binaries side-by-side.
+# Both tools use identical HCL — run the same .tf files with either binary.
+#
+# Also installs Java 17 and creates the Jenkins agent working directory
+# so this VM can be registered as a Jenkins agent (label: tfm001).
+# =============================================================================
+
+---
+# OpenTofu — open-source Terraform fork, BSL-free
+tofu_version:        "1.9.0"
+tofu_download_url:   "https://github.com/opentofu/opentofu/releases/download/v{{ tofu_version }}/tofu_{{ tofu_version }}_linux_amd64.zip"
+
+# Terraform — HashiCorp original
+terraform_version:      "1.10.5"
+terraform_download_url: "https://releases.hashicorp.com/terraform/{{ terraform_version }}/terraform_{{ terraform_version }}_linux_amd64.zip"
+
+# Jenkins agent
+jenkins_agent_dir: /opt/jenkins-agent
+
+# Vault — address set globally so tofu/terraform can reach it without extra config
+vault_addr: "http://10.10.0.44:8200"
+
+# Terraform repo clone path on this VM
+tf_repo_dir: /opt/homelabinfra-iac-terraform
+tf_repo_url: "https://github.com/ptchuitio84/homelabinfra-iac-terraform.git"

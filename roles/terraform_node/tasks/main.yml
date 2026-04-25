@@ -1,0 +1,134 @@
+# =============================================================================
+# roles/terraform_node/tasks/main.yml — Terraform/OpenTofu Node Setup
+# =============================================================================
+# 1. Install Java 17 (Jenkins agent requirement)
+# 2. Install OpenTofu binary
+# 3. Install Terraform binary
+# 4. Set VAULT_ADDR globally
+# 5. Create Jenkins agent working directory
+# 6. Clone Terraform repo
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: PREREQUISITES
+# =============================================================================
+
+- name: Install required packages
+  ansible.builtin.dnf:
+    name:
+      - java-17-openjdk
+      - unzip
+      - git
+    state: present
+
+# =============================================================================
+# SECTION 2: OPENTOFU
+# Open-source Terraform fork — primary tool for this lab.
+# Binary: /usr/local/bin/tofu
+# =============================================================================
+
+- name: Download OpenTofu {{ tofu_version }}
+  ansible.builtin.get_url:
+    url: "{{ tofu_download_url }}"
+    dest: /tmp/tofu.zip
+    mode: '0644'
+
+- name: Extract OpenTofu binary
+  ansible.builtin.unarchive:
+    src: /tmp/tofu.zip
+    dest: /usr/local/bin/
+    remote_src: true
+    include:
+      - tofu
+    mode: '0755'
+
+- name: Verify OpenTofu installation
+  ansible.builtin.command: tofu version
+  register: tofu_ver
+  changed_when: false
+
+- name: Show OpenTofu version
+  ansible.builtin.debug:
+    msg: "{{ tofu_ver.stdout_lines[0] }}"
+
+# =============================================================================
+# SECTION 3: TERRAFORM
+# HashiCorp original — installed side-by-side for learning and comparison.
+# Binary: /usr/local/bin/terraform
+# =============================================================================
+
+- name: Download Terraform {{ terraform_version }}
+  ansible.builtin.get_url:
+    url: "{{ terraform_download_url }}"
+    dest: /tmp/terraform.zip
+    mode: '0644'
+
+- name: Extract Terraform binary
+  ansible.builtin.unarchive:
+    src: /tmp/terraform.zip
+    dest: /usr/local/bin/
+    remote_src: true
+    include:
+      - terraform
+    mode: '0755'
+
+- name: Verify Terraform installation
+  ansible.builtin.command: terraform version
+  register: tf_ver
+  changed_when: false
+
+- name: Show Terraform version
+  ansible.builtin.debug:
+    msg: "{{ tf_ver.stdout_lines[0] }}"
+
+# =============================================================================
+# SECTION 4: VAULT ENVIRONMENT
+# VAULT_ADDR set globally so all processes (Jenkins agent, shell, tofu, terraform)
+# can reach Vault without extra configuration.
+# =============================================================================
+
+- name: Set VAULT_ADDR in /etc/environment
+  ansible.builtin.lineinfile:
+    path: /etc/environment
+    line: "VAULT_ADDR={{ vault_addr }}"
+    regexp: "^VAULT_ADDR="
+    create: true
+    mode: '0644'
+
+# =============================================================================
+# SECTION 5: JENKINS AGENT
+# Jenkins controller connects via SSH and uses this directory as the workspace.
+# Label 'tfm001' must be set in Jenkins UI when registering the node.
+# =============================================================================
+
+- name: Create Jenkins agent working directory
+  ansible.builtin.file:
+    path: "{{ jenkins_agent_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+# =============================================================================
+# SECTION 6: TERRAFORM REPO
+# =============================================================================
+
+- name: Clone Terraform repo to {{ tf_repo_dir }}
+  ansible.builtin.git:
+    repo: "{{ tf_repo_url }}"
+    dest: "{{ tf_repo_dir }}"
+    version: main
+    force: false
+  ignore_errors: true
+
+- name: Deployment complete
+  ansible.builtin.debug:
+    msg:
+      - "hmvlaptfm001 is ready."
+      - "OpenTofu:  {{ tofu_ver.stdout_lines[0] }}"
+      - "Terraform: {{ tf_ver.stdout_lines[0] }}"
+      - "Next: register this VM as Jenkins agent (label: tfm001) via Jenkins UI"
+      - "      Manage Jenkins → Nodes → New Node → Permanent Agent"
+      - "      Remote root dir: {{ jenkins_agent_dir }}"
+      - "      Launch method: SSH — host 10.10.0.48"

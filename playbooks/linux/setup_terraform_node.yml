@@ -1,0 +1,33 @@
+# =============================================================================
+# playbooks/linux/setup_terraform_node.yml — Terraform/OpenTofu Node
+# =============================================================================
+# Installs OpenTofu + Terraform side-by-side on a dedicated OL9 VM.
+# This VM runs as Jenkins agent 'tfm001' — all Terraform pipeline operations
+# execute here, isolated from the Ansible control node (ans001).
+#
+# USAGE (manual):
+#   ansible-playbook playbooks/linux/setup_terraform_node.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --limit hmvlaptfm001
+#
+# USAGE (via Jenkins pipeline):
+#   Triggered automatically by nnt-jkn-provision-vm with role=terraform_node
+#
+# POST-DEPLOY:
+#   Register hmvlaptfm001 as a Jenkins agent:
+#     Jenkins → Manage Jenkins → Nodes → New Node
+#     Name: tfm001 | Type: Permanent Agent
+#     Remote root directory: /opt/jenkins-agent
+#     Label: tfm001
+#     Launch method: Launch agents via SSH
+#     Host: 10.10.0.48
+#     Credentials: (SSH key with access to root@hmvlaptfm001)
+# =============================================================================
+
+---
+- name: Configure Terraform/OpenTofu execution node
+  hosts: all
+  gather_facts: true
+
+  roles:
+    - terraform_node
