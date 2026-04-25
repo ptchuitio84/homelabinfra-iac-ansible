@@ -59,7 +59,7 @@
           engine_mount_point='secret',
           token=vault_lookup_token,
           url=vault_addr) }}"
-      no_log: true
+      no_log: false
 
   roles:
     - minio
