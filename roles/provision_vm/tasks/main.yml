@@ -79,6 +79,8 @@
         state: present
         type: thin
         datastore: "{{ vm_datastore }}"
+        scsi_controller: 0
+        scsi_type: paravirtual
         unit_number: 1
   delegate_to: localhost
   when: vm_extra_disk_gb | int > 0
