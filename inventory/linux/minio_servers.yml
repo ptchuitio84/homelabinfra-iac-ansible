@@ -1,0 +1,16 @@
+# =============================================================================
+# inventory/linux/minio_servers.yml — Minio Object Storage
+# =============================================================================
+# Single-node Minio instance. S3-compatible backend for:
+#   - Terraform remote state  (bucket: terraform-state)
+#   - Loki log storage        (bucket: loki)
+#   - Velero k8s backups      (bucket: velero)
+# =============================================================================
+
+---
+minio_servers:
+  hosts:
+
+    hmvlapmin001.nnt.com:
+      ansible_host: 10.10.0.47
+      vm_role: minio

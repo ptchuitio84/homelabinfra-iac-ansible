@@ -1,0 +1,180 @@
+# =============================================================================
+# roles/minio/tasks/main.yml — Minio Object Storage Deployment
+# =============================================================================
+# 1. Partitions and formats the data disk (/dev/sdb) as XFS, mounts at
+#    /data/minio with UUID-based fstab entry
+# 2. Creates minio system user
+# 3. Downloads and installs minio + mc binaries
+# 4. Writes config and systemd unit
+# 5. Opens firewall ports (9000 API, 9001 console)
+# 6. Starts service and creates buckets
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: DATA DISK SETUP
+# Uses UUID in fstab — device names are non-deterministic on VMware SCSI.
+# =============================================================================
+
+- name: Wipe stale partition signatures from {{ minio_data_disk }}
+  ansible.builtin.command: wipefs -a {{ minio_data_disk }}
+  changed_when: true
+
+- name: Create GPT partition on {{ minio_data_disk }}
+  community.general.parted:
+    device: "{{ minio_data_disk }}"
+    label: gpt
+    number: 1
+    state: present
+    part_end: "100%"
+
+- name: Format data partition as XFS
+  community.general.filesystem:
+    fstype: xfs
+    dev: "{{ minio_data_disk }}1"
+    force: false
+
+- name: Get UUID of data partition
+  ansible.builtin.command: blkid -s UUID -o value {{ minio_data_disk }}1
+  register: minio_disk_uuid
+  changed_when: false
+
+- name: Create Minio data directory
+  ansible.builtin.file:
+    path: "{{ minio_data_dir }}"
+    state: directory
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    mode: '0750'
+
+- name: Mount data disk and persist in /etc/fstab via UUID
+  ansible.posix.mount:
+    path: "{{ minio_data_dir }}"
+    src: "UUID={{ minio_disk_uuid.stdout }}"
+    fstype: xfs
+    opts: defaults
+    state: mounted
+
+# =============================================================================
+# SECTION 2: SYSTEM USER
+# =============================================================================
+
+- name: Create minio system user
+  ansible.builtin.user:
+    name: "{{ minio_user }}"
+    system: true
+    shell: /sbin/nologin
+    home: /var/lib/minio
+    create_home: false
+
+- name: Set ownership of data directory
+  ansible.builtin.file:
+    path: "{{ minio_data_dir }}"
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    recurse: true
+
+# =============================================================================
+# SECTION 3: BINARIES
+# =============================================================================
+
+- name: Download Minio binary
+  ansible.builtin.get_url:
+    url: "{{ minio_download_url }}"
+    dest: /usr/local/bin/minio
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Download mc (Minio client) binary
+  ansible.builtin.get_url:
+    url: "{{ mc_download_url }}"
+    dest: /usr/local/bin/mc
+    mode: '0755'
+    owner: root
+    group: root
+
+# =============================================================================
+# SECTION 4: CONFIGURATION
+# =============================================================================
+
+- name: Create Minio config directory
+  ansible.builtin.file:
+    path: "{{ minio_config_dir }}"
+    state: directory
+    owner: root
+    group: "{{ minio_group }}"
+    mode: '0750'
+
+- name: Create Minio certs directory
+  ansible.builtin.file:
+    path: "{{ minio_cert_dir }}"
+    state: directory
+    owner: root
+    group: "{{ minio_group }}"
+    mode: '0750'
+  when: minio_tls_enabled
+
+- name: Deploy Minio environment file
+  ansible.builtin.template:
+    src: minio.env.j2
+    dest: "{{ minio_config_dir }}/minio.env"
+    owner: root
+    group: "{{ minio_group }}"
+    mode: '0640'
+  notify: Restart Minio
+  no_log: true
+
+- name: Deploy Minio systemd unit
+  ansible.builtin.template:
+    src: minio.service.j2
+    dest: /etc/systemd/system/minio.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Minio
+
+# =============================================================================
+# SECTION 5: FIREWALL
+# =============================================================================
+
+- name: Open Minio API port ({{ minio_api_port }})
+  ansible.posix.firewalld:
+    port: "{{ minio_api_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+
+- name: Open Minio console port ({{ minio_console_port }})
+  ansible.posix.firewalld:
+    port: "{{ minio_console_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+
+# =============================================================================
+# SECTION 6: SERVICE + BUCKETS
+# =============================================================================
+
+- name: Enable and start Minio
+  ansible.builtin.systemd:
+    name: minio
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Wait for Minio API to be ready
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ minio_api_port }}"
+    timeout: 60
+    state: started
+
+- name: Create buckets
+  ansible.builtin.command:
+    cmd: /usr/local/bin/mc mb --ignore-existing minio/{{ item }}
+  environment:
+    MC_HOST_minio: "http://{{ minio_root_user }}:{{ minio_root_password }}@127.0.0.1:{{ minio_api_port }}"
+  loop: "{{ minio_buckets }}"
+  changed_when: true
+  no_log: true

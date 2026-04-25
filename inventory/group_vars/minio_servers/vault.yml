@@ -1,0 +1,16 @@
+# =============================================================================
+# group_vars/minio_servers/vault.yml — Minio Secrets (Ansible Vault Encrypted)
+# =============================================================================
+# THIS FILE MUST BE ENCRYPTED before committing:
+#   ansible-vault encrypt inventory/group_vars/minio_servers/vault.yml
+#
+# BEFORE RUNNING THE PLAYBOOK:
+#   1. On hmvlapvlt001, create the secret:
+#        vault kv put secret/minio/root user=minio password='<strong-password>'
+#   2. Get a Vault token with read access to secret/minio/root:
+#        vault token create -policy=default
+#   3. Replace the placeholder below with that token, then encrypt this file.
+# =============================================================================
+
+---
+vault_lookup_token: "REPLACE_WITH_VAULT_TOKEN"

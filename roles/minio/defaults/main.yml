@@ -1,0 +1,42 @@
+# =============================================================================
+# roles/minio/defaults/main.yml — Minio Object Storage Defaults
+# =============================================================================
+# Single-node Minio on OL9. Credentials are pulled from HashiCorp Vault at
+# runtime — see playbooks/linux/setup_minio.yml for the lookup pre-task.
+#
+# DATA DISK: Requires a second 100GB VMDK attached at provision time
+#   (extra_disk_gb: 100 in the Jenkins VM_SPEC JSON).
+# =============================================================================
+
+---
+# Binary
+minio_download_url: "https://dl.min.io/server/minio/release/linux-amd64/minio"
+mc_download_url:    "https://dl.min.io/client/mc/release/linux-amd64/mc"
+
+# System user
+minio_user:  minio
+minio_group: minio
+
+# Disk and paths
+minio_data_disk:   /dev/sdb
+minio_data_dir:    /data/minio
+minio_config_dir:  /etc/minio
+minio_cert_dir:    /etc/minio/certs
+
+# Network
+minio_api_port:     9000
+minio_console_port: 9001
+
+# TLS — disabled by default; enable after cert issuance from Sub-CA
+minio_tls_enabled: false
+
+# Buckets to create on first deploy
+minio_buckets:
+  - terraform-state
+  - loki
+  - velero
+
+# Credentials — set by the Vault lookup pre-task in the playbook
+# Do NOT set these here — they come from HashiCorp Vault at runtime
+minio_root_user:     ""
+minio_root_password: ""
