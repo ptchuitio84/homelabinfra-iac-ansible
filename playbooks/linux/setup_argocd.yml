@@ -63,7 +63,7 @@
           --namespace {{ argocd_namespace }} \
           --set server.ingress.enabled=true \
           --set server.ingress.ingressClassName=traefik \
-          --set "server.ingress.hosts[0]={{ argocd_hostname }}" \
+          --set server.ingress.hostname={{ argocd_hostname }} \
           --set server.ingress.tls=false \
           --set configs.params."server\.insecure"=true \
           --set redis.resources.requests.memory=64Mi \
