@@ -79,21 +79,18 @@
         state: present
 
     # -------------------------------------------------------------------------
-    # 5. Expand partition 2 (LVM PV)
+    # 5. Detect LVM PV on OS disk + expand it
     # -------------------------------------------------------------------------
-    - name: Detect /boot partition number
+    - name: Detect LVM PV partition on OS disk
       ansible.builtin.shell: |
-        lsblk -no PARTNUM $(findmnt -n -o SOURCE /boot) | head -1
-      register: boot_partnum_raw
+        pvs --noheadings -o pv_name 2>/dev/null | tr -d ' ' | grep "^/dev/{{ os_disk }}" | head -1
+      register: lvm_pv_raw
       changed_when: false
 
-    - name: Set boot partition number fact
+    - name: Set LVM PV facts
       ansible.builtin.set_fact:
-        boot_partnum: "{{ boot_partnum_raw.stdout | trim }}"
-
-    - name: Detect LVM PV partition number (partition after /boot)
-      ansible.builtin.set_fact:
-        lvm_partnum: "{{ (boot_partnum | int) + 1 }}"
+        lvm_pv: "{{ lvm_pv_raw.stdout | trim }}"
+        lvm_partnum: "{{ lvm_pv_raw.stdout | trim | regex_replace('^/dev/' + os_disk, '') }}"
 
     - name: Grow LVM PV partition
       ansible.builtin.command: growpart /dev/{{ os_disk }} {{ lvm_partnum }}
@@ -107,7 +104,7 @@
     # 6. Resize LVM PV + extend root LV
     # -------------------------------------------------------------------------
     - name: Resize LVM physical volume
-      ansible.builtin.command: pvresize /dev/{{ os_disk }}{{ lvm_partnum }}
+      ansible.builtin.command: pvresize {{ lvm_pv }}
       register: pvresize_result
       changed_when: "'changed' in pvresize_result.stdout or '1 changed' in pvresize_result.stdout"
 

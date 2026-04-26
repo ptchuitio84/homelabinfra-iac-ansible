@@ -43,11 +43,19 @@ pipeline {
 
         stage('Boot cleanup + disk expansion') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
-                        playbooks/linux/boot_cleanup.yml \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                script {
+                    def rc = sh(
+                        script: """
+                            cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
+                                playbooks/linux/boot_cleanup.yml \
+                                --vault-password-file ${VAULT_PASS_FILE}
+                        """,
+                        returnStatus: true
+                    )
+                    if (rc != 0) {
+                        currentBuild.result = 'UNSTABLE'
+                    }
+                }
             }
         }
 
@@ -55,10 +63,13 @@ pipeline {
 
     post {
         success {
-            echo 'Boot cleanup and disk expansion complete across all Linux VMs.'
+            echo 'Boot cleanup and disk expansion complete — all hosts clean.'
+        }
+        unstable {
+            echo 'Boot cleanup completed with failures on one or more hosts — review PLAY RECAP above.'
         }
         failure {
-            echo 'Cleanup failed on one or more hosts — review console output.'
+            echo 'Pipeline error — playbook did not run. Check agent and repo connectivity.'
         }
     }
 }
