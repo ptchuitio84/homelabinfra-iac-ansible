@@ -15,3 +15,5 @@ dns_source_zone: nnt.com
 # Target zones to sync into — add new domains here
 dns_target_zones:
   - nanonetech.com
+  - aigenticsolutions.ai
+  - aigenticsolutions.io
