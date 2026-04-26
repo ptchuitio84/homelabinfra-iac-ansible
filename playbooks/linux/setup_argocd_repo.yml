@@ -55,6 +55,45 @@
         that: vault_health.json.sealed == false
         fail_msg: "Vault is sealed — unseal before running this playbook"
 
+    - name: Validate Vault token is accepted
+      ansible.builtin.uri:
+        url:            "{{ vault_addr }}/v1/auth/token/lookup-self"
+        method:         GET
+        headers:
+          X-Vault-Token: "{{ vault_lookup_token }}"
+        validate_certs: false
+        status_code:    200
+      delegate_to: localhost
+      register: token_check
+      failed_when: token_check.status != 200
+      no_log: true
+
+    - name: Assert Vault token is valid
+      ansible.builtin.assert:
+        that: token_check.status == 200
+        fail_msg: >
+          Vault token rejected (HTTP {{ token_check.status }}).
+          Check vault_lookup_token in inventory/group_vars/k8s_nodes/vault.yml.
+
+    - name: Check GitHub secret path exists in Vault
+      ansible.builtin.uri:
+        url:            "{{ vault_addr }}/v1/secret/metadata/{{ vault_secret_path }}"
+        method:         GET
+        headers:
+          X-Vault-Token: "{{ vault_lookup_token }}"
+        validate_certs: false
+        status_code:    [200, 404]
+      delegate_to: localhost
+      register: secret_meta
+      no_log: true
+
+    - name: Assert secret path exists
+      ansible.builtin.assert:
+        that: secret_meta.status == 200
+        fail_msg: >
+          Secret 'secret/{{ vault_secret_path }}' not found in Vault (HTTP {{ secret_meta.status }}).
+          Run: vault kv put secret/github/nnt token=<YOUR_PAT>
+
     - name: Read GitHub PAT from Vault
       ansible.builtin.uri:
         url:            "{{ vault_addr }}/v1/secret/data/{{ vault_secret_path }}"
