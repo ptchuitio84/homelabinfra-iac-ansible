@@ -49,7 +49,7 @@ pipeline {
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '30'))
-        timeout(time: 1, unit: 'HOURS')  // covers dry-run + enforce; input gate has its own 24h timeout
+        timeout(time: 26, unit: 'HOURS')  // dry-run (~1h) + 24h approval gate + enforce (~1h)
         timestamps()
     }
 
