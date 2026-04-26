@@ -1,0 +1,84 @@
+# =============================================================================
+# playbooks/linux/setup_metallb.yml — MetalLB Layer 2 Load Balancer
+# =============================================================================
+# Deploys MetalLB in L2 mode on the k3s cluster.
+# Gives LoadBalancer-type services real IPs from the homelab subnet.
+#
+# IP Pool: 10.10.1.200–10.10.1.210 (excluded from Cisco DHCP)
+# Mode: L2 Advertisement — MetalLB answers ARP for pool IPs
+#
+# Run this before setup_traefik.yml and setup_argocd.yml.
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/setup_metallb.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+# =============================================================================
+
+---
+- name: Deploy MetalLB
+  hosts: k8s_control_plane
+  gather_facts: false
+
+  vars:
+    metallb_version: "v0.14.9"
+    metallb_ip_pool: "10.10.1.200-10.10.1.210"
+
+  tasks:
+
+    - name: Apply MetalLB manifest
+      ansible.builtin.shell: |
+        kubectl apply -f \
+          https://raw.githubusercontent.com/metallb/metallb/{{ metallb_version }}/config/manifests/metallb-native.yaml
+      register: metallb_apply
+      changed_when: "'created' in metallb_apply.stdout or 'configured' in metallb_apply.stdout"
+
+    - name: Wait for MetalLB controller to be ready
+      ansible.builtin.shell: |
+        kubectl -n metallb-system rollout status deployment/controller --timeout=120s
+      changed_when: false
+
+    - name: Wait for MetalLB webhook to be ready
+      ansible.builtin.shell: |
+        kubectl -n metallb-system rollout status deployment/controller --timeout=60s
+        sleep 10
+      changed_when: false
+
+    - name: Apply MetalLB IPAddressPool
+      ansible.builtin.shell: |
+        kubectl apply -f - <<'EOF'
+        apiVersion: metallb.io/v1beta1
+        kind: IPAddressPool
+        metadata:
+          name: homelab-pool
+          namespace: metallb-system
+        spec:
+          addresses:
+            - {{ metallb_ip_pool }}
+        EOF
+      register: pool_apply
+      changed_when: "'created' in pool_apply.stdout or 'configured' in pool_apply.stdout"
+
+    - name: Apply MetalLB L2Advertisement
+      ansible.builtin.shell: |
+        kubectl apply -f - <<'EOF'
+        apiVersion: metallb.io/v1beta1
+        kind: L2Advertisement
+        metadata:
+          name: homelab-l2
+          namespace: metallb-system
+        spec:
+          ipAddressPools:
+            - homelab-pool
+        EOF
+      register: l2_apply
+      changed_when: "'created' in l2_apply.stdout or 'configured' in l2_apply.stdout"
+
+    - name: Verify MetalLB pods are running
+      ansible.builtin.shell: |
+        kubectl -n metallb-system get pods
+      register: metallb_pods
+      changed_when: false
+
+    - name: Show MetalLB pod status
+      ansible.builtin.debug:
+        msg: "{{ metallb_pods.stdout_lines }}"

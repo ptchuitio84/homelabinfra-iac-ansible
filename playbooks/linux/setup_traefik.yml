@@ -1,0 +1,79 @@
+# =============================================================================
+# playbooks/linux/setup_traefik.yml — Traefik Ingress Controller
+# =============================================================================
+# Deploys Traefik v3 via Helm as the cluster ingress controller.
+# Traefik gets a LoadBalancer IP from MetalLB (10.10.1.200).
+# All HTTP/HTTPS traffic into the cluster routes through Traefik.
+#
+# Prerequisites:
+#   - MetalLB deployed (setup_metallb.yml)
+#   - DNS A record: *.nnt.com → 10.10.1.200 (or per-service records)
+#
+# Entry points:
+#   - web:       port 80  (HTTP)
+#   - websecure: port 443 (HTTPS)
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/setup_traefik.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+# =============================================================================
+
+---
+- name: Deploy Traefik ingress controller
+  hosts: k8s_control_plane
+  gather_facts: false
+
+  vars:
+    traefik_namespace: "traefik"
+    traefik_lb_ip: "10.10.1.200"
+
+  tasks:
+
+    - name: Add Traefik Helm repo
+      ansible.builtin.shell: |
+        helm repo add traefik https://traefik.github.io/charts
+        helm repo update
+      changed_when: false
+
+    - name: Create Traefik namespace
+      ansible.builtin.shell: |
+        kubectl create namespace {{ traefik_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+      changed_when: false
+
+    - name: Deploy Traefik via Helm
+      ansible.builtin.shell: |
+        helm upgrade --install traefik traefik/traefik \
+          --namespace {{ traefik_namespace }} \
+          --set service.type=LoadBalancer \
+          --set service.spec.loadBalancerIP={{ traefik_lb_ip }} \
+          --set ports.web.port=80 \
+          --set ports.websecure.port=443 \
+          --set ingressClass.enabled=true \
+          --set ingressClass.isDefaultClass=true \
+          --set logs.general.level=INFO \
+          --wait --timeout=120s
+      register: traefik_deploy
+      changed_when: true
+
+    - name: Wait for Traefik to get LoadBalancer IP
+      ansible.builtin.shell: |
+        kubectl -n {{ traefik_namespace }} get svc traefik \
+          -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+      register: traefik_ip
+      until: traefik_ip.stdout == traefik_lb_ip
+      retries: 12
+      delay: 10
+      changed_when: false
+
+    - name: Show Traefik service
+      ansible.builtin.shell: |
+        kubectl -n {{ traefik_namespace }} get svc traefik
+      register: traefik_svc
+      changed_when: false
+
+    - name: Display Traefik status
+      ansible.builtin.debug:
+        msg:
+          - "Traefik is up — External IP: {{ traefik_lb_ip }}"
+          - "{{ traefik_svc.stdout_lines }}"
+          - "Add DNS A records pointing services to {{ traefik_lb_ip }}"

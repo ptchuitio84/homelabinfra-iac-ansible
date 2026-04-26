@@ -1,0 +1,96 @@
+# =============================================================================
+# playbooks/linux/setup_argocd.yml — ArgoCD GitOps Controller
+# =============================================================================
+# Deploys ArgoCD via Helm behind the Traefik ingress controller.
+# ArgoCD UI is accessible at https://argocd.nnt.com
+#
+# Prerequisites:
+#   - MetalLB deployed  (setup_metallb.yml)
+#   - Traefik deployed  (setup_traefik.yml)
+#   - DNS A record:     argocd.nnt.com → 10.10.1.200
+#
+# Storage: Redis PVC lands on NFS StorageClass (validates NFS end-to-end)
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/setup_argocd.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+# =============================================================================
+
+---
+- name: Deploy ArgoCD
+  hosts: k8s_control_plane
+  gather_facts: false
+
+  vars:
+    argocd_namespace: "argocd"
+    argocd_hostname: "argocd.nnt.com"
+
+  tasks:
+
+    # -------------------------------------------------------------------------
+    # 1. Fix local-path StorageClass — remove default annotation
+    # -------------------------------------------------------------------------
+    - name: Remove default annotation from local-path StorageClass
+      ansible.builtin.shell: |
+        kubectl patch storageclass local-path \
+          -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+      register: patch_result
+      changed_when: "'storageclass.storage.k8s.io/local-path patched' in patch_result.stdout"
+      failed_when: patch_result.rc != 0 and 'not found' not in patch_result.stderr
+
+    # -------------------------------------------------------------------------
+    # 2. Deploy ArgoCD
+    # -------------------------------------------------------------------------
+    - name: Add ArgoCD Helm repo
+      ansible.builtin.shell: |
+        helm repo add argo https://argoproj.github.io/argo-helm
+        helm repo update
+      changed_when: false
+
+    - name: Create ArgoCD namespace
+      ansible.builtin.shell: |
+        kubectl create namespace {{ argocd_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+      changed_when: false
+
+    - name: Deploy ArgoCD via Helm
+      ansible.builtin.shell: |
+        helm upgrade --install argocd argo/argo-cd \
+          --namespace {{ argocd_namespace }} \
+          --set server.ingress.enabled=true \
+          --set server.ingress.ingressClassName=traefik \
+          --set "server.ingress.hosts[0]={{ argocd_hostname }}" \
+          --set server.ingress.tls=false \
+          --set configs.params."server\.insecure"=true \
+          --set redis.resources.requests.memory=64Mi \
+          --wait --timeout=300s
+      register: argocd_deploy
+      changed_when: true
+
+    # -------------------------------------------------------------------------
+    # 3. Retrieve initial admin password
+    # -------------------------------------------------------------------------
+    - name: Get ArgoCD initial admin password
+      ansible.builtin.shell: |
+        kubectl -n {{ argocd_namespace }} get secret argocd-initial-admin-secret \
+          -o jsonpath="{.data.password}" | base64 -d
+      register: argocd_password
+      changed_when: false
+      no_log: true
+
+    - name: Verify ArgoCD pods are running
+      ansible.builtin.shell: |
+        kubectl -n {{ argocd_namespace }} get pods
+      register: argocd_pods
+      changed_when: false
+
+    - name: Show ArgoCD pod status
+      ansible.builtin.debug:
+        msg: "{{ argocd_pods.stdout_lines }}"
+
+    - name: Display ArgoCD access info
+      ansible.builtin.debug:
+        msg:
+          - "ArgoCD is up — http://{{ argocd_hostname }}"
+          - "Username: admin"
+          - "Password: {{ argocd_password.stdout }}"
+          - "Change password on first login."
