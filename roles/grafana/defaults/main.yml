@@ -43,6 +43,9 @@ grafana_admin_password: "{{ vault_grafana_admin_password }}"
 # Prometheus datasource — auto-provisioned on deploy.
 grafana_prometheus_url: "http://hmvlapmon002.nnt.com:9090"
 
+# Loki datasource — auto-provisioned on deploy.
+grafana_loki_url: "http://hmvlapmon003.nnt.com:3100"
+
 # Grafana version — installed from official OSS RPM repo (no version pin needed,
 # repo always serves latest stable).
 grafana_repo_baseurl: "https://rpm.grafana.com"

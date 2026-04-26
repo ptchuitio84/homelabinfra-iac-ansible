@@ -1,0 +1,14 @@
+# =============================================================================
+# Grafana datasource provisioning — Loki
+# Managed by Ansible (roles/grafana)
+# =============================================================================
+
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    url: {{ grafana_loki_url }}
+    isDefault: false
+    editable: false
