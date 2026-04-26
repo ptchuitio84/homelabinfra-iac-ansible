@@ -46,6 +46,7 @@
 
     - name: Deploy Traefik via Helm
       ansible.builtin.shell: |
+        export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
         helm upgrade --install traefik traefik/traefik \
           --namespace {{ traefik_namespace }} \
           --set service.type=LoadBalancer \

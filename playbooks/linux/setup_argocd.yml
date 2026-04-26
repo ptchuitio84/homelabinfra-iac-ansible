@@ -46,6 +46,7 @@
     # -------------------------------------------------------------------------
     - name: Add ArgoCD Helm repo
       ansible.builtin.shell: |
+        export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
         helm repo add argo https://argoproj.github.io/argo-helm
         helm repo update
       changed_when: false
@@ -57,6 +58,7 @@
 
     - name: Deploy ArgoCD via Helm
       ansible.builtin.shell: |
+        export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
         helm upgrade --install argocd argo/argo-cd \
           --namespace {{ argocd_namespace }} \
           --set server.ingress.enabled=true \
