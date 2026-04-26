@@ -26,6 +26,10 @@
   vars:
     traefik_namespace: "traefik"
     traefik_lb_ip: "10.10.1.200"
+    kubeconfig: "/etc/rancher/k3s/k3s.yaml"
+
+  environment:
+    KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
 
   tasks:
 

@@ -25,6 +25,9 @@
     argocd_namespace: "argocd"
     argocd_hostname: "argocd.nnt.com"
 
+  environment:
+    KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+
   tasks:
 
     # -------------------------------------------------------------------------
