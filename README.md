@@ -183,11 +183,12 @@ Ansible playbooks are not run by hand in production. Everything that touches liv
 | Pipeline | Trigger | What it does |
 |---|---|---|
 | `nnt-jkn-lin-patch` | Weekly (scheduled) | `dnf update` all Linux VMs, reboot if required, validate all services post-reboot |
+| `nnt-jkn-boot-cleanup` | On demand | Remove old kernels fleet-wide, expand root LVM to consume any new disk space provisioned at the hypervisor |
 | `nnt-jkn-provision-vm` | On demand | Clone VM from golden template via vCenter API, set hostname/IP/DNS, wait for SSH readiness |
 | `nnt-jkn-setup-k3s` | On demand | Bootstrap k3s control plane and join workers to cluster |
 | `nnt-jkn-net-backup` | Daily (scheduled) | Pull running configs from all network devices, commit to git with timestamp |
 | `nnt-jkn-net-enforce-swplnet251/252/253` | On demand | Push and verify baseline config against a specific switch |
-| `nnt-jkn-win-dns-sync` | On demand | Sync DNS A records from NetBox IPAM to Active Directory DNS |
+| `nnt-jkn-win-dns-sync` | Daily (3am) + on demand | Sync all A and CNAME records from `nnt.com` (source of truth) into `nanonetech.com`, `aigenticsolutions.ai`, and `aigenticsolutions.io` |
 | `nnt-jkn-terraform-apply` | On demand | Run `tofu`/`terraform` plan, apply, or destroy against `homelabinfra-iac-terraform` — executes on `tfm001`, Vault token injected at runtime |
 
 **Why Jenkins for infrastructure automation instead of a SaaS CI platform?**
@@ -361,12 +362,13 @@ ansible-playbook playbooks/linux/patch_linux_vms.yml \
 | `k3s` | k3s install, control plane init, worker join | k8s nodes |
 | `k8s_nfs_provisioner` | Helm deploy of nfs-subdir-external-provisioner | k8s control plane |
 | `plex` | Plex Media Server, LVM data disk, config | plex VMs |
+| `nextjs_deploy` | Next.js app deployment — NodeSource repo, Node.js 20, PM2 process manager, Nginx reverse proxy, secrets from HashiCorp Vault | web001 |
 | `webserver` | Nginx, static site config | web001 |
 | `windows_dc` | AD DS promotion, DNS zone config | DC VMs |
 | `exchange` | Exchange Server configuration | exc001 |
 | `mailcleaner` | Mailcleaner mail filter (Debian, SSH workarounds) | mailcleaner VM |
 | `minio` | Minio S3-compatible object storage, XFS data disk, bucket creation, Vault credential integration | min001 |
-| `terraform_node` | OpenTofu + Terraform binaries, Java 17 (Jenkins agent), VAULT_ADDR global config, repo clone | tfm001 |
+| `terraform_node` | OpenTofu + Terraform binaries, Java 21 (Jenkins agent), VAULT_ADDR global config, repo clone | tfm001 |
 | `idrac_fan_controller` | Dell iDRAC fan speed override via IPMI | Physical hosts |
 
 ---
