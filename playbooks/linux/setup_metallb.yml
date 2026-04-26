@@ -40,7 +40,7 @@
     - name: Wait for MetalLB webhook to be ready
       ansible.builtin.shell: |
         kubectl -n metallb-system rollout status deployment/controller --timeout=60s
-        sleep 10
+        kubectl -n metallb-system wait --for=condition=ready pod -l component=controller --timeout=60s
       changed_when: false
 
     - name: Apply MetalLB IPAddressPool
@@ -57,6 +57,9 @@
         EOF
       register: pool_apply
       changed_when: "'created' in pool_apply.stdout or 'configured' in pool_apply.stdout"
+      retries: 6
+      delay: 10
+      until: pool_apply.rc == 0
 
     - name: Apply MetalLB L2Advertisement
       ansible.builtin.shell: |
@@ -72,6 +75,9 @@
         EOF
       register: l2_apply
       changed_when: "'created' in l2_apply.stdout or 'configured' in l2_apply.stdout"
+      retries: 6
+      delay: 10
+      until: l2_apply.rc == 0
 
     - name: Verify MetalLB pods are running
       ansible.builtin.shell: |
