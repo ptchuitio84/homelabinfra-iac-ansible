@@ -188,7 +188,7 @@ Ansible playbooks are not run by hand in production. Everything that touches liv
 | `nnt-jkn-setup-k3s` | On demand | Bootstrap k3s control plane and join workers to cluster |
 | `nnt-jkn-net-backup` | Daily (scheduled) | Pull running configs from all network devices, commit to git with timestamp |
 | `nnt-jkn-net-enforce-swplnet251/252/253` | On demand | Push and verify baseline config against a specific switch |
-| `nnt-jkn-win-dns-sync` | Daily (3am) + on demand | Sync all A and CNAME records from `nnt.com` (source of truth) into `nanonetech.com`, `aigenticsolutions.ai`, and `aigenticsolutions.io` |
+| `nnt-jkn-win-dns-sync` | Daily (3am) + on demand | Pull IP allocations from NetBox IPAM, register DNS records in `nnt.com`, then sync all A and CNAME records zone-to-zone into `nanonetech.com`, `aigenticsolutions.ai`, and `aigenticsolutions.io`, and trigger AD replication |
 | `nnt-jkn-terraform-apply` | On demand | Run `tofu`/`terraform` plan, apply, or destroy against `homelabinfra-iac-terraform` — executes on `tfm001`, Vault token injected at runtime |
 
 **Why Jenkins for infrastructure automation instead of a SaaS CI platform?**
