@@ -1,0 +1,7 @@
+# ENCRYPT THIS FILE before committing:
+#   ansible-vault encrypt inventory/group_vars/k8s_nodes/vault.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+# vault_lookup_token: <HashiCorp Vault token with read access to secret/github/nnt>
+
+vault_lookup_token: "REPLACE_ME"

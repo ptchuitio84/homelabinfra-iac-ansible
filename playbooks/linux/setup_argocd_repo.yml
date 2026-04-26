@@ -1,0 +1,113 @@
+# =============================================================================
+# playbooks/linux/setup_argocd_repo.yml — Register GitHub Repo in ArgoCD
+# =============================================================================
+# Reads the GitHub PAT from HashiCorp Vault and creates the ArgoCD repository
+# secret in the argocd namespace. ArgoCD discovers this secret automatically
+# via the argocd.argoproj.io/secret-type=repository label.
+#
+# Prerequisites:
+#   1. PAT stored in Vault:
+#        vault kv put secret/github/nnt token=<PAT>
+#   2. vault_lookup_token set in:
+#        inventory/group_vars/k8s_nodes/vault.yml (encrypted)
+#   3. ArgoCD deployed (setup_argocd.yml)
+#
+# USAGE (manual):
+#   ansible-playbook playbooks/linux/setup_argocd_repo.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+# USAGE (via Jenkins pipeline):
+#   Called after setup_argocd.yml completes in the k8s bootstrap pipeline
+# =============================================================================
+
+---
+- name: Register GitHub repo in ArgoCD
+  hosts: k8s_control_plane
+  gather_facts: false
+
+  vars:
+    vault_addr:        "http://10.10.0.44:8200"
+    argocd_namespace:  "argocd"
+    repo_url:          "https://github.com/ptchuitio84/homelabinfra-k8s-apps.git"
+    repo_secret_name:  "repo-nnt-k8s-apps"
+    github_username:   "ptchuitio84"
+    vault_secret_path: "github/nnt"
+
+  vars_files:
+    - ../../inventory/group_vars/k8s_nodes/vault.yml
+
+  environment:
+    KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+
+  pre_tasks:
+
+    - name: Verify Vault is reachable
+      ansible.builtin.uri:
+        url:            "{{ vault_addr }}/v1/sys/health"
+        validate_certs: false
+        status_code:    [200, 429, 472, 473, 501, 503]
+      delegate_to: localhost
+      register: vault_health
+      failed_when: vault_health.status not in [200, 429, 472, 473, 501, 503]
+
+    - name: Confirm Vault is unsealed
+      ansible.builtin.assert:
+        that: vault_health.json.sealed == false
+        fail_msg: "Vault is sealed — unseal before running this playbook"
+
+    - name: Read GitHub PAT from Vault
+      ansible.builtin.set_fact:
+        github_creds: "{{ lookup('community.hashi_vault.vault_kv2_get',
+          vault_secret_path,
+          engine_mount_point='secret',
+          token=vault_lookup_token,
+          url=vault_addr) }}"
+      no_log: true
+
+  tasks:
+
+    # -------------------------------------------------------------------------
+    # 1. Create ArgoCD repository secret
+    # -------------------------------------------------------------------------
+    - name: Create ArgoCD repository secret from Vault PAT
+      ansible.builtin.shell: |
+        kubectl -n {{ argocd_namespace }} create secret generic {{ repo_secret_name }} \
+          --from-literal=type=git \
+          --from-literal=url={{ repo_url }} \
+          --from-literal=username={{ github_username }} \
+          --from-literal=password={{ github_creds.secret.token }} \
+          --dry-run=client -o yaml | kubectl apply -f -
+      register: secret_result
+      changed_when: "'created' in secret_result.stdout or 'configured' in secret_result.stdout"
+      no_log: true
+
+    # -------------------------------------------------------------------------
+    # 2. Label the secret so ArgoCD discovers it
+    # -------------------------------------------------------------------------
+    - name: Label secret as ArgoCD repository
+      ansible.builtin.shell: |
+        kubectl -n {{ argocd_namespace }} label secret {{ repo_secret_name }} \
+          argocd.argoproj.io/secret-type=repository \
+          --overwrite
+      register: label_result
+      changed_when: "'labeled' in label_result.stdout or 'not labeled' not in label_result.stdout"
+
+    # -------------------------------------------------------------------------
+    # 3. Verify ArgoCD sees the repo as connected
+    # -------------------------------------------------------------------------
+    - name: Wait for ArgoCD to register the repository
+      ansible.builtin.shell: |
+        kubectl -n {{ argocd_namespace }} get secret {{ repo_secret_name }} \
+          -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/secret-type}'
+      register: label_check
+      changed_when: false
+      retries: 5
+      delay: 5
+      until: label_check.stdout == "repository"
+
+    - name: Show repository secret status
+      ansible.builtin.debug:
+        msg:
+          - "Repository secret '{{ repo_secret_name }}' applied in namespace '{{ argocd_namespace }}'"
+          - "ArgoCD will pick it up within ~30s — verify at http://argocd.nnt.com/settings/repos"
+          - "URL: {{ repo_url }}"
