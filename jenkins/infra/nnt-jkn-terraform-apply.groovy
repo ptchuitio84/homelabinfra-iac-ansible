@@ -13,8 +13,8 @@
 //   TF_ACTION  — plan, apply, or destroy
 //
 // CREDENTIALS REQUIRED IN JENKINS:
-//   vault-root-token — Secret text — HashiCorp Vault root token
-//                      Used to authenticate the Vault provider at runtime
+//   nnt-vault-root-token — Secret text — HashiCorp Vault root token
+//                          Used to authenticate the Vault provider at runtime
 //
 // JENKINS SETUP:
 //   1. New Item → Pipeline → name: nnt-jkn-terraform-apply
@@ -23,7 +23,7 @@
 //   4. Credentials: github-pat
 //   5. Branch: */main
 //   6. Script Path: jenkins/infra/nnt-jkn-terraform-apply.groovy
-//   7. Add credentials: vault-root-token (Secret text)
+//   7. Add credentials: nnt-vault-root-token (Secret text)
 //   8. Register hmvlaptfm001 as Jenkins agent with label: tfm001
 // =============================================================================
 
@@ -47,7 +47,7 @@ pipeline {
     environment {
         TF_REPO_PATH  = '/opt/homelabinfra-iac-terraform'
         VAULT_ADDR    = 'http://10.10.0.44:8200'
-        VAULT_TOKEN   = credentials('vault-root-token')
+        VAULT_TOKEN   = credentials('nnt-vault-root-token')
         TF_IN_AUTOMATION = 'true'
     }
 
