@@ -10,6 +10,7 @@ server:
   log_level: info
 
 common:
+  instance_addr: 127.0.0.1
   path_prefix: {{ loki_data_dir }}
   storage:
     filesystem:
@@ -17,7 +18,6 @@ common:
       rules_directory: {{ loki_rules_dir }}
   replication_factor: 1
   ring:
-    instance_addr: 127.0.0.1
     kvstore:
       store: inmemory
 
