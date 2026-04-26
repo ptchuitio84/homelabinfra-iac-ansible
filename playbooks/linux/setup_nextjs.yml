@@ -1,0 +1,60 @@
+# =============================================================================
+# playbooks/linux/setup_nextjs.yml — AIgentic Solutions Next.js Deployment
+# =============================================================================
+# Deploys the aigenticsolutions Next.js app on hmvlapweb001.
+# Pulls app secrets from HashiCorp Vault at runtime.
+#
+# PRE-FLIGHT:
+#   1. Store secrets in Vault:
+#        vault kv put secret/aigenticsolutions/env ANTHROPIC_API_KEY=... ...
+#   2. Set vault_lookup_token in inventory/group_vars/webservers/vault.yml
+#      then encrypt: ansible-vault encrypt inventory/group_vars/webservers/vault.yml
+#   3. Ensure web001 SSH key is added as deploy key on GitHub (aigenticsolutions repo)
+#
+# USAGE (manual):
+#   ansible-playbook playbooks/linux/setup_nextjs.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     --limit hmvlapweb001
+#
+# USAGE (via Jenkins):
+#   Triggered by nnt-jkn-provision-vm with role=nextjs_deploy
+# =============================================================================
+
+---
+- name: Deploy AIgentic Solutions Next.js app
+  hosts: all
+  gather_facts: true
+
+  vars:
+    vault_addr: "http://10.10.0.44:8200"
+
+  vars_files:
+    - ../../inventory/group_vars/webservers/vault.yml
+
+  pre_tasks:
+    - name: Verify Vault is reachable
+      ansible.builtin.uri:
+        url: "{{ vault_addr }}/v1/sys/health"
+        validate_certs: false
+        status_code: [200, 429, 472, 473, 501, 503]
+      delegate_to: localhost
+      register: vault_health
+      failed_when: vault_health.status not in [200, 429, 472, 473, 501, 503]
+
+    - name: Confirm Vault is unsealed
+      ansible.builtin.assert:
+        that: not vault_health.json.sealed
+        fail_msg: "Vault at {{ vault_addr }} is sealed — unseal before running"
+
+    - name: Fetch app secrets from Vault
+      ansible.builtin.set_fact:
+        app_env: "{{ vault_secrets.secret }}"
+      vars:
+        vault_secrets: "{{ lookup('community.hashi_vault.vault_kv2_get', 'aigenticsolutions/env',
+          engine_mount_point='secret',
+          token=vault_lookup_token,
+          url=vault_addr) }}"
+      no_log: true
+
+  roles:
+    - nextjs_deploy

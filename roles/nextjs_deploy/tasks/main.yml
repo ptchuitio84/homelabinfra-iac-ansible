@@ -1,0 +1,124 @@
+# =============================================================================
+# roles/nextjs_deploy/tasks/main.yml — Next.js App Deployment
+# =============================================================================
+
+---
+# ---------------------------------------------------------------------------
+# 1. Node.js 20 LTS
+# ---------------------------------------------------------------------------
+- name: Add NodeSource Node.js 20 repository
+  ansible.builtin.shell: curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+  args:
+    creates: /etc/yum.repos.d/nodesource-el9.repo
+
+- name: Install Node.js 20
+  ansible.builtin.dnf:
+    name: nodejs
+    state: present
+
+- name: Install PM2 globally
+  community.general.npm:
+    name: pm2
+    global: true
+    state: present
+
+# ---------------------------------------------------------------------------
+# 2. GitHub host key — prevents interactive prompt on first clone
+# ---------------------------------------------------------------------------
+- name: Accept GitHub host key
+  ansible.builtin.known_hosts:
+    name: github.com
+    key: "{{ item }}"
+    state: present
+  loop:
+    - "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+    - "github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg="
+
+# ---------------------------------------------------------------------------
+# 3. Clone / update repo
+# ---------------------------------------------------------------------------
+- name: Clone aigenticsolutions repo
+  ansible.builtin.git:
+    repo: "{{ nextjs_repo }}"
+    dest: "{{ nextjs_app_dir }}"
+    version: "{{ nextjs_branch }}"
+    accept_hostkey: true
+    force: false
+  register: git_result
+
+# ---------------------------------------------------------------------------
+# 4. Environment file from Vault
+# ---------------------------------------------------------------------------
+- name: Deploy .env.local
+  ansible.builtin.template:
+    src: env.local.j2
+    dest: "{{ nextjs_app_dir }}/.env.local"
+    owner: root
+    group: root
+    mode: '0600'
+  register: env_result
+
+# ---------------------------------------------------------------------------
+# 5. Install dependencies and build
+# ---------------------------------------------------------------------------
+- name: npm ci
+  community.general.npm:
+    path: "{{ nextjs_app_dir }}"
+    ci: true
+  when: git_result.changed or env_result.changed
+
+- name: npm run build
+  ansible.builtin.command:
+    cmd: npm run build
+    chdir: "{{ nextjs_app_dir }}"
+  environment:
+    NEXT_TELEMETRY_DISABLED: "1"
+  when: git_result.changed or env_result.changed
+
+# ---------------------------------------------------------------------------
+# 6. PM2 process management
+# ---------------------------------------------------------------------------
+- name: Deploy PM2 ecosystem config
+  ansible.builtin.template:
+    src: ecosystem.config.js.j2
+    dest: "{{ nextjs_app_dir }}/ecosystem.config.js"
+    mode: '0644'
+
+- name: Start or restart app via PM2
+  ansible.builtin.command:
+    cmd: pm2 startOrRestart {{ nextjs_app_dir }}/ecosystem.config.js
+  register: pm2_start
+  changed_when: "'online' in pm2_start.stdout or 'restarted' in pm2_start.stdout"
+
+- name: Configure PM2 startup on boot
+  ansible.builtin.command:
+    cmd: pm2 startup systemd -u root --hp /root
+  args:
+    creates: /etc/systemd/system/pm2-root.service
+
+- name: Enable PM2 service
+  ansible.builtin.systemd:
+    name: pm2-root
+    enabled: true
+    daemon_reload: true
+
+- name: Save PM2 process list
+  ansible.builtin.command:
+    cmd: pm2 save
+  changed_when: true
+
+# ---------------------------------------------------------------------------
+# 7. Nginx reverse proxy
+# ---------------------------------------------------------------------------
+- name: Deploy nginx proxy config
+  ansible.builtin.template:
+    src: nginx_nextjs.conf.j2
+    dest: /etc/nginx/conf.d/{{ nextjs_app_name }}.conf
+    mode: '0644'
+  notify: Reload nginx
+
+- name: Remove default nginx static config
+  ansible.builtin.file:
+    path: /etc/nginx/conf.d/default.conf
+    state: absent
+  notify: Reload nginx

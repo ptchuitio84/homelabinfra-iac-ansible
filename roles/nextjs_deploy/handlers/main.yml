@@ -1,0 +1,9 @@
+# =============================================================================
+# roles/nextjs_deploy/handlers/main.yml
+# =============================================================================
+
+---
+- name: Reload nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded

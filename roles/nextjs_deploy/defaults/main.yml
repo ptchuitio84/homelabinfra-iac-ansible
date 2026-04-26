@@ -1,0 +1,10 @@
+# =============================================================================
+# roles/nextjs_deploy/defaults/main.yml
+# =============================================================================
+
+---
+nextjs_app_name:  aigenticsolutions
+nextjs_app_dir:   /opt/aigenticsolutions
+nextjs_repo:      git@github.com:ptchuitio84/aigenticsolutions.git
+nextjs_branch:    main
+nextjs_port:      3000
