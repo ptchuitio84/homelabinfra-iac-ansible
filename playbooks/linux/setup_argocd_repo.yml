@@ -56,12 +56,20 @@
         fail_msg: "Vault is sealed — unseal before running this playbook"
 
     - name: Read GitHub PAT from Vault
+      ansible.builtin.uri:
+        url:            "{{ vault_addr }}/v1/secret/data/{{ vault_secret_path }}"
+        method:         GET
+        headers:
+          X-Vault-Token: "{{ vault_lookup_token }}"
+        validate_certs: false
+        status_code:    200
+      delegate_to: localhost
+      register: vault_secret
+      no_log: true
+
+    - name: Extract PAT from Vault response
       ansible.builtin.set_fact:
-        github_creds: "{{ lookup('community.hashi_vault.vault_kv2_get',
-          vault_secret_path,
-          engine_mount_point='secret',
-          token=vault_lookup_token,
-          url=vault_addr) }}"
+        github_pat: "{{ vault_secret.json.data.data.token }}"
       no_log: true
 
   tasks:
@@ -75,7 +83,7 @@
           --from-literal=type=git \
           --from-literal=url={{ repo_url }} \
           --from-literal=username={{ github_username }} \
-          --from-literal=password={{ github_creds.secret.token }} \
+          --from-literal=password={{ github_pat }} \
           --dry-run=client -o yaml | kubectl apply -f -
       register: secret_result
       changed_when: "'created' in secret_result.stdout or 'configured' in secret_result.stdout"
