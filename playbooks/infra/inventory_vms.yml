@@ -1,0 +1,131 @@
+# =============================================================================
+# playbooks/infra/inventory_vms.yml — vCenter VM Inventory Export
+# =============================================================================
+# Queries vCenter for all VMs and generates one YAML spec file per VM.
+# Output lands in /tmp/vm_inventory/ on the Ansible control node.
+# Use this to seed homelabinfra-iac-vms with the existing fleet.
+#
+# USAGE:
+#   ansible-playbook playbooks/infra/inventory_vms.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+# OUTPUT:
+#   /tmp/vm_inventory/<vm_name>.yml  — one file per VM
+#   /tmp/vm_inventory/summary.txt    — fleet summary table
+# =============================================================================
+
+---
+- name: Inventory all VMs from vCenter
+  hosts: vcenter
+  gather_facts: false
+
+  tasks:
+
+    - name: Create output directory
+      ansible.builtin.file:
+        path: /tmp/vm_inventory
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+
+    - name: Gather all VM info from vCenter
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: "{{ vcenter_validate_certs }}"
+        vm_type: vm
+      register: vm_info
+      delegate_to: localhost
+
+    - name: Generate YAML spec file per VM
+      ansible.builtin.copy:
+        dest: "/tmp/vm_inventory/{{ item.guest_name | lower | replace(' ', '_') }}.yml"
+        mode: '0644'
+        content: |
+          # =============================================================================
+          # VM Spec: {{ item.guest_name }}
+          # Generated: {{ lookup('pipe', 'date +%Y-%m-%d') }}
+          # Source: vCenter inventory export (playbooks/infra/inventory_vms.yml)
+          # =============================================================================
+          # STATUS: existing — not yet managed by Terraform
+          # To bring under Terraform management: terraform import + plan verification
+          # =============================================================================
+
+          name:         "{{ item.guest_name }}"
+          power_state:  "{{ item.power_state }}"
+          guest_os:     "{{ item.guest_fullname | default('unknown') }}"
+
+          hardware:
+            cpus:       {{ item.cpu_count | default(0) }}
+            memory_mb:  {{ item.memory_mb | default(0) }}
+
+          disks:
+          {% for disk in item.guest_disk_info | default([]) %}
+            - label:    "{{ disk.disk_label | default('unknown') }}"
+              capacity: "{{ disk.capacity | default('unknown') }}"
+          {% else %}
+            []
+          {% endfor %}
+
+          network:
+            ip:         "{{ item.ip_address | default('unknown') }}"
+            interfaces:
+          {% for nic in item.guest_network_info | default([]) %}
+              - mac:      "{{ nic.mac_address | default('unknown') }}"
+                network:  "{{ nic.network | default('unknown') }}"
+                ip:       "{{ nic.ip_addresses[0] | default('unknown') if nic.ip_addresses is defined and nic.ip_addresses | length > 0 else 'unknown' }}"
+          {% else %}
+              []
+          {% endfor %}
+
+          placement:
+            datacenter: "{{ item.datacenter | default('unknown') }}"
+            cluster:    "{{ item.cluster | default('unknown') }}"
+            host:       "{{ item.esxi_hostname | default('unknown') }}"
+            datastore:  "{{ item.datastore | default([]) | join(', ') }}"
+
+          tags:         {{ item.tags | default([]) }}
+      loop: "{{ vm_info.virtual_machines }}"
+      loop_control:
+        label: "{{ item.guest_name }}"
+      delegate_to: localhost
+
+    - name: Generate fleet summary
+      ansible.builtin.copy:
+        dest: /tmp/vm_inventory/summary.txt
+        mode: '0644'
+        content: |
+          ================================================================================
+          VM Fleet Inventory — {{ lookup('pipe', 'date +%Y-%m-%d') }}
+          vCenter: {{ vcenter_hostname }}
+          Total VMs: {{ vm_info.virtual_machines | length }}
+          ================================================================================
+
+          {% set header = '%-40s %-12s %5s %8s %-16s' %}
+          {{ '%-40s %-12s %5s %8s %-16s' | format('NAME', 'POWER', 'CPU', 'MEM(MB)', 'IP') }}
+          {{ '-' * 84 }}
+          {% for vm in vm_info.virtual_machines | sort(attribute='guest_name') %}
+          {{ '%-40s %-12s %5s %8s %-16s' | format(
+              vm.guest_name,
+              vm.power_state,
+              vm.cpu_count | default(0),
+              vm.memory_mb | default(0),
+              vm.ip_address | default('—')
+          ) }}
+          {% endfor %}
+      delegate_to: localhost
+
+    - name: Show summary
+      ansible.builtin.command: cat /tmp/vm_inventory/summary.txt
+      register: summary
+      changed_when: false
+      delegate_to: localhost
+
+    - name: Print summary
+      ansible.builtin.debug:
+        msg: "{{ summary.stdout_lines }}"
+
+    - name: List generated spec files
+      ansible.builtin.debug:
+        msg: "Spec files written to /tmp/vm_inventory/ — {{ vm_info.virtual_machines | length }} VMs exported."
