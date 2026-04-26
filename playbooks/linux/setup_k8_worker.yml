@@ -18,9 +18,8 @@
         name: nfs-utils
         state: present
 
-    - name: Ensure SSH is open in firewalld
-      ansible.posix.firewalld:
-        service: ssh
-        permanent: true
-        state: enabled
-        immediate: true
+    - name: Disable firewalld — k3s manages iptables directly
+      ansible.builtin.service:
+        name: firewalld
+        state: stopped
+        enabled: false
