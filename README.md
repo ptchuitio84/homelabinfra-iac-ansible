@@ -8,6 +8,7 @@ Built to close the gap between hyperscale operational experience and hands-on in
 
 **Companion repositories:**
 - [`homelabinfra-iac-terraform`](https://github.com/ptchuitio84/homelabinfra-iac-terraform) — Declarative vSphere provisioning with OpenTofu/Terraform. Vault-sourced credentials, Minio remote state backend. Separate repo, separate failure domain, separate execution node (`hmvlaptfm001`).
+- [`homelabinfra-k8s-apps`](https://github.com/ptchuitio84/homelabinfra-k8s-apps) — Kubernetes application manifests and Helm chart wrappers. ArgoCD watches this repo and continuously reconciles the cluster. GitOps source of truth for all k8s workloads.
 - [`homelabinfra-iac-network`](https://github.com/ptchuitio84/homelabinfra-network-configs) — Network device configs for Cisco IOS, Arista EOS, and Meraki. Configuration-as-code for all switching infrastructure, backed up to git on a daily schedule via Jenkins.
 - [`homelabinfra-network-backups`](https://github.com/ptchuitio84/homelabinfra-network-backups) — Timestamped running config snapshots committed automatically by the daily backup pipeline.
 - [`plex-ansible`](https://github.com/ptchuitio84/plex-ansible) — Isolated Ansible automation for Plex Media Server deployment and management.
@@ -190,6 +191,10 @@ Ansible playbooks are not run by hand in production. Everything that touches liv
 | `nnt-jkn-net-enforce-swplnet251/252/253` | On demand | Push and verify baseline config against a specific switch |
 | `nnt-jkn-win-dns-sync` | Daily (3am) + on demand | Pull IP allocations from NetBox IPAM, register DNS records in `nnt.com`, then sync all A and CNAME records zone-to-zone into `nanonetech.com`, `aigenticsolutions.ai`, and `aigenticsolutions.io`, and trigger AD replication |
 | `nnt-jkn-terraform-apply` | On demand | Run `tofu`/`terraform` plan, apply, or destroy against `homelabinfra-iac-terraform` — executes on `tfm001`, Vault token injected at runtime |
+| `setup_metallb` | On demand | Deploy MetalLB L2 mode on k3s — IP pool 10.10.1.200–210, controller pinned to control plane node |
+| `setup_traefik` | On demand | Deploy Traefik ingress controller via Helm — single LoadBalancer IP, Host-header routing for all k8s apps |
+| `setup_argocd` | On demand | Deploy ArgoCD via Helm — GitOps controller at `argocd.nnt.com`, NFS Redis storage |
+| `setup_argocd_repo` | On demand | Register the k8s-apps GitHub repo in ArgoCD — reads PAT from Vault (`secret/github/nnt`), creates K8s repo secret |
 
 **Why Jenkins for infrastructure automation instead of a SaaS CI platform?**
 All pipelines target on-premises infrastructure — vCenter, WinRM endpoints, SSH, network device SSH — none of which are reachable from a cloud-hosted runner without a VPN or tunnel. A self-hosted Jenkins instance on the same L2 segment eliminates that dependency entirely. Jenkins also gives full control over pipeline agent configuration, credentials management, and job scheduling with no per-minute billing.
