@@ -20,7 +20,7 @@
 
 pipeline {
 
-    agent { label 'ans001' }
+    agent any
 
     environment {
         ANSIBLE_REPO_PATH = '/opt/homelabinfra-iac-ansible'

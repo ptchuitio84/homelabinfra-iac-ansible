@@ -41,7 +41,7 @@
 
 pipeline {
 
-    agent { label 'ans001' }
+    agent any
 
     parameters {
         text(

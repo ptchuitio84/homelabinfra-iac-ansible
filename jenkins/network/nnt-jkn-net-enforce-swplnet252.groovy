@@ -49,7 +49,7 @@ pipeline {
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '30'))
-        timeout(time: 26, unit: 'HOURS')  // dry-run (~1h) + 24h approval gate + enforce (~1h)
+        timeout(time: 2, unit: 'HOURS')  // dry-run (~1h) + enforce (~1h)
         timestamps()
     }
 
@@ -96,19 +96,19 @@ pipeline {
             }
         }
 
-        stage('Approval Gate') {
-            when {
-                expression { env.HAS_CHANGES == 'true' }
-            }
-            steps {
-                timeout(time: 24, unit: 'HOURS') {
-                    input(
-                        message: 'swplnet252 — drift detected. Review dry-run output above, then approve to enforce or abort.',
-                        ok: 'Enforce'
-                    )
-                }
-            }
-        }
+        // stage('Approval Gate') {
+        //     when {
+        //         expression { env.HAS_CHANGES == 'true' }
+        //     }
+        //     steps {
+        //         timeout(time: 24, unit: 'HOURS') {
+        //             input(
+        //                 message: 'swplnet252 — drift detected. Review dry-run output above, then approve to enforce or abort.',
+        //                 ok: 'Enforce'
+        //             )
+        //         }
+        //     }
+        // }
 
         stage('Enforce baseline — swplnet252') {
             steps {

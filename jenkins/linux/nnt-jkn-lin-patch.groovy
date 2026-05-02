@@ -34,7 +34,7 @@
 
 pipeline {
 
-    agent { label 'ans001' }
+    agent any
 
     triggers {
         cron('0 2 * * 0')  // Sunday at 2am

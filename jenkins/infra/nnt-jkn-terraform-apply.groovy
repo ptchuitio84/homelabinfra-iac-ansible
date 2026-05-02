@@ -29,7 +29,7 @@
 
 pipeline {
 
-    agent { label 'tfm001' }
+    agent any
 
     parameters {
         choice(
