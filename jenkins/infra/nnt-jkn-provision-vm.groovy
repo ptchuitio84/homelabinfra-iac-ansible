@@ -276,6 +276,18 @@ pipeline {
             }
         }
 
+        stage('Join Domain') {
+            steps {
+                sh """
+                    cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
+                        playbooks/linux/join_domain.yml \
+                        --vault-password-file ${VAULT_PASS_FILE} \
+                        -i ${env.VM_IP}, \
+                        --extra-vars "target_hosts=all"
+                """
+            }
+        }
+
     }
 
     post {
@@ -284,6 +296,15 @@ pipeline {
         }
         failure {
             script {
+                // Unjoin domain before destroying the VM — realm leave requires the VM to still exist
+                if (env.VM_IP) {
+                    sh """
+                        cd ${ANSIBLE_REPO_PATH} && ansible-playbook \
+                            playbooks/linux/leave_domain.yml \
+                            --vault-password-file ${VAULT_PASS_FILE} \
+                            -i ${env.VM_IP}, || true
+                    """
+                }
                 if (env.NETBOX_IP_ID) {
                     sh """
                         curl -s -X DELETE \

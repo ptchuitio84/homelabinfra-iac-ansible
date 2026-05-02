@@ -1,0 +1,38 @@
+# =============================================================================
+# playbooks/linux/leave_domain.yml — Remove a Linux host from nanonetech.com
+# =============================================================================
+# Gracefully unjoins a host from the AD domain. Used by build pipelines
+# to clean up a partially-joined VM before teardown on provisioning failure.
+#
+# IDEMPOTENT: yes — no-op if the host is not currently joined.
+#
+# USAGE:
+#   # Pipeline use — target a single IP:
+#   ansible-playbook playbooks/linux/leave_domain.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     -i 10.10.1.50,
+#
+# VAULT REQUIRED: no — realm leave uses the existing machine credential
+#                 cached from join time.
+# =============================================================================
+
+---
+- name: Leave AD domain
+  hosts: all
+  gather_facts: false
+  ignore_unreachable: true
+
+  vars:
+    ad_domain: "{{ lookup('vars', 'ad_domain', default='nanonetech.com') }}"
+
+  tasks:
+    - name: Check domain membership
+      ansible.builtin.command: realm list
+      register: realm_list
+      changed_when: false
+      failed_when: false
+
+    - name: Leave domain {{ ad_domain }}
+      ansible.builtin.command: realm leave {{ ad_domain }}
+      when: realm_list.rc == 0 and ad_domain in realm_list.stdout
+      failed_when: false

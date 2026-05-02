@@ -1,8 +1,8 @@
 # =============================================================================
-# playbooks/linux/join_domain.yml — Join all Linux hosts to nanonetech.com
+# playbooks/linux/join_domain.yml — Join Linux hosts to nanonetech.com
 # =============================================================================
-# Joins all managed OL9 Linux VMs to the AD domain, configures SSSD for
-# centralized auth, and grants sudo to the "NNT Linux Admins" AD group.
+# Joins OL9 Linux VMs to the AD domain, configures SSSD for centralized
+# auth, and grants sudo to the "NNT Linux Admins" AD group.
 #
 # PREREQUISITES:
 #   1. AD group "NNT Linux Admins" exists in nanonetech.com
@@ -10,14 +10,20 @@
 #   3. DNS on each Linux host resolves nanonetech.com (DC is nameserver)
 #   4. vault_windows_admin_user / vault_windows_admin_password in vault
 #
-# USAGE:
+# USAGE — fleet run (uses inventory groups):
 #   ansible-playbook playbooks/linux/join_domain.yml \
 #     --vault-password-file ~/.ansible/vault_pass.txt
 #
-#   # Single host:
+# USAGE — single host from inventory:
 #   ansible-playbook playbooks/linux/join_domain.yml \
 #     --vault-password-file ~/.ansible/vault_pass.txt \
 #     --limit hmvlapmon001.nnt.com
+#
+# USAGE — pipeline/dynamic target (pass IP directly, bypass inventory):
+#   ansible-playbook playbooks/linux/join_domain.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     -i 10.10.1.50, \
+#     --extra-vars "target_hosts=all"
 #
 # IDEMPOTENT: yes — skips join if host is already a domain member.
 #
@@ -27,15 +33,8 @@
 ---
 - name: Join Linux hosts to nanonetech.com
   hosts: >-
-    ansible_nodes:
-    monitoring:
-    jenkins:
-    nfs_servers:
-    registry:
-    vault_servers:
-    k8s_nodes:
-    netbox:
-    webservers
+    {{ target_hosts
+       | default('ansible_nodes:monitoring:jenkins:nfs_servers:registry:vault_servers:k8s_nodes:netbox:webservers') }}
   serial: 5              # 5 at a time — avoids hammering the DC with simultaneous joins
   gather_facts: false
   ignore_unreachable: true
