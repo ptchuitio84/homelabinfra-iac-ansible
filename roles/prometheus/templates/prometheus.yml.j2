@@ -53,7 +53,7 @@ scrape_configs:
   # Jenkins exposes build metrics via the Prometheus Metrics plugin.
   # Endpoint requires auth — credentials stored in vault.
   - job_name: "jenkins"
-    metrics_path: /prometheus
+    metrics_path: /prometheus/
     basic_auth:
       username: "{{ vault_jenkins_prometheus_user }}"
       password: "{{ vault_jenkins_prometheus_token }}"
