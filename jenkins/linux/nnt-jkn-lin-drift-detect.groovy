@@ -7,30 +7,25 @@
 //   Nightly Ansible --check run against all Linux hosts to detect configuration
 //   drift from the baseline (common role + login_banner role).
 //
-//   If any host has drifted, the pipeline fails → Prometheus picks up the
-//   JenkinsBuildFailed alert → email to infra-ops@nanonetech.com.
+//   If drift is found, automatically triggers nnt-jkn-lin-enforce-baseline and
+//   waits for it to complete. The build succeeds if enforcement succeeds.
+//   The build fails only if Ansible errors out or enforcement fails.
 //
-//   No changes are made to any host — this is a read-only check.
-//
-// WHAT COUNTS AS DRIFT:
-//   Any task in the common or login_banner role that would change state:
-//     - Timezone mismatch
-//     - Base package missing
-//     - NTP config changed
-//     - SELinux mode changed
-//     - Login banner content changed
-//     - sshd Banner directive missing
+// OUTCOMES:
+//   SUCCESS — no drift detected, OR drift found and successfully remediated
+//   FAILURE — Ansible error during check, OR enforcement pipeline failed
 //
 // SCHEDULE: Daily at 3am (6 hours after Sunday patching window).
 //
 // JENKINS SETUP:
 //   1. New Item → Pipeline → name: nnt-jkn-lin-drift-detect
-//   2. Pipeline → Definition: Pipeline script from SCM
-//   3. SCM: Git → URL: https://github.com/ptchuitio84/homelabinfra-iac-ansible.git
-//   4. Credentials: github-pat
-//   5. Branch: */main
-//   6. Script Path: jenkins/linux/nnt-jkn-lin-drift-detect.groovy
-//   7. Save
+//   2. Place in the nnt-infra-syncs folder
+//   3. Pipeline → Definition: Pipeline script from SCM
+//   4. SCM: Git → URL: https://github.com/ptchuitio84/homelabinfra-iac-ansible.git
+//   5. Credentials: github-pat
+//   6. Branch: */main
+//   7. Script Path: jenkins/linux/nnt-jkn-lin-drift-detect.groovy
+//   8. Save
 // =============================================================================
 
 pipeline {
@@ -63,8 +58,6 @@ pipeline {
         stage('Baseline drift check') {
             steps {
                 script {
-                    // --check: dry run, no changes applied.
-                    // Ansible exits 0 even when tasks would change — parse PLAY RECAP for drift.
                     def rc = sh(
                         script: """
                             cd ${env.ANSIBLE_REPO_PATH} && \
@@ -84,18 +77,19 @@ pipeline {
                         error("Ansible exited with error (rc=${rc}). Check console output.")
                     }
 
-                    // PLAY RECAP lines with changed > 0 indicate drift.
-                    // Format: "hostname : ok=N changed=N unreachable=N failed=N ..."
                     def driftedHosts = output.readLines().findAll { line ->
                         line =~ /:\s+ok=\d+.*changed=[1-9]/
                     }
 
                     if (driftedHosts) {
-                        error(
-                            "DRIFT DETECTED on ${driftedHosts.size()} host(s):\n" +
+                        echo(
+                            "Drift detected on ${driftedHosts.size()} host(s):\n" +
                             driftedHosts.join('\n') +
-                            "\n\nRun with --check --diff to see exact changes needed."
+                            "\n\nTriggering enforcement..."
                         )
+                        build job: 'nnt-infra-syncs/nnt-jkn-lin-enforce-baseline',
+                              wait: true,
+                              propagate: true
                     }
                 }
             }
@@ -104,10 +98,10 @@ pipeline {
 
     post {
         success {
-            echo 'No drift detected — all hosts match baseline.'
+            echo 'Fleet is clean — no drift, or drift detected and successfully remediated.'
         }
         failure {
-            echo 'Drift detected or playbook error. Check console output for details.'
+            echo 'Check or enforcement failed. See console output for details.'
         }
     }
 }

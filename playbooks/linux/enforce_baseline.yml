@@ -1,0 +1,30 @@
+# =============================================================================
+# playbooks/linux/enforce_baseline.yml — Linux Baseline Enforcement
+# =============================================================================
+# PURPOSE:
+#   Enforce the desired baseline state on all Linux hosts. Run by the
+#   nnt-jkn-lin-enforce-baseline Jenkins pipeline — triggered automatically
+#   when nnt-jkn-lin-drift-detect finds drift, or manually on demand.
+#
+#   Roles enforced:
+#     common       — timezone, base packages, NTP, SELinux, hostname, /etc/hosts
+#     login_banner — /etc/issue.net, /etc/profile.d/00-banner.sh, sshd Banner
+#
+#   Unlike drift_detect.yml, this playbook WILL make changes.
+#
+# USAGE (enforcement):
+#   ansible-playbook playbooks/linux/enforce_baseline.yml \
+#     -i inventory/ \
+#     --vault-password-file /root/.ansible/vault_pass.txt
+# =============================================================================
+
+---
+- name: Linux baseline enforcement
+  hosts: linux
+  gather_facts: true
+  ignore_unreachable: true
+  any_errors_fatal: false
+
+  roles:
+    - role: common
+    - role: login_banner
