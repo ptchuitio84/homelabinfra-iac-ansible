@@ -180,6 +180,33 @@
   notify: Restart Prometheus
 
 # =============================================================================
+# SECTION 4b: ALERT RULES
+# Deploy rule files from templates into /etc/prometheus/rules/.
+# Prometheus loads all *.yml files in that directory on start and on SIGHUP.
+# =============================================================================
+
+- name: Create Prometheus rules directory
+  ansible.builtin.file:
+    path: "{{ prometheus_config_dir }}/rules"
+    state: directory
+    owner: "{{ prometheus_user }}"
+    group: "{{ prometheus_group }}"
+    mode: '0755'
+
+- name: Deploy alert rule files
+  ansible.builtin.template:
+    src: "rules/{{ item }}"
+    dest: "{{ prometheus_config_dir }}/rules/{{ item | replace('.j2', '') }}"
+    owner: "{{ prometheus_user }}"
+    group: "{{ prometheus_group }}"
+    mode: '0644'
+  loop:
+    - node.rules.yml.j2
+    - network.rules.yml.j2
+    - jenkins.rules.yml.j2
+  notify: Restart Prometheus
+
+# =============================================================================
 # SECTION 5: SYSTEMD SERVICE
 # =============================================================================
 

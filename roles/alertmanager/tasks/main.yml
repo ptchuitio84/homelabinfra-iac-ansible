@@ -1,0 +1,131 @@
+# =============================================================================
+# roles/alertmanager/tasks/main.yml — Alertmanager Deployment Tasks
+# =============================================================================
+# Deploys Alertmanager on OL9 as a systemd service on hmvlapmon002.
+# Co-located with Prometheus — no data disk needed (state is tiny).
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: SYSTEM USER
+# =============================================================================
+
+- name: Create alertmanager system group
+  ansible.builtin.group:
+    name: "{{ alertmanager_group }}"
+    system: true
+    state: present
+
+- name: Create alertmanager system user
+  ansible.builtin.user:
+    name: "{{ alertmanager_user }}"
+    group: "{{ alertmanager_group }}"
+    system: true
+    shell: /sbin/nologin
+    create_home: false
+    state: present
+
+# =============================================================================
+# SECTION 2: DIRECTORIES
+# =============================================================================
+
+- name: Create Alertmanager directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ alertmanager_user }}"
+    group: "{{ alertmanager_group }}"
+    mode: '0755'
+  loop:
+    - "{{ alertmanager_install_dir }}"
+    - "{{ alertmanager_config_dir }}"
+    - "{{ alertmanager_data_dir }}"
+    - "{{ alertmanager_log_dir }}"
+
+# =============================================================================
+# SECTION 3: INSTALL
+# =============================================================================
+
+- name: Download Alertmanager {{ alertmanager_version }}
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/alertmanager/releases/download/v{{ alertmanager_version }}/alertmanager-{{ alertmanager_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/alertmanager-{{ alertmanager_version }}.tar.gz"
+    mode: '0644'
+
+- name: Extract Alertmanager archive
+  ansible.builtin.unarchive:
+    src: "/tmp/alertmanager-{{ alertmanager_version }}.tar.gz"
+    dest: /tmp/
+    remote_src: true
+
+- name: Install Alertmanager binary
+  ansible.builtin.copy:
+    src: "/tmp/alertmanager-{{ alertmanager_version }}.linux-amd64/alertmanager"
+    dest: "{{ alertmanager_install_dir }}/alertmanager"
+    owner: "{{ alertmanager_user }}"
+    group: "{{ alertmanager_group }}"
+    mode: '0755'
+    remote_src: true
+
+- name: Install amtool binary
+  ansible.builtin.copy:
+    src: "/tmp/alertmanager-{{ alertmanager_version }}.linux-amd64/amtool"
+    dest: "{{ alertmanager_install_dir }}/amtool"
+    owner: "{{ alertmanager_user }}"
+    group: "{{ alertmanager_group }}"
+    mode: '0755'
+    remote_src: true
+
+# =============================================================================
+# SECTION 4: CONFIGURATION
+# =============================================================================
+
+- name: Deploy Alertmanager configuration
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ alertmanager_config_dir }}/alertmanager.yml"
+    owner: "{{ alertmanager_user }}"
+    group: "{{ alertmanager_group }}"
+    mode: '0640'
+  notify: Restart Alertmanager
+
+# =============================================================================
+# SECTION 5: SYSTEMD SERVICE
+# =============================================================================
+
+- name: Deploy Alertmanager systemd service
+  ansible.builtin.template:
+    src: alertmanager.service.j2
+    dest: /etc/systemd/system/alertmanager.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Alertmanager
+
+- name: Enable and start Alertmanager
+  ansible.builtin.systemd:
+    name: alertmanager
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# =============================================================================
+# SECTION 6: FIREWALL + VERIFY
+# =============================================================================
+
+- name: Open Alertmanager port in firewalld
+  ansible.posix.firewalld:
+    port: "{{ alertmanager_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+
+- name: Wait for Alertmanager to be reachable
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ alertmanager_port }}"
+    timeout: 30
+
+- name: Display Alertmanager access URL
+  ansible.builtin.debug:
+    msg: "Alertmanager is up — http://{{ ansible_host }}:{{ alertmanager_port }}"

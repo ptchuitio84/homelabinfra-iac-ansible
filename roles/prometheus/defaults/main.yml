@@ -93,3 +93,6 @@ prometheus_meraki_exporter_host: "hmvlapmon003.nnt.com"
 # UnPoller — runs on mon003, scrapes UniFi controller for AP/client metrics
 unpoller_port: 9130
 prometheus_unpoller_host: "hmvlapmon003.nnt.com"
+
+# Alertmanager — co-located on this host, receives fired alerts from Prometheus
+alertmanager_port: 9093

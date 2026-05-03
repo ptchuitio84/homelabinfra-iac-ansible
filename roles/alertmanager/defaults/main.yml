@@ -1,0 +1,39 @@
+# =============================================================================
+# roles/alertmanager/defaults/main.yml — Alertmanager Role Default Variables
+# =============================================================================
+# Deploys Alertmanager on OL9 as a systemd service alongside Prometheus.
+# Receives alerts from Prometheus and routes them to email via Exchange.
+#
+# ARCHITECTURE:
+#   Prometheus (hmvlapmon002:9090) → fires alerts → Alertmanager (:9093)
+#   Alertmanager → SMTP → webmail.nanonetech.com:25 → infra-ops@nanonetech.com
+# =============================================================================
+
+---
+alertmanager_version: "0.27.0"
+
+alertmanager_user:  alertmanager
+alertmanager_group: alertmanager
+
+alertmanager_install_dir: /opt/alertmanager
+alertmanager_config_dir:  /etc/alertmanager
+alertmanager_data_dir:    /var/lib/alertmanager
+alertmanager_log_dir:     /var/log/alertmanager
+
+alertmanager_port: 9093
+
+# SMTP — Exchange receive connector on webmail.nanonetech.com accepts port 25
+# with no auth from internal network. No TLS on internal relay.
+alertmanager_smtp_host:    webmail.nanonetech.com
+alertmanager_smtp_port:    25
+alertmanager_smtp_from:    alertmanager@nanonetech.com
+alertmanager_smtp_tls:     false
+
+alertmanager_alert_email:  infra-ops@nanonetech.com
+
+# How long to wait before sending the first alert in a group.
+alertmanager_group_wait: 30s
+# Minimum time between alert group notifications after the first.
+alertmanager_group_interval: 5m
+# How long to wait before re-sending a firing alert.
+alertmanager_repeat_interval: 4h

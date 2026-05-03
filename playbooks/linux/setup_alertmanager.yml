@@ -1,0 +1,80 @@
+# =============================================================================
+# playbooks/linux/setup_alertmanager.yml — Deploy Alertmanager
+# =============================================================================
+# PURPOSE:
+#   Deploys Alertmanager on hmvlapmon002 (co-located with Prometheus).
+#   Also re-deploys Prometheus configuration to wire up the alerting stanza
+#   and push the alert rule files.
+#
+# WHAT THIS DOES:
+#   1. Installs Alertmanager binary from GitHub releases.
+#   2. Deploys alertmanager.yml (SMTP → webmail.nanonetech.com:25).
+#   3. Starts Alertmanager as a systemd service, opens port 9093.
+#   4. Re-deploys prometheus.yml + rule files (node/network/jenkins).
+#   5. Restarts Prometheus so it picks up the alerting config.
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/setup_alertmanager.yml \
+#     -i inventory/ --vault-password-file /root/.ansible/vault_pass.txt
+# =============================================================================
+
+---
+
+# =============================================================================
+# PLAY 1: Deploy Alertmanager
+# =============================================================================
+- name: Deploy Alertmanager on hmvlapmon002
+  hosts: monitoring
+  gather_facts: true
+  limit: hmvlapmon002.nnt.com
+
+  roles:
+    - role: alertmanager
+
+
+# =============================================================================
+# PLAY 2: Update Prometheus config with alerting stanza + rule files
+# =============================================================================
+- name: Update Prometheus configuration and alert rules
+  hosts: monitoring
+  gather_facts: true
+  limit: hmvlapmon002.nnt.com
+
+  tasks:
+
+    - name: Create Prometheus rules directory
+      ansible.builtin.file:
+        path: "{{ prometheus_config_dir }}/rules"
+        state: directory
+        owner: "{{ prometheus_user }}"
+        group: "{{ prometheus_group }}"
+        mode: '0755'
+
+    - name: Deploy alert rule files
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../roles/prometheus/templates/rules/{{ item }}"
+        dest: "{{ prometheus_config_dir }}/rules/{{ item | replace('.j2', '') }}"
+        owner: "{{ prometheus_user }}"
+        group: "{{ prometheus_group }}"
+        mode: '0644'
+      loop:
+        - node.rules.yml.j2
+        - network.rules.yml.j2
+        - jenkins.rules.yml.j2
+      notify: Restart Prometheus
+
+    - name: Deploy updated Prometheus configuration
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../roles/prometheus/templates/prometheus.yml.j2"
+        dest: "{{ prometheus_config_dir }}/prometheus.yml"
+        owner: "{{ prometheus_user }}"
+        group: "{{ prometheus_group }}"
+        mode: '0644'
+      notify: Restart Prometheus
+
+  handlers:
+    - name: Restart Prometheus
+      ansible.builtin.systemd:
+        name: prometheus
+        state: restarted
+        daemon_reload: true

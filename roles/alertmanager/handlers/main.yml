@@ -1,0 +1,10 @@
+# =============================================================================
+# roles/alertmanager/handlers/main.yml — Alertmanager Handlers
+# =============================================================================
+
+---
+- name: Restart Alertmanager
+  ansible.builtin.systemd:
+    name: alertmanager
+    state: restarted
+    daemon_reload: true

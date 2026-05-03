@@ -10,6 +10,24 @@ global:
   evaluation_interval: {{ prometheus_evaluation_interval }}
 
 # =============================================================================
+# ALERTING
+# Alertmanager co-located on this host. Prometheus pushes firing alerts to it.
+# =============================================================================
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["localhost:{{ alertmanager_port }}"]
+
+# =============================================================================
+# ALERT RULES
+# Loaded from /etc/prometheus/rules/*.yml — deployed by prometheus role tasks.
+# =============================================================================
+
+rule_files:
+  - "{{ prometheus_config_dir }}/rules/*.yml"
+
+# =============================================================================
 # SCRAPE CONFIGS
 # Each job defines a set of targets Prometheus polls for metrics.
 # =============================================================================
