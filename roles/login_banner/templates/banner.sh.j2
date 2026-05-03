@@ -8,7 +8,7 @@
 _HOSTNAME="{{ ansible_fqdn | default(ansible_hostname) }}"
 _IP="{{ ansible_default_ipv4.address | default('unknown') }}"
 _OS="{{ ansible_distribution }} {{ ansible_distribution_version }}"
-_KERNEL="{{ ansible_kernel }}"
+_KERNEL=$(uname -r)
 _ENV="{{ banner_env }}{% if banner_role %} | Role: {{ banner_role }}{% endif %}"
 
 # Dynamic values — gathered at login time
