@@ -24,9 +24,8 @@
 # PLAY 1: Deploy Alertmanager
 # =============================================================================
 - name: Deploy Alertmanager on hmvlapmon002
-  hosts: monitoring
+  hosts: hmvlapmon002.nnt.com
   gather_facts: true
-  limit: hmvlapmon002.nnt.com
 
   roles:
     - role: alertmanager
@@ -36,9 +35,8 @@
 # PLAY 2: Update Prometheus config with alerting stanza + rule files
 # =============================================================================
 - name: Update Prometheus configuration and alert rules
-  hosts: monitoring
+  hosts: hmvlapmon002.nnt.com
   gather_facts: true
-  limit: hmvlapmon002.nnt.com
 
   tasks:
 
