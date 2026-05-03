@@ -208,9 +208,9 @@
         timeout: 600
         delay: 15
 
-    - name: Wait for Keycloak health endpoint to return 200
+    - name: Wait for Keycloak master realm endpoint to return 200
       ansible.builtin.uri:
-        url:            "{{ keycloak_base_url }}/health/ready"
+        url:            "{{ keycloak_base_url }}/realms/master"
         status_code:    200
         validate_certs: false
       retries: 20
