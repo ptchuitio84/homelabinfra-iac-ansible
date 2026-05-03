@@ -38,6 +38,9 @@
   hosts: hmvlapmon002.nnt.com
   gather_facts: true
 
+  vars_files:
+    - "{{ playbook_dir }}/../../roles/prometheus/defaults/main.yml"
+
   tasks:
 
     - name: Create Prometheus rules directory
