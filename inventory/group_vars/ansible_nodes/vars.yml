@@ -22,8 +22,9 @@ ansible_user: root
 # Long-term: replace with SSH key auth and remove this.
 ansible_password: "{{ vault_ansible_node_password }}"
 
-# Standard SSH connection — this is a Linux VM, not a network device.
-ansible_connection: ssh
+# Local connection — ans001 is the control node. Ansible runs tasks directly
+# without SSH-ing back to itself. Avoids password/key auth against localhost.
+ansible_connection: local
 
 # Use the system Python 3 interpreter (pre-installed on OL9).
 # Ansible needs Python on the target host to run most modules.
