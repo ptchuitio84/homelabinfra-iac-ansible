@@ -50,3 +50,9 @@ grafana_loki_url: "http://hmvlapmon003.nnt.com:3100"
 # repo always serves latest stable).
 grafana_repo_baseurl: "https://rpm.grafana.com"
 grafana_repo_gpgkey: "https://rpm.grafana.com/gpg.key"
+
+# OIDC — disabled by default, enabled by setup_keycloak_sso.yml
+grafana_oidc_enabled: false
+grafana_oidc_client_id: grafana
+grafana_oidc_client_secret: ""
+grafana_oidc_issuer_base: "http://keycloak.nnt.com/realms/nnt"

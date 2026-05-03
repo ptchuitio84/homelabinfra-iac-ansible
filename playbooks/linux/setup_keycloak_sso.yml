@@ -1,0 +1,565 @@
+# =============================================================================
+# playbooks/linux/setup_keycloak_sso.yml — Keycloak SSO Setup
+# =============================================================================
+# PURPOSE:
+#   Deploy the keycloak-admin-secret K8s Secret from Vault, create the DNS
+#   record, wait for Keycloak to come up, configure the nnt realm + OIDC
+#   clients, then wire ArgoCD and Grafana to Keycloak.
+#
+# PREREQUISITES:
+#   1. Store Keycloak admin password in Vault:
+#        vault kv put secret/keycloak/admin password=<password>
+#
+#   2. Push homelabinfra-k8s-apps to git (ArgoCD will sync keycloak app).
+#      The playbook waits up to 10 minutes for keycloak.nnt.com to be reachable.
+#
+# WHAT THIS PLAYBOOK DOES:
+#   Play 1 — k8s_control_plane:
+#     - Creates keycloak namespace
+#     - Creates keycloak-admin-secret from Vault
+#     - Creates DNS record keycloak.nnt.com → 10.10.1.200
+#
+#   Play 2 — ansible_nodes (localhost):
+#     - Waits for Keycloak to be reachable
+#     - Creates nnt realm
+#     - Creates argocd and grafana OIDC clients
+#     - Stores client secrets in Vault
+#
+#   Play 3 — k8s_control_plane:
+#     - Patches argocd-secret with Keycloak client secret
+#     - Patches argocd-cm with OIDC config
+#     - Restarts argocd-server
+#
+#   Play 4 — monitoring (hmvlapmon001):
+#     - Deploys Grafana config with OIDC enabled
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/setup_keycloak_sso.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+# =============================================================================
+
+---
+# =============================================================================
+# Play 1: Bootstrap — namespace, admin secret, DNS
+# =============================================================================
+- name: Keycloak pre-deploy — K8s secret and DNS
+  hosts: k8s_control_plane
+  gather_facts: false
+
+  vars:
+    vault_addr:       "https://10.10.0.44:8200"
+    keycloak_ns:      "keycloak"
+    keycloak_ip:      "10.10.1.200"
+    keycloak_hostname: "keycloak"
+
+  vars_files:
+    - ../../inventory/group_vars/k8s_nodes/vault.yml
+
+  environment:
+    KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+
+  pre_tasks:
+
+    - name: Verify Vault is reachable
+      ansible.builtin.uri:
+        url:            "{{ vault_addr }}/v1/sys/health"
+        validate_certs: false
+        status_code:    [200, 429, 472, 473, 501, 503]
+      delegate_to: localhost
+      register: vault_health
+      failed_when: vault_health.status not in [200, 429, 472, 473, 501, 503]
+
+    - name: Assert Vault is unsealed
+      ansible.builtin.assert:
+        that: vault_health.json.sealed == false
+        fail_msg: "Vault is sealed — unseal before running this playbook"
+
+    - name: Read Keycloak admin password from Vault
+      ansible.builtin.uri:
+        url:            "{{ vault_addr }}/v1/secret/data/keycloak/admin"
+        method:         GET
+        headers:
+          X-Vault-Token: "{{ vault_lookup_token }}"
+        validate_certs: false
+        status_code:    200
+      delegate_to: localhost
+      register: vault_keycloak_admin
+      no_log: true
+      failed_when: >
+        vault_keycloak_admin.status != 200 or
+        vault_keycloak_admin.json.data.data.password is not defined
+
+    - name: Extract admin password
+      ansible.builtin.set_fact:
+        keycloak_admin_password: "{{ vault_keycloak_admin.json.data.data.password }}"
+      no_log: true
+
+  tasks:
+
+    - name: Create keycloak namespace
+      ansible.builtin.shell: |
+        kubectl create namespace {{ keycloak_ns }} --dry-run=client -o yaml | kubectl apply -f -
+      register: ns_result
+      changed_when: "'created' in ns_result.stdout"
+
+    - name: Create keycloak-admin-secret from Vault
+      ansible.builtin.shell: |
+        kubectl -n {{ keycloak_ns }} create secret generic keycloak-admin-secret \
+          --from-literal=KEYCLOAK_ADMIN=admin \
+          --from-literal=KEYCLOAK_ADMIN_PASSWORD={{ keycloak_admin_password }} \
+          --dry-run=client -o yaml | kubectl apply -f -
+      register: secret_result
+      changed_when: "'created' in secret_result.stdout or 'configured' in secret_result.stdout"
+      no_log: true
+
+    - name: Add DNS record keycloak.nnt.com → {{ keycloak_ip }}
+      ansible.windows.win_powershell:
+        script: |
+          $ErrorActionPreference = 'Stop'
+          $zone     = "nnt.com"
+          $hostname = "{{ keycloak_hostname }}"
+          $ip       = "{{ keycloak_ip }}"
+
+          $existing = Get-DnsServerResourceRecord `
+              -ZoneName $zone `
+              -Name $hostname `
+              -RRType A `
+              -ErrorAction SilentlyContinue
+
+          if ($existing) {
+              $currentIP = $existing.RecordData.IPv4Address.ToString()
+              if ($currentIP -eq $ip) {
+                  Write-Output "[OK] $hostname.$zone -> $ip (unchanged)"
+              } else {
+                  Remove-DnsServerResourceRecord -ZoneName $zone -Name $hostname -RRType A -Force
+                  Add-DnsServerResourceRecordA -ZoneName $zone -Name $hostname `
+                      -IPv4Address $ip -TimeToLive 00:05:00
+                  Write-Output "[UPDATED] $hostname.$zone -> $currentIP -> $ip"
+              }
+          } else {
+              Add-DnsServerResourceRecordA -ZoneName $zone -Name $hostname `
+                  -IPv4Address $ip -TimeToLive 00:05:00
+              Write-Output "[ADDED] $hostname.$zone -> $ip"
+          }
+      delegate_to: "{{ groups['ad_dns_sync'][0] }}"
+      register: dns_result
+
+    - name: DNS result
+      ansible.builtin.debug:
+        msg: "{{ dns_result.output }}"
+
+    - name: Trigger AD replication
+      ansible.windows.win_powershell:
+        script: |
+          repadmin /syncall /AdeP
+          Write-Output "Replication triggered."
+      delegate_to: "{{ groups['ad_dns_sync'][0] }}"
+
+    - name: "NEXT STEP: push homelabinfra-k8s-apps to deploy Keycloak"
+      ansible.builtin.debug:
+        msg: >
+          keycloak-admin-secret created and DNS record added.
+          Push homelabinfra-k8s-apps to git — ArgoCD will sync the keycloak app.
+          This playbook will wait up to 10 minutes for keycloak.nnt.com to be reachable.
+
+
+# =============================================================================
+# Play 2: Wait, configure realm and clients via Keycloak admin API
+# =============================================================================
+- name: Configure Keycloak realm and OIDC clients
+  hosts: ansible_nodes
+  gather_facts: false
+
+  vars:
+    vault_addr:         "https://10.10.0.44:8200"
+    keycloak_base_url:  "http://keycloak.nnt.com"
+    keycloak_realm:     "nnt"
+
+  vars_files:
+    - ../../inventory/group_vars/k8s_nodes/vault.yml
+
+  pre_tasks:
+
+    - name: Read Keycloak admin password from Vault
+      ansible.builtin.uri:
+        url:            "{{ vault_addr }}/v1/secret/data/keycloak/admin"
+        method:         GET
+        headers:
+          X-Vault-Token: "{{ vault_lookup_token }}"
+        validate_certs: false
+        status_code:    200
+      register: vault_keycloak_admin
+      no_log: true
+
+    - name: Extract admin password
+      ansible.builtin.set_fact:
+        keycloak_admin_password: "{{ vault_keycloak_admin.json.data.data.password }}"
+      no_log: true
+
+  tasks:
+
+    # -------------------------------------------------------------------------
+    # 1. Wait for Keycloak
+    # -------------------------------------------------------------------------
+    - name: Wait for Keycloak to be reachable (up to 10 minutes)
+      ansible.builtin.wait_for:
+        host: keycloak.nnt.com
+        port: 80
+        timeout: 600
+        delay: 15
+
+    - name: Wait for Keycloak health endpoint to return 200
+      ansible.builtin.uri:
+        url:            "{{ keycloak_base_url }}/health/ready"
+        status_code:    200
+        validate_certs: false
+      retries: 20
+      delay:   15
+      register: keycloak_health
+      until:   keycloak_health.status == 200
+
+    # -------------------------------------------------------------------------
+    # 2. Authenticate to admin API
+    # -------------------------------------------------------------------------
+    - name: Get Keycloak admin token
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/realms/master/protocol/openid-connect/token"
+        method:       POST
+        body_format:  form-urlencoded
+        body:
+          client_id:  admin-cli
+          username:   admin
+          password:   "{{ keycloak_admin_password }}"
+          grant_type: password
+        status_code:  200
+        validate_certs: false
+      register: keycloak_token_resp
+      no_log: true
+
+    - name: Extract admin token
+      ansible.builtin.set_fact:
+        keycloak_token: "{{ keycloak_token_resp.json.access_token }}"
+      no_log: true
+
+    # -------------------------------------------------------------------------
+    # 3. Create nnt realm
+    # -------------------------------------------------------------------------
+    - name: Check if nnt realm exists
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm }}"
+        method:       GET
+        headers:
+          Authorization: "Bearer {{ keycloak_token }}"
+        status_code:  [200, 404]
+        validate_certs: false
+      register: realm_check
+      no_log: true
+
+    - name: Create nnt realm
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms"
+        method:       POST
+        headers:
+          Authorization:  "Bearer {{ keycloak_token }}"
+          Content-Type:   "application/json"
+        body_format:  json
+        body:
+          realm:       "{{ keycloak_realm }}"
+          displayName: "NNT"
+          enabled:     true
+          loginTheme:  keycloak
+          sslRequired: none
+        status_code:  201
+        validate_certs: false
+      when: realm_check.status == 404
+
+    # -------------------------------------------------------------------------
+    # 4. Create ArgoCD OIDC client
+    # -------------------------------------------------------------------------
+    - name: Check if argocd client exists
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm }}/clients?clientId=argocd"
+        method:       GET
+        headers:
+          Authorization: "Bearer {{ keycloak_token }}"
+        status_code:  200
+        validate_certs: false
+      register: argocd_client_check
+      no_log: true
+
+    - name: Create argocd OIDC client
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm }}/clients"
+        method:       POST
+        headers:
+          Authorization: "Bearer {{ keycloak_token }}"
+          Content-Type:  "application/json"
+        body_format:  json
+        body:
+          clientId:                 argocd
+          name:                     "ArgoCD"
+          enabled:                  true
+          protocol:                 openid-connect
+          publicClient:             false
+          standardFlowEnabled:      true
+          directAccessGrantsEnabled: false
+          redirectUris:
+            - "http://argocd.nnt.com/auth/callback"
+            - "https://argocd.nnt.com/auth/callback"
+          webOrigins:
+            - "http://argocd.nnt.com"
+            - "https://argocd.nnt.com"
+        status_code:  201
+        validate_certs: false
+      when: argocd_client_check.json | length == 0
+
+    - name: Get argocd client UUID
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm }}/clients?clientId=argocd"
+        method:       GET
+        headers:
+          Authorization: "Bearer {{ keycloak_token }}"
+        status_code:  200
+        validate_certs: false
+      register: argocd_client_resp
+      no_log: true
+
+    - name: Extract argocd client UUID
+      ansible.builtin.set_fact:
+        argocd_client_uuid: "{{ argocd_client_resp.json[0].id }}"
+      no_log: true
+
+    - name: Get argocd client secret
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm }}/clients/{{ argocd_client_uuid }}/client-secret"
+        method:       GET
+        headers:
+          Authorization: "Bearer {{ keycloak_token }}"
+        status_code:  200
+        validate_certs: false
+      register: argocd_secret_resp
+      no_log: true
+
+    - name: Extract argocd client secret
+      ansible.builtin.set_fact:
+        argocd_client_secret: "{{ argocd_secret_resp.json.value }}"
+      no_log: true
+
+    - name: Store argocd client secret in Vault
+      ansible.builtin.uri:
+        url:          "{{ vault_addr }}/v1/secret/data/keycloak/clients/argocd"
+        method:       POST
+        headers:
+          X-Vault-Token: "{{ vault_lookup_token }}"
+          Content-Type:  "application/json"
+        body_format:  json
+        body:
+          data:
+            secret: "{{ argocd_client_secret }}"
+        status_code:  [200, 204]
+        validate_certs: false
+      no_log: true
+
+    # -------------------------------------------------------------------------
+    # 5. Create Grafana OIDC client
+    # -------------------------------------------------------------------------
+    - name: Check if grafana client exists
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm }}/clients?clientId=grafana"
+        method:       GET
+        headers:
+          Authorization: "Bearer {{ keycloak_token }}"
+        status_code:  200
+        validate_certs: false
+      register: grafana_client_check
+      no_log: true
+
+    - name: Create grafana OIDC client
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm }}/clients"
+        method:       POST
+        headers:
+          Authorization: "Bearer {{ keycloak_token }}"
+          Content-Type:  "application/json"
+        body_format:  json
+        body:
+          clientId:                 grafana
+          name:                     "Grafana"
+          enabled:                  true
+          protocol:                 openid-connect
+          publicClient:             false
+          standardFlowEnabled:      true
+          directAccessGrantsEnabled: false
+          redirectUris:
+            - "http://hmvlapmon001.nnt.com:3000/login/generic_oauth"
+          webOrigins:
+            - "http://hmvlapmon001.nnt.com:3000"
+        status_code:  201
+        validate_certs: false
+      when: grafana_client_check.json | length == 0
+
+    - name: Get grafana client UUID
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm }}/clients?clientId=grafana"
+        method:       GET
+        headers:
+          Authorization: "Bearer {{ keycloak_token }}"
+        status_code:  200
+        validate_certs: false
+      register: grafana_client_resp
+      no_log: true
+
+    - name: Extract grafana client UUID
+      ansible.builtin.set_fact:
+        grafana_client_uuid: "{{ grafana_client_resp.json[0].id }}"
+      no_log: true
+
+    - name: Get grafana client secret
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm }}/clients/{{ grafana_client_uuid }}/client-secret"
+        method:       GET
+        headers:
+          Authorization: "Bearer {{ keycloak_token }}"
+        status_code:  200
+        validate_certs: false
+      register: grafana_secret_resp
+      no_log: true
+
+    - name: Extract grafana client secret
+      ansible.builtin.set_fact:
+        grafana_client_secret: "{{ grafana_secret_resp.json.value }}"
+      no_log: true
+
+    - name: Store grafana client secret in Vault
+      ansible.builtin.uri:
+        url:          "{{ vault_addr }}/v1/secret/data/keycloak/clients/grafana"
+        method:       POST
+        headers:
+          X-Vault-Token: "{{ vault_lookup_token }}"
+          Content-Type:  "application/json"
+        body_format:  json
+        body:
+          data:
+            secret: "{{ grafana_client_secret }}"
+        status_code:  [200, 204]
+        validate_certs: false
+      no_log: true
+
+    - name: Summary — clients created
+      ansible.builtin.debug:
+        msg:
+          - "Realm '{{ keycloak_realm }}' configured."
+          - "Clients created: argocd, grafana"
+          - "Client secrets stored in Vault at secret/keycloak/clients/{argocd,grafana}"
+
+
+# =============================================================================
+# Play 3: Configure ArgoCD OIDC
+# =============================================================================
+- name: Configure ArgoCD OIDC
+  hosts: k8s_control_plane
+  gather_facts: false
+
+  vars:
+    vault_addr:      "https://10.10.0.44:8200"
+    argocd_ns:       "argocd"
+    keycloak_realm:  "nnt"
+    keycloak_issuer: "http://keycloak.nnt.com/realms/nnt"
+
+  vars_files:
+    - ../../inventory/group_vars/k8s_nodes/vault.yml
+
+  environment:
+    KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+
+  tasks:
+
+    - name: Read argocd client secret from Vault
+      ansible.builtin.uri:
+        url:          "{{ vault_addr }}/v1/secret/data/keycloak/clients/argocd"
+        method:       GET
+        headers:
+          X-Vault-Token: "{{ vault_lookup_token }}"
+        validate_certs: false
+        status_code:  200
+      register: vault_argocd
+      no_log: true
+
+    - name: Extract argocd client secret
+      ansible.builtin.set_fact:
+        argocd_client_secret: "{{ vault_argocd.json.data.data.secret }}"
+      no_log: true
+
+    - name: Patch argocd-secret with Keycloak client secret
+      ansible.builtin.shell: |
+        kubectl -n {{ argocd_ns }} patch secret argocd-secret \
+          --type=merge \
+          -p '{"stringData": {"oidc.keycloak.clientSecret": "{{ argocd_client_secret }}"}}'
+      register: patch_secret_result
+      changed_when: true
+      no_log: true
+
+    - name: Patch argocd-cm with OIDC config
+      ansible.builtin.shell: |
+        kubectl -n {{ argocd_ns }} patch configmap argocd-cm \
+          --type=merge \
+          -p '{
+            "data": {
+              "oidc.config": "name: Keycloak\nissuer: {{ keycloak_issuer }}\nclientID: argocd\nclientSecret: $oidc.keycloak.clientSecret\nrequestedScopes: [\"openid\", \"profile\", \"email\", \"groups\"]\n"
+            }
+          }'
+      register: patch_cm_result
+      changed_when: true
+
+    - name: Restart argocd-server to pick up OIDC config
+      ansible.builtin.shell: |
+        kubectl -n {{ argocd_ns }} rollout restart deployment argocd-server
+      register: restart_result
+      changed_when: true
+
+    - name: Wait for argocd-server rollout
+      ansible.builtin.shell: |
+        kubectl -n {{ argocd_ns }} rollout status deployment argocd-server --timeout=120s
+      changed_when: false
+
+
+# =============================================================================
+# Play 4: Configure Grafana OIDC
+# =============================================================================
+- name: Configure Grafana OIDC
+  hosts: monitoring
+  gather_facts: true
+
+  vars:
+    vault_addr: "https://10.10.0.44:8200"
+
+  vars_files:
+    - ../../inventory/group_vars/monitoring/vault.yml
+    - ../../inventory/group_vars/k8s_nodes/vault.yml
+
+  tasks:
+
+    - name: Read grafana client secret from Vault
+      ansible.builtin.uri:
+        url:          "{{ vault_addr }}/v1/secret/data/keycloak/clients/grafana"
+        method:       GET
+        headers:
+          X-Vault-Token: "{{ vault_lookup_token }}"
+        validate_certs: false
+        status_code:  200
+      delegate_to: localhost
+      register: vault_grafana
+      no_log: true
+
+    - name: Extract grafana client secret
+      ansible.builtin.set_fact:
+        grafana_client_secret: "{{ vault_grafana.json.data.data.secret }}"
+      no_log: true
+
+    - name: Deploy Grafana config with OIDC enabled
+      ansible.builtin.include_role:
+        name: grafana
+      vars:
+        grafana_oidc_enabled: true
+        grafana_oidc_client_secret: "{{ grafana_client_secret }}"
+      when: inventory_hostname == groups['monitoring'][0]

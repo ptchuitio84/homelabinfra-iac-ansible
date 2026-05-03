@@ -29,3 +29,18 @@ level = info
 [analytics]
 reporting_enabled = false
 check_for_updates = false
+{% if grafana_oidc_enabled %}
+
+[auth.generic_oauth]
+enabled = true
+name = Keycloak
+allow_sign_up = true
+client_id = {{ grafana_oidc_client_id }}
+client_secret = {{ grafana_oidc_client_secret }}
+scopes = openid email profile
+auth_url = {{ grafana_oidc_issuer_base }}/protocol/openid-connect/auth
+token_url = {{ grafana_oidc_issuer_base }}/protocol/openid-connect/token
+api_url = {{ grafana_oidc_issuer_base }}/protocol/openid-connect/userinfo
+signout_redirect_url = {{ grafana_oidc_issuer_base }}/protocol/openid-connect/logout
+role_attribute_path = contains(roles[*], 'Admin') && 'Admin' || contains(roles[*], 'Editor') && 'Editor' || 'Viewer'
+{% endif %}
