@@ -10,9 +10,14 @@ storage "file" {
 }
 
 listener "tcp" {
-  address     = "{{ vault_listen_addr }}:{{ vault_port }}"
-  tls_disable = true
+  address       = "{{ vault_listen_addr }}:{{ vault_port }}"
+{% if vault_tls_enabled %}
+  tls_cert_file = "{{ vault_tls_cert_file }}"
+  tls_key_file  = "{{ vault_tls_key_file }}"
+{% else %}
+  tls_disable   = true
+{% endif %}
 }
 
-api_addr     = "http://{{ ansible_default_ipv4.address }}:{{ vault_port }}"
-cluster_addr = "http://{{ ansible_default_ipv4.address }}:{{ vault_port | int + 1 }}"
+api_addr     = "{{ 'https' if vault_tls_enabled else 'http' }}://{{ ansible_default_ipv4.address }}:{{ vault_port }}"
+cluster_addr = "{{ 'https' if vault_tls_enabled else 'http' }}://{{ ansible_default_ipv4.address }}:{{ vault_port | int + 1 }}"

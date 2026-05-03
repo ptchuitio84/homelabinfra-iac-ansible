@@ -21,7 +21,7 @@ terraform_download_url: "https://releases.hashicorp.com/terraform/{{ terraform_v
 jenkins_agent_dir: /opt/jenkins-agent
 
 # Vault — address set globally so tofu/terraform can reach it without extra config
-vault_addr: "http://10.10.0.44:8200"
+vault_addr: "https://10.10.0.44:8200"
 
 # Terraform repo clone path on this VM
 tf_repo_dir: /opt/homelabinfra-iac-terraform

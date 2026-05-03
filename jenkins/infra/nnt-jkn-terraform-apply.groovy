@@ -46,7 +46,7 @@ pipeline {
 
     environment {
         TF_REPO_PATH  = '/opt/homelabinfra-iac-terraform'
-        VAULT_ADDR    = 'http://10.10.0.44:8200'
+        VAULT_ADDR    = 'https://10.10.0.44:8200'
         VAULT_TOKEN   = credentials('nnt-vault-root-token')
         TF_IN_AUTOMATION = 'true'
     }

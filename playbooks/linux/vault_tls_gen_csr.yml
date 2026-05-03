@@ -1,0 +1,147 @@
+# =============================================================================
+# playbooks/linux/vault_tls_gen_csr.yml — Vault TLS: Generate Key + CSR
+# =============================================================================
+# PURPOSE:
+#   Phase 1 of enabling TLS on HashiCorp Vault (hmvlapvlt001).
+#   1. Generates a 2048-bit RSA private key on hmvlapvlt001.
+#   2. Writes an OpenSSL config with the required SANs.
+#   3. Generates the CSR and fetches it to the control node.
+#   4. Copies the CSR to HMVWAPCA002 ready for signing.
+#
+# AFTER THIS PLAYBOOK:
+#   RDP to HMVWAPCA002 and run:
+#     certreq -submit -attrib "CertificateTemplate:WebServer" ^
+#       C:\Temp\vault.csr C:\Temp\vault.cer
+#   Then run:
+#     ansible-playbook playbooks/linux/vault_tls_deploy.yml -i inventory/ \
+#       --vault-password-file /root/.ansible/vault_pass.txt
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/vault_tls_gen_csr.yml \
+#     -i inventory/ --vault-password-file /root/.ansible/vault_pass.txt
+# =============================================================================
+
+---
+
+# =============================================================================
+# PLAY 1: Generate private key and CSR on hmvlapvlt001
+# =============================================================================
+- name: Generate Vault TLS private key and CSR
+  hosts: vault_servers
+  gather_facts: false
+
+  vars:
+    vault_tls_dir:  /etc/vault.d/tls
+    vault_key_path: /etc/vault.d/tls/vault.key
+    vault_csr_path: /tmp/vault.csr
+    vault_csr_conf: /tmp/vault_csr.conf
+
+  tasks:
+
+    - name: Create TLS directory
+      ansible.builtin.file:
+        path: "{{ vault_tls_dir }}"
+        state: directory
+        owner: vault
+        group: vault
+        mode: '0750'
+
+    - name: Write OpenSSL CSR config
+      ansible.builtin.copy:
+        dest: "{{ vault_csr_conf }}"
+        mode: '0600'
+        content: |
+          [req]
+          default_bits       = 2048
+          prompt             = no
+          default_md         = sha256
+          req_extensions     = v3_req
+          distinguished_name = dn
+
+          [dn]
+          CN = hmvlapvlt001.nnt.com
+          O  = NNT
+          C  = US
+
+          [v3_req]
+          subjectAltName   = @alt_names
+          keyUsage         = nonRepudiation, digitalSignature, keyEncipherment
+          extendedKeyUsage = serverAuth
+
+          [alt_names]
+          DNS.1 = hmvlapvlt001.nnt.com
+          DNS.2 = vault.nnt.com
+          IP.1  = 10.10.0.44
+          IP.2  = 127.0.0.1
+
+    - name: Generate private key
+      ansible.builtin.command: openssl genrsa -out {{ vault_key_path }} 2048
+      args:
+        creates: "{{ vault_key_path }}"
+
+    - name: Lock down private key permissions
+      ansible.builtin.file:
+        path: "{{ vault_key_path }}"
+        owner: vault
+        group: vault
+        mode: '0640'
+
+    - name: Generate CSR
+      ansible.builtin.command: >
+        openssl req -new
+          -key {{ vault_key_path }}
+          -out {{ vault_csr_path }}
+          -config {{ vault_csr_conf }}
+      changed_when: true
+
+    - name: Confirm CSR was created
+      ansible.builtin.stat:
+        path: "{{ vault_csr_path }}"
+      register: csr_stat
+      failed_when: not csr_stat.stat.exists
+
+    - name: Show CSR subject and SANs
+      ansible.builtin.command: openssl req -noout -text -in {{ vault_csr_path }}
+      register: csr_text
+      changed_when: false
+
+    - name: Print CSR subject
+      ansible.builtin.debug:
+        msg: "{{ csr_text.stdout_lines | select('match', '.*Subject.*|.*DNS.*|.*IP.*') | list }}"
+
+    - name: Fetch CSR to control node
+      ansible.builtin.fetch:
+        src: "{{ vault_csr_path }}"
+        dest: /tmp/vault.csr
+        flat: true
+
+
+# =============================================================================
+# PLAY 2: Stage CSR on HMVWAPCA002 for manual signing
+# =============================================================================
+- name: Stage CSR on HMVWAPCA002
+  hosts: hmvwapca002.nanonetech.com
+  gather_facts: false
+
+  tasks:
+
+    - name: Ensure C:\Temp exists
+      ansible.windows.win_file:
+        path: C:\Temp
+        state: directory
+
+    - name: Copy CSR to HMVWAPCA002
+      ansible.windows.win_copy:
+        src: /tmp/vault.csr
+        dest: C:\Temp\vault.csr
+
+    - name: Print manual signing instructions
+      ansible.builtin.debug:
+        msg:
+          - "========================================================"
+          - "CSR is staged at C:\\Temp\\vault.csr on HMVWAPCA002."
+          - "RDP to HMVWAPCA002 and run:"
+          - "  certreq -submit -attrib \"CertificateTemplate:WebServer\" \\"
+          - "    C:\\Temp\\vault.csr C:\\Temp\\vault.cer"
+          - "Then run vault_tls_deploy.yml to fetch the cert and go live."
+          - "========================================================"

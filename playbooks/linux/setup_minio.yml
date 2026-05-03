@@ -6,7 +6,7 @@
 #
 # PRE-FLIGHT (do these before running):
 #   1. On hmvlapvlt001 — create the secret:
-#        export VAULT_ADDR=http://10.10.0.44:8200
+#        export VAULT_ADDR=https://10.10.0.44:8200
 #        vault kv put secret/minio/root user=minio password='<strong-pass>'
 #   2. Populate vault_lookup_token in:
 #        inventory/group_vars/minio_servers/vault.yml
@@ -30,7 +30,7 @@
   gather_facts: true
 
   vars:
-    vault_addr: "http://10.10.0.44:8200"
+    vault_addr: "https://10.10.0.44:8200"
 
   vars_files:
     - ../../inventory/group_vars/minio_servers/vault.yml

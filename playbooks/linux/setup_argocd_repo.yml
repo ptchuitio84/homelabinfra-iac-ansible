@@ -26,7 +26,7 @@
   gather_facts: false
 
   vars:
-    vault_addr:        "http://10.10.0.44:8200"
+    vault_addr:        "https://10.10.0.44:8200"
     argocd_namespace:  "argocd"
     repo_url:          "https://github.com/ptchuitio84/homelabinfra-k8s-apps.git"
     repo_secret_name:  "repo-nnt-k8s-apps"

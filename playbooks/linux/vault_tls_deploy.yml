@@ -1,0 +1,137 @@
+# =============================================================================
+# playbooks/linux/vault_tls_deploy.yml — Vault TLS: Deploy Signed Cert
+# =============================================================================
+# PURPOSE:
+#   Phase 2 of enabling TLS on HashiCorp Vault (hmvlapvlt001).
+#   Prerequisite: vault_tls_gen_csr.yml run + certreq signed cert at
+#   C:\Temp\vault.cer on HMVWAPCA002.
+#
+#   1. Fetches the signed cert from HMVWAPCA002.
+#   2. Builds the full chain: vault.cer + Sub-CA + Root CA.
+#   3. Deploys chain + key to /etc/vault.d/tls/ on hmvlapvlt001.
+#   4. Updates vault.hcl with TLS enabled.
+#   5. Restarts Vault and verifies HTTPS is up.
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/vault_tls_deploy.yml \
+#     -i inventory/ --vault-password-file /root/.ansible/vault_pass.txt
+# =============================================================================
+
+---
+
+# =============================================================================
+# PLAY 1: Fetch signed cert from HMVWAPCA002
+# =============================================================================
+- name: Fetch signed cert from HMVWAPCA002
+  hosts: hmvwapca002.nanonetech.com
+  gather_facts: false
+
+  tasks:
+
+    - name: Confirm signed cert exists on HMVWAPCA002
+      ansible.windows.win_stat:
+        path: C:\Temp\vault.cer
+      register: cert_stat
+      failed_when: not cert_stat.stat.exists
+
+    - name: Fetch signed cert to control node
+      ansible.builtin.fetch:
+        src: C:\Temp\vault.cer
+        dest: /tmp/vault.cer
+        flat: true
+
+
+# =============================================================================
+# PLAY 2: Build full cert chain on control node
+# =============================================================================
+- name: Build cert chain on control node
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    vault_cer:    /tmp/vault.cer
+    sub_ca_pem:   "{{ playbook_dir }}/../../files/pki/subca_new.pem"
+    root_ca_pem:  "{{ playbook_dir }}/../../files/pki/root_ca.pem"
+    vault_chain:  /tmp/vault.crt
+
+  tasks:
+
+    - name: Verify signed cert is present
+      ansible.builtin.stat:
+        path: "{{ vault_cer }}"
+      register: cer_stat
+      failed_when: not cer_stat.stat.exists
+
+    - name: Build full chain (server cert + Sub-CA + Root CA)
+      ansible.builtin.shell: >
+        cat {{ vault_cer }} {{ sub_ca_pem }} {{ root_ca_pem }} > {{ vault_chain }}
+      changed_when: true
+
+    - name: Verify chain contains exactly 3 certs
+      ansible.builtin.shell: grep -c 'BEGIN CERTIFICATE' {{ vault_chain }}
+      register: chain_count
+      changed_when: false
+      failed_when: chain_count.stdout | int != 3
+
+    - name: Show chain cert count
+      ansible.builtin.debug:
+        msg: "Chain: {{ chain_count.stdout }} certs (server + Sub-CA + Root CA). Ready to deploy."
+
+
+# =============================================================================
+# PLAY 3: Deploy chain + key, reconfigure Vault, verify
+# =============================================================================
+- name: Deploy TLS cert and reconfigure Vault
+  hosts: vault_servers
+  gather_facts: true
+
+  vars:
+    vault_tls_enabled:   true
+    vault_config_dir:    /etc/vault.d
+    vault_data_dir:      /opt/vault/data
+    vault_listen_addr:   "0.0.0.0"
+    vault_port:          8200
+    vault_ui:            true
+    vault_tls_cert_file: /etc/vault.d/tls/vault.crt
+    vault_tls_key_file:  /etc/vault.d/tls/vault.key
+
+  tasks:
+
+    - name: Verify private key exists from Phase 1
+      ansible.builtin.stat:
+        path: "{{ vault_tls_key_file }}"
+      register: key_stat
+      failed_when: not key_stat.stat.exists
+
+    - name: Deploy cert chain to Vault TLS directory
+      ansible.builtin.copy:
+        src: /tmp/vault.crt
+        dest: "{{ vault_tls_cert_file }}"
+        owner: vault
+        group: vault
+        mode: '0640'
+
+    - name: Update vault.hcl — enable TLS
+      ansible.builtin.include_role:
+        name: vault
+        tasks_from: configure
+
+    - name: Flush handlers — restart Vault before health check
+      ansible.builtin.meta: flush_handlers
+
+    - name: Wait for Vault to respond on HTTPS
+      ansible.builtin.uri:
+        url: "https://{{ ansible_default_ipv4.address }}:{{ vault_port }}/v1/sys/health"
+        validate_certs: true
+        status_code: [200, 429, 472, 473, 501, 503]
+      register: vault_health
+      until: vault_health.status in [200, 429, 472, 473, 501, 503]
+      retries: 12
+      delay: 5
+
+    - name: Vault HTTPS status
+      ansible.builtin.debug:
+        msg: >-
+          Vault is up on HTTPS — HTTP status {{ vault_health.status }}
+          (200=active, 429=standby, 501=uninitialized, 503=sealed)

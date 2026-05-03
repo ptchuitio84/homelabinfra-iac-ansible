@@ -1,72 +1,37 @@
 # =============================================================================
-# playbooks/windows/distribute_root_ca.yml — Root CA Trust Distribution
+# playbooks/windows/distribute_root_ca.yml — CA Cert Fleet Distribution
 # =============================================================================
 # PURPOSE:
-#   1. Exports the Root CA certificate from HMVWAPCA001 (adcs_root) to a temp
-#      path on the Windows host, then fetches it to the Ansible control node.
-#   2. Pushes the root cert to all Linux hosts and updates the ca-trust store.
+#   Distributes the NNT Root CA and Sub-CA certs to all managed hosts so
+#   that any cert signed by NNT-NANONETECH-Sub-CA is trusted natively.
 #
-# After this runs, all Linux hosts will trust TLS certs issued by the
-# NNT-NANONETECH-Sub-CA (signed by NNT-NANONETECH-CA root).
+#   After this runs:
+#   - All Linux hosts: certs in /etc/pki/ca-trust/source/anchors/, update-ca-trust run
+#   - All Windows hosts: Root CA in LocalMachine\Root, Sub-CA in LocalMachine\CA
+#   - validate_certs: true works in Ansible uri module
+#   - Terraform vault provider skips skip_tls_verify
+#   - Browsers on domain Windows machines trust internal certs
+#
+# SOURCE FILES (committed to repo — public certs, not sensitive):
+#   files/pki/root_ca.pem   — CN=NNT-NANONETECH-CA (Root, self-signed, 2046)
+#   files/pki/subca_new.pem — CN=NNT-NANONETECH-Sub-CA (Intermediate, 2031)
+#
+# TARGETS:
+#   Linux:   all managed Linux host groups
+#   Windows: hmvwapdc001, hmvwapdc002, hmvwapex001
+#   Skip:    HMVWAPCA001 (offline), HMVWAPCA002 (already trusts its own chain)
 #
 # USAGE:
 #   ansible-playbook playbooks/windows/distribute_root_ca.yml \
-#     --vault-password-file ~/.ansible/vault_pass.txt
-#
-# OUTPUT:
-#   Root cert fetched to: /tmp/NNT-NANONETECH-CA.cer on the control node
-#   Installed to: /etc/pki/ca-trust/source/anchors/NNT-NANONETECH-CA.crt
-#   on all managed Linux hosts.
-#
-# VAULT REQUIRED: yes (windows admin creds)
+#     -i inventory/ --vault-password-file /root/.ansible/vault_pass.txt
 # =============================================================================
 
 ---
 
 # =============================================================================
-# PLAY 1: Export root CA cert from CA001 and fetch to control node
+# PLAY 1: Distribute Root CA + Sub-CA to all Linux hosts
 # =============================================================================
-- name: Export root CA cert from HMVWAPCA001
-  hosts: hmvwapca001.nanonetech.com
-  gather_facts: false
-
-  tasks:
-
-    - name: Ensure C:\Temp exists on CA001
-      ansible.windows.win_file:
-        path: C:\Temp
-        state: directory
-
-    - name: Export root CA certificate from Trusted Root store
-      ansible.windows.win_shell: |
-        $cert = Get-ChildItem -Path Cert:\LocalMachine\Root |
-                Where-Object { $_.Subject -match 'NANONETECH' } |
-                Select-Object -First 1
-        Export-Certificate -Cert $cert -FilePath 'C:\Temp\NNT-NANONETECH-CA.cer' -Type CERT
-      register: cert_export
-
-    - name: Confirm cert file was created
-      ansible.windows.win_stat:
-        path: C:\Temp\NNT-NANONETECH-CA.cer
-      register: cert_stat
-      failed_when: not cert_stat.stat.exists
-
-    - name: Fetch cert to Ansible control node
-      ansible.builtin.fetch:
-        src: C:\Temp\NNT-NANONETECH-CA.cer
-        dest: /tmp/NNT-NANONETECH-CA.cer
-        flat: true
-
-    - name: Clean up temp cert on CA001
-      ansible.windows.win_file:
-        path: C:\Temp\NNT-NANONETECH-CA.cer
-        state: absent
-
-
-# =============================================================================
-# PLAY 2: Push root CA cert to all managed Linux hosts
-# =============================================================================
-- name: Distribute root CA cert to Linux hosts
+- name: Distribute CA certs to Linux hosts
   hosts: >-
     ansible_nodes:
     monitoring:
@@ -76,8 +41,9 @@
     vault_servers:
     k8s_nodes:
     netbox:
-    webservers
-  serial: 0           # run all in parallel — read-only trust store update
+    webservers:
+    terraform_nodes
+  serial: 0
   gather_facts: false
   ignore_unreachable: true
   any_errors_fatal: false
@@ -90,41 +56,89 @@
         state: directory
         mode: '0755'
 
-    # certutil exports DER-encoded .cer — copy it to the remote host first,
-    # then convert to PEM in place for update-ca-trust.
-    - name: Copy DER cert to remote host
+    - name: Deploy Root CA cert
       ansible.builtin.copy:
-        src: /tmp/NNT-NANONETECH-CA.cer
-        dest: /tmp/NNT-NANONETECH-CA.cer
-        mode: '0644'
-
-    - name: Convert DER cert to PEM and place in trust anchors
-      ansible.builtin.shell: |
-        openssl x509 -inform DER \
-          -in /tmp/NNT-NANONETECH-CA.cer \
-          -out /etc/pki/ca-trust/source/anchors/NNT-NANONETECH-CA.crt
-      args:
-        creates: /etc/pki/ca-trust/source/anchors/NNT-NANONETECH-CA.crt
-      register: cert_convert
-
-    - name: Set correct permissions on cert file
-      ansible.builtin.file:
-        path: /etc/pki/ca-trust/source/anchors/NNT-NANONETECH-CA.crt
+        src: "{{ playbook_dir }}/../../files/pki/root_ca.pem"
+        dest: /etc/pki/ca-trust/source/anchors/NNT-NANONETECH-CA.crt
         owner: root
         group: root
         mode: '0644'
+      register: root_ca_copy
+
+    - name: Deploy Sub-CA cert
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../files/pki/subca_new.pem"
+        dest: /etc/pki/ca-trust/source/anchors/NNT-NANONETECH-Sub-CA.crt
+        owner: root
+        group: root
+        mode: '0644'
+      register: sub_ca_copy
 
     - name: Update ca-trust store
-      ansible.builtin.command: update-ca-trust
-      when: cert_convert.changed
+      ansible.builtin.command: update-ca-trust extract
+      when: root_ca_copy.changed or sub_ca_copy.changed
       changed_when: true
 
-    # Confirm the cert is valid PEM and shows the expected CA subject
-    - name: Verify cert is valid PEM and shows expected CA subject
-      ansible.builtin.shell: |
-        openssl x509 -noout -subject \
-          -in /etc/pki/ca-trust/source/anchors/NNT-NANONETECH-CA.crt \
-          | grep -i "NANONETECH"
-      register: verify_result
+    - name: Verify Root CA is trusted
+      ansible.builtin.shell: "openssl x509 -noout -subject -in /etc/pki/ca-trust/source/anchors/NNT-NANONETECH-CA.crt | grep -i NANONETECH"
+      register: verify_root
       changed_when: false
-      failed_when: verify_result.rc != 0
+      failed_when: verify_root.rc != 0
+
+    - name: Verify Sub-CA is trusted
+      ansible.builtin.shell: "openssl x509 -noout -subject -in /etc/pki/ca-trust/source/anchors/NNT-NANONETECH-Sub-CA.crt | grep -i NANONETECH"
+      register: verify_sub
+      changed_when: false
+      failed_when: verify_sub.rc != 0
+
+
+# =============================================================================
+# PLAY 2: Distribute Root CA + Sub-CA to Windows hosts
+# =============================================================================
+- name: Distribute CA certs to Windows hosts
+  hosts:
+    - hmvwapdc001.nanonetech.com
+    - hmvwapdc002.nanonetech.com
+    - hmvwapex001.nanonetech.com
+  gather_facts: false
+  ignore_unreachable: true
+  any_errors_fatal: false
+
+  tasks:
+
+    - name: Ensure C:\Temp exists
+      ansible.windows.win_file:
+        path: C:\Temp
+        state: directory
+
+    - name: Copy Root CA PEM to Windows host
+      ansible.windows.win_copy:
+        src: "{{ playbook_dir }}/../../files/pki/root_ca.pem"
+        dest: C:\Temp\NNT-NANONETECH-CA.pem
+
+    - name: Copy Sub-CA PEM to Windows host
+      ansible.windows.win_copy:
+        src: "{{ playbook_dir }}/../../files/pki/subca_new.pem"
+        dest: C:\Temp\NNT-NANONETECH-Sub-CA.pem
+
+    - name: Install Root CA into LocalMachine\Root store
+      ansible.windows.win_certificate_store:
+        path: C:\Temp\NNT-NANONETECH-CA.pem
+        state: present
+        store_location: LocalMachine
+        store_name: Root
+
+    - name: Install Sub-CA into LocalMachine\CA (Intermediate) store
+      ansible.windows.win_certificate_store:
+        path: C:\Temp\NNT-NANONETECH-Sub-CA.pem
+        state: present
+        store_location: LocalMachine
+        store_name: CA
+
+    - name: Clean up temp cert files
+      ansible.windows.win_file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - C:\Temp\NNT-NANONETECH-CA.pem
+        - C:\Temp\NNT-NANONETECH-Sub-CA.pem

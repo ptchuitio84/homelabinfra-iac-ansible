@@ -1,0 +1,16 @@
+# =============================================================================
+# roles/vault/tasks/configure.yml — Vault config-only update
+# =============================================================================
+# Called by vault_tls_deploy.yml via include_role tasks_from: configure.
+# Renders vault.hcl.j2 and notifies the Restart Vault handler.
+# =============================================================================
+
+---
+- name: Deploy vault.hcl config
+  ansible.builtin.template:
+    src: vault.hcl.j2
+    dest: "{{ vault_config_dir }}/vault.hcl"
+    owner: vault
+    group: vault
+    mode: '0640'
+  notify: Restart Vault
