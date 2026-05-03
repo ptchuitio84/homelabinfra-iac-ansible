@@ -1,0 +1,35 @@
+# =============================================================================
+# playbooks/linux/drift_detect.yml — Linux Baseline Drift Detection
+# =============================================================================
+# PURPOSE:
+#   Run by the nnt-jkn-lin-drift-detect Jenkins pipeline with --check --diff.
+#   Tests whether all Linux hosts match their desired baseline state without
+#   making any changes.
+#
+#   Roles enforced:
+#     common       — timezone, base packages, NTP, SELinux, hostname, /etc/hosts
+#     login_banner — /etc/issue.net, /etc/profile.d/00-banner.sh, sshd Banner
+#
+# HOW DRIFT IS DETECTED:
+#   Ansible --check exits 0 even when tasks would change. The Jenkins pipeline
+#   parses the PLAY RECAP for any host with changed > 0 and fails the build.
+#   That failure triggers the JenkinsBuildFailed Prometheus alert → email.
+#
+# DO NOT RUN DIRECTLY without --check — this will enforce changes on all hosts.
+#
+# USAGE (dry run):
+#   ansible-playbook playbooks/linux/drift_detect.yml \
+#     -i inventory/ --check --diff \
+#     --vault-password-file /root/.ansible/vault_pass.txt
+# =============================================================================
+
+---
+- name: Linux baseline drift check
+  hosts: linux
+  gather_facts: true
+  ignore_unreachable: true
+  any_errors_fatal: false
+
+  roles:
+    - role: common
+    - role: login_banner
