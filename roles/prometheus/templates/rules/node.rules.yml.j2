@@ -29,9 +29,7 @@ groups:
           severity: warning
         annotations:
           summary: "Disk space low on {{ "{{" }} $labels.instance {{ "}}" }}"
-          description: >
-            Filesystem {{ "{{" }} $labels.mountpoint {{ "}}" }} on {{ "{{" }} $labels.instance {{ "}}" }}
-            has {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}% free.
+          description: "Filesystem {{ "{{" }} $labels.mountpoint {{ "}}" }} on {{ "{{" }} $labels.instance {{ "}}" }} has {{ "{{" }} $value {{ "}}" }}% free."
 
       - alert: DiskSpaceCritical
         expr: >
@@ -44,9 +42,7 @@ groups:
           severity: critical
         annotations:
           summary: "Disk space critical on {{ "{{" }} $labels.instance {{ "}}" }}"
-          description: >
-            Filesystem {{ "{{" }} $labels.mountpoint {{ "}}" }} on {{ "{{" }} $labels.instance {{ "}}" }}
-            has {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}% free.
+          description: "Filesystem {{ "{{" }} $labels.mountpoint {{ "}}" }} on {{ "{{" }} $labels.instance {{ "}}" }} has {{ "{{" }} $value {{ "}}" }}% free."
 
       - alert: HighMemoryUsage
         expr: >
@@ -56,6 +52,4 @@ groups:
           severity: warning
         annotations:
           summary: "High memory usage on {{ "{{" }} $labels.instance {{ "}}" }}"
-          description: >
-            Available memory on {{ "{{" }} $labels.instance {{ "}}" }} is below 10%
-            ({{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}% available).
+          description: "Available memory on {{ "{{" }} $labels.instance {{ "}}" }} is below 10% ({{ "{{" }} $value {{ "}}" }}% available)."
