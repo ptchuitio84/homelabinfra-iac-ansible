@@ -499,12 +499,13 @@
       changed_when: true
       no_log: true
 
-    - name: Patch argocd-cm with OIDC config
+    - name: Patch argocd-cm with OIDC config and server URL
       ansible.builtin.shell: |
         kubectl -n {{ argocd_ns }} patch configmap argocd-cm \
           --type=merge \
           -p '{
             "data": {
+              "url": "http://argocd.nnt.com",
               "oidc.config": "name: Keycloak\nissuer: {{ keycloak_issuer }}\nclientID: argocd\nclientSecret: $oidc.keycloak.clientSecret\nrequestedScopes: [\"openid\", \"profile\", \"email\", \"groups\"]\n"
             }
           }'
