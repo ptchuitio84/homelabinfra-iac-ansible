@@ -5,6 +5,7 @@
 [server]
 http_port = {{ grafana_port }}
 domain = {{ ansible_host }}
+root_url = http://{{ grafana_fqdn | default(inventory_hostname) }}:{{ grafana_port }}/
 
 [paths]
 data = {{ grafana_data_dir }}
