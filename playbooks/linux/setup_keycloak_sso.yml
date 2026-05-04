@@ -274,7 +274,86 @@
       when: realm_check.status == 404
 
     # -------------------------------------------------------------------------
-    # 4. Create ArgoCD OIDC client
+    # 4. Create groups client scope (required for ArgoCD OIDC groups claim)
+    # -------------------------------------------------------------------------
+    - name: Check if groups client scope exists
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm }}/client-scopes"
+        method:       GET
+        headers:
+          Authorization: "Bearer {{ keycloak_token }}"
+        status_code:  200
+        validate_certs: false
+      register: client_scopes_resp
+      no_log: true
+
+    - name: Create groups client scope
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm }}/client-scopes"
+        method:       POST
+        headers:
+          Authorization: "Bearer {{ keycloak_token }}"
+          Content-Type:  "application/json"
+        body_format:  json
+        body:
+          name:        "groups"
+          description: "Group memberships"
+          protocol:    "openid-connect"
+          attributes:
+            include.in.token.scope: "true"
+        status_code:  201
+        validate_certs: false
+      when: client_scopes_resp.json | selectattr('name', 'equalto', 'groups') | list | length == 0
+
+    - name: Get groups scope ID
+      ansible.builtin.set_fact:
+        groups_scope_id: "{{ (client_scopes_resp.json | selectattr('name', 'equalto', 'groups') | list | first).id
+                            if (client_scopes_resp.json | selectattr('name', 'equalto', 'groups') | list | length > 0)
+                            else '' }}"
+      no_log: true
+
+    - name: Refresh client scopes list to get groups ID after creation
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm }}/client-scopes"
+        method:       GET
+        headers:
+          Authorization: "Bearer {{ keycloak_token }}"
+        status_code:  200
+        validate_certs: false
+      register: client_scopes_fresh
+      when: groups_scope_id == ''
+      no_log: true
+
+    - name: Set groups_scope_id from fresh list
+      ansible.builtin.set_fact:
+        groups_scope_id: "{{ (client_scopes_fresh.json | selectattr('name', 'equalto', 'groups') | list | first).id }}"
+      when: groups_scope_id == ''
+      no_log: true
+
+    - name: Add groups membership mapper to groups scope
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm }}/client-scopes/{{ groups_scope_id }}/protocol-mappers/models"
+        method:       POST
+        headers:
+          Authorization: "Bearer {{ keycloak_token }}"
+          Content-Type:  "application/json"
+        body_format:  json
+        body:
+          name:           "groups"
+          protocol:       "openid-connect"
+          protocolMapper: "oidc-group-membership-mapper"
+          config:
+            full.path:          "false"
+            id.token.claim:     "true"
+            access.token.claim: "true"
+            userinfo.token.claim: "true"
+            claim.name:         "groups"
+        status_code:  [201, 409]
+        validate_certs: false
+      no_log: true
+
+    # -------------------------------------------------------------------------
+    # 5. Create ArgoCD OIDC client
     # -------------------------------------------------------------------------
     - name: Check if argocd client exists
       ansible.builtin.uri:
@@ -357,6 +436,16 @@
           data:
             secret: "{{ argocd_client_secret }}"
         status_code:  [200, 204]
+        validate_certs: false
+      no_log: true
+
+    - name: Assign groups scope to argocd client (optional)
+      ansible.builtin.uri:
+        url:          "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm }}/clients/{{ argocd_client_uuid }}/optional-client-scopes/{{ groups_scope_id }}"
+        method:       PUT
+        headers:
+          Authorization: "Bearer {{ keycloak_token }}"
+        status_code:  [204, 409]
         validate_certs: false
       no_log: true
 
