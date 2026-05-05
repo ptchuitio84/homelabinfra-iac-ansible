@@ -92,6 +92,11 @@
   gather_facts: false
 
   tasks:
+    - name: Pull latest from remote before committing
+      ansible.builtin.command:
+        cmd: git pull --rebase origin main
+        chdir: /opt/homelabinfra-network-backups
+
     # Stage all changed config files.
     - name: Stage all config changes
       ansible.builtin.command:
