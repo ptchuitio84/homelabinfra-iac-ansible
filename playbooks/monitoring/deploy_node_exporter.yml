@@ -16,11 +16,7 @@
 
 ---
 - name: Deploy node_exporter (all Linux hosts)
-  hosts:
-    - ansible_nodes
-    - jenkins
-    - monitoring
-    - plex_servers
+  hosts: linux
   become: true
   gather_facts: true
 
