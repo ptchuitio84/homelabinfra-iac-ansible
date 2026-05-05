@@ -28,7 +28,19 @@
     state: present
 
 # =============================================================================
-# SECTION 2: INSTALL
+# SECTION 2: TEXTFILE COLLECTOR DIRECTORY
+# =============================================================================
+
+- name: Create textfile collector directory
+  ansible.builtin.file:
+    path: "{{ node_exporter_textfile_dir }}"
+    state: directory
+    owner: "{{ node_exporter_user }}"
+    group: "{{ node_exporter_group }}"
+    mode: '0755'
+
+# =============================================================================
+# SECTION 3: INSTALL
 # =============================================================================
 
 - name: Download node_exporter {{ node_exporter_version }}

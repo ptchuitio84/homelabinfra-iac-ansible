@@ -1,0 +1,35 @@
+# =============================================================================
+# playbooks/linux/run_lynis.yml — Fleet-Wide Lynis Security Audit
+# =============================================================================
+# PURPOSE:
+# Runs a Lynis security audit across all Linux hosts. Installs Lynis from
+# Cisofy repo if not present, runs the audit, and writes the hardening index
+# to the node_exporter textfile collector for Prometheus/Grafana tracking.
+#
+# USAGE:
+#   # Full fleet:
+#   ansible-playbook playbooks/linux/run_lynis.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+#   # Single host:
+#   ansible-playbook playbooks/linux/run_lynis.yml \
+#     --limit hmvlapans001.nnt.com \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+#
+# OUTPUT:
+#   /var/log/lynis-report.dat     — full Lynis report per host
+#   /var/log/lynis.log            — audit log per host
+#   /var/lib/node_exporter/textfile_collector/lynis.prom — metric for Prometheus
+#
+# REQUIRES: node_exporter textfile collector enabled (roles/node_exporter)
+# VAULT REQUIRED: yes
+# =============================================================================
+
+---
+- name: Run Lynis security audit fleet-wide
+  hosts: linux
+  gather_facts: false
+  become: true
+
+  roles:
+    - lynis

@@ -24,3 +24,6 @@ node_exporter_install_dir: /opt/node_exporter
 
 # Port node_exporter listens on — must match prometheus_node_targets in Prometheus role.
 node_exporter_port: 9100
+
+# Directory for textfile collector — Lynis and other tools write .prom files here.
+node_exporter_textfile_dir: /var/lib/node_exporter/textfile_collector

@@ -1,0 +1,21 @@
+# =============================================================================
+# roles/lynis/defaults/main.yml — Lynis Role Default Variables
+# =============================================================================
+# WHAT THIS ROLE DOES:
+# Installs Lynis from the official Cisofy repo, runs a full system audit,
+# parses the hardening index, and writes it to the node_exporter textfile
+# collector directory so Prometheus can scrape it and Grafana can display it.
+# =============================================================================
+
+---
+# Cisofy repo baseurl — always points to latest stable release.
+lynis_repo_baseurl: https://packages.cisofy.com/community/lynis/rpm/
+lynis_repo_gpgkey: https://packages.cisofy.com/keys/cisofy-software-rpms-public.key
+
+# Lynis writes its report here — hardening_index= is parsed from this file.
+lynis_report_file: /var/log/lynis-report.dat
+lynis_log_file: /var/log/lynis.log
+
+# Where the .prom metric file lands — must match node_exporter textfile collector dir.
+lynis_textfile_dir: /var/lib/node_exporter/textfile_collector
+lynis_metric_file: "{{ lynis_textfile_dir }}/lynis.prom"

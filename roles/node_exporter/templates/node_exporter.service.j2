@@ -11,7 +11,8 @@ User={{ node_exporter_user }}
 Group={{ node_exporter_group }}
 Type=simple
 ExecStart={{ node_exporter_install_dir }}/node_exporter \
-  --web.listen-address=:{{ node_exporter_port }}
+  --web.listen-address=:{{ node_exporter_port }} \
+  --collector.textfile.directory={{ node_exporter_textfile_dir }}
 Restart=on-failure
 RestartSec=5s
 

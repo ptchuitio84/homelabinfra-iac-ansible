@@ -1,0 +1,65 @@
+# =============================================================================
+# roles/lynis/tasks/main.yml — Lynis Security Auditing Role
+# =============================================================================
+# Installs Lynis from Cisofy repo, runs a full system audit as root,
+# and writes the hardening index to the node_exporter textfile collector
+# so Prometheus can scrape it fleet-wide.
+# =============================================================================
+
+---
+# =============================================================================
+# SECTION 1: INSTALL
+# =============================================================================
+
+- name: Add Cisofy Lynis repository
+  ansible.builtin.yum_repository:
+    name: cisofy-lynis
+    description: CISOfy Lynis
+    baseurl: "{{ lynis_repo_baseurl }}"
+    gpgcheck: true
+    gpgkey: "{{ lynis_repo_gpgkey }}"
+    enabled: true
+    priority: 2
+
+- name: Install Lynis
+  ansible.builtin.dnf:
+    name: lynis
+    state: latest
+    update_cache: true
+
+# =============================================================================
+# SECTION 2: RUN AUDIT
+# =============================================================================
+
+# Full system audit — must run as root for complete coverage.
+# --no-colors and --quiet suppress interactive output; report written to file.
+- name: Run Lynis system audit
+  ansible.builtin.command:
+    cmd: >
+      lynis audit system
+      --no-colors
+      --quiet
+      --logfile {{ lynis_log_file }}
+      --report-file {{ lynis_report_file }}
+  changed_when: true
+
+# =============================================================================
+# SECTION 3: PARSE AND EXPORT METRIC
+# =============================================================================
+
+- name: Read hardening index from Lynis report
+  ansible.builtin.shell:
+    cmd: "grep '^hardening_index=' {{ lynis_report_file }} | cut -d= -f2"
+  register: lynis_score
+  changed_when: false
+
+- name: Write hardening index to textfile collector
+  ansible.builtin.copy:
+    content: |
+      # HELP lynis_hardening_index Lynis security hardening index (0-100)
+      # TYPE lynis_hardening_index gauge
+      lynis_hardening_index {{ lynis_score.stdout | trim }}
+    dest: "{{ lynis_metric_file }}"
+    owner: node_exporter
+    group: node_exporter
+    mode: '0644'
