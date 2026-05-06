@@ -49,7 +49,7 @@ pipeline {
 
         stage('Sync repo') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh "ssh -o StrictHostKeyChecking=no ${ANS001} 'cd ${ANSIBLE_REPO_PATH} && git pull'"
                 }
             }
@@ -57,7 +57,7 @@ pipeline {
 
         stage('Vault') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -72,7 +72,7 @@ pipeline {
 
         stage('Minio') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -87,7 +87,7 @@ pipeline {
 
         stage('NetBox') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -102,7 +102,7 @@ pipeline {
 
         stage('NFS Server') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -117,7 +117,7 @@ pipeline {
 
         stage('Harbor') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -132,7 +132,7 @@ pipeline {
 
         stage('Terraform Node') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \

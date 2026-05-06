@@ -48,7 +48,7 @@ pipeline {
 
         stage('Sync repo') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh "ssh -o StrictHostKeyChecking=no ${ANS001} 'cd ${ANSIBLE_REPO_PATH} && git pull'"
                 }
             }
@@ -56,7 +56,7 @@ pipeline {
 
         stage('Plex') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -71,7 +71,7 @@ pipeline {
 
         stage('Webserver') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \

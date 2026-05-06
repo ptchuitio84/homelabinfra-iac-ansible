@@ -54,7 +54,7 @@ pipeline {
 
         stage('Sync repo') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh "ssh -o StrictHostKeyChecking=no ${ANS001} 'cd ${ANSIBLE_REPO_PATH} && git pull'"
                 }
             }
@@ -62,7 +62,7 @@ pipeline {
 
         stage('Deploy node_exporter') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     script {
                         def limitFlag = params.LIMIT?.trim() ? "--limit '${params.LIMIT}'" : ''
                         sh """

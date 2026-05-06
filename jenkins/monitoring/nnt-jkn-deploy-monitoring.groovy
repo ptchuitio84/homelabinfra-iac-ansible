@@ -53,7 +53,7 @@ pipeline {
 
         stage('Sync repo') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh "ssh -o StrictHostKeyChecking=no ${ANS001} 'cd ${ANSIBLE_REPO_PATH} && git pull'"
                 }
             }
@@ -61,7 +61,7 @@ pipeline {
 
         stage('node_exporter') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -76,7 +76,7 @@ pipeline {
 
         stage('Prometheus') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -91,7 +91,7 @@ pipeline {
 
         stage('Alertmanager') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -106,7 +106,7 @@ pipeline {
 
         stage('Grafana') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -121,7 +121,7 @@ pipeline {
 
         stage('Loki') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -136,7 +136,7 @@ pipeline {
 
         stage('Promtail') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -151,7 +151,7 @@ pipeline {
 
         stage('SNMP Exporter') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -166,7 +166,7 @@ pipeline {
 
         stage('VMware Exporter') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -181,7 +181,7 @@ pipeline {
 
         stage('Meraki Exporter') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -196,7 +196,7 @@ pipeline {
 
         stage('Unpoller') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
@@ -211,7 +211,7 @@ pipeline {
 
         stage('Telegraf vSphere') {
             steps {
-                sshagent(['root']) {
+                sshagent(credentials: ['ansible-node-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${ANS001} \
                             'cd ${ANSIBLE_REPO_PATH} && \
