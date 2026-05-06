@@ -22,10 +22,9 @@
     priority: 2
 
 - name: Install Lynis
-  ansible.builtin.dnf:
+  ansible.builtin.package:
     name: lynis
     state: latest
-    update_cache: true
 
 # =============================================================================
 # SECTION 2: RUN AUDIT
