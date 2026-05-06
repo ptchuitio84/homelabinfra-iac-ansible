@@ -42,14 +42,6 @@ pipeline {
         timestamps()
     }
 
-    parameters {
-        string(
-            name: 'LIMIT',
-            defaultValue: '',
-            description: 'Ansible --limit to target a single host (e.g. hmvlapans001.nnt.com). Leave blank to run fleet-wide.'
-        )
-    }
-
     stages {
 
         stage('Sync repo') {
@@ -63,18 +55,14 @@ pipeline {
         stage('Deploy node_exporter') {
             steps {
                 sshagent(credentials: ['ansible-node-ssh-key']) {
-                    script {
-                        def limitFlag = params.LIMIT?.trim() ? "--limit '${params.LIMIT}'" : ''
-                        sh """
-                            ssh -o StrictHostKeyChecking=no ${ANS001} \
-                                'cd ${ANSIBLE_REPO_PATH} && \
-                                /usr/local/bin/ansible-playbook \
-                                    playbooks/monitoring/deploy_node_exporter.yml \
-                                    -i inventory/ \
-                                    --vault-password-file ${VAULT_PASS_FILE} \
-                                    ${limitFlag}'
-                        """
-                    }
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/monitoring/deploy_node_exporter.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
                 }
             }
         }
@@ -82,7 +70,7 @@ pipeline {
 
     post {
         success {
-            echo 'node_exporter deployed successfully across all targeted hosts.'
+            echo 'node_exporter deployed successfully across all Linux hosts.'
         }
         failure {
             echo 'Deployment failed. Check console output for unreachable hosts or errors.'
