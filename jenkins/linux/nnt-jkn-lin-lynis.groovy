@@ -35,6 +35,7 @@ pipeline {
     }
 
     environment {
+        ANS001            = 'root@10.10.1.31'
         ANSIBLE_REPO_PATH = '/opt/homelabinfra-iac-ansible'
         VAULT_PASS_FILE   = '/root/.ansible/vault_pass.txt'
     }
@@ -49,19 +50,24 @@ pipeline {
 
         stage('Sync repo') {
             steps {
-                sh "cd ${ANSIBLE_REPO_PATH} && git pull"
+                sshagent(['root']) {
+                    sh "ssh -o StrictHostKeyChecking=no ${ANS001} 'cd ${ANSIBLE_REPO_PATH} && git pull'"
+                }
             }
         }
 
         stage('Lynis audit') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/run_lynis.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/run_lynis.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
     }

@@ -38,6 +38,7 @@ pipeline {
     agent any
 
     environment {
+        ANS001            = 'root@10.10.1.31'
         ANSIBLE_REPO_PATH = '/opt/homelabinfra-iac-ansible'
         VAULT_PASS_FILE   = '/root/.ansible/vault_pass.txt'
     }
@@ -52,139 +53,174 @@ pipeline {
 
         stage('Sync repo') {
             steps {
-                sh "cd ${ANSIBLE_REPO_PATH} && git pull"
+                sshagent(['root']) {
+                    sh "ssh -o StrictHostKeyChecking=no ${ANS001} 'cd ${ANSIBLE_REPO_PATH} && git pull'"
+                }
             }
         }
 
         stage('node_exporter') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/monitoring/deploy_node_exporter.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/monitoring/deploy_node_exporter.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('Prometheus') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/monitoring/setup_prometheus.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/monitoring/setup_prometheus.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('Alertmanager') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_alertmanager.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_alertmanager.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('Grafana') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/monitoring/setup_grafana.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/monitoring/setup_grafana.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('Loki') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/monitoring/setup_loki.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/monitoring/setup_loki.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('Promtail') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/monitoring/deploy_promtail.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/monitoring/deploy_promtail.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('SNMP Exporter') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/monitoring/setup_snmp_exporter.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/monitoring/setup_snmp_exporter.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('VMware Exporter') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/monitoring/setup_vmware_exporter.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/monitoring/setup_vmware_exporter.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('Meraki Exporter') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_meraki_exporter.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_meraki_exporter.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('Unpoller') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_unpoller.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_unpoller.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('Telegraf vSphere') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/monitoring/setup_telegraf_vsphere.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/monitoring/setup_telegraf_vsphere.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
     }

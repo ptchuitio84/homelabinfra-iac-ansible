@@ -34,6 +34,7 @@ pipeline {
     agent any
 
     environment {
+        ANS001            = 'root@10.10.1.31'
         ANSIBLE_REPO_PATH = '/opt/homelabinfra-iac-ansible'
         VAULT_PASS_FILE   = '/root/.ansible/vault_pass.txt'
     }
@@ -48,79 +49,99 @@ pipeline {
 
         stage('Sync repo') {
             steps {
-                sh "cd ${ANSIBLE_REPO_PATH} && git pull"
+                sshagent(['root']) {
+                    sh "ssh -o StrictHostKeyChecking=no ${ANS001} 'cd ${ANSIBLE_REPO_PATH} && git pull'"
+                }
             }
         }
 
         stage('Vault') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_vault.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_vault.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('Minio') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_minio.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_minio.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('NetBox') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_netbox.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_netbox.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('NFS Server') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_nfs_server.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_nfs_server.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('Harbor') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_harbor.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_harbor.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('Terraform Node') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_terraform_node.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_terraform_node.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
     }

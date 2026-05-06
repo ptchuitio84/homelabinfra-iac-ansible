@@ -42,6 +42,7 @@ pipeline {
     agent any
 
     environment {
+        ANS001            = 'root@10.10.1.31'
         ANSIBLE_REPO_PATH = '/opt/homelabinfra-iac-ansible'
         VAULT_PASS_FILE   = '/root/.ansible/vault_pass.txt'
     }
@@ -56,91 +57,114 @@ pipeline {
 
         stage('Sync repo') {
             steps {
-                sh "cd ${ANSIBLE_REPO_PATH} && git pull"
+                sshagent(['root']) {
+                    sh "ssh -o StrictHostKeyChecking=no ${ANS001} 'cd ${ANSIBLE_REPO_PATH} && git pull'"
+                }
             }
         }
 
         stage('k3s') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_k3s.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_k3s.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('MetalLB') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_metallb.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_metallb.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('Traefik') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_traefik.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_traefik.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('NFS Provisioner') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_nfs_provisioner.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_nfs_provisioner.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('ArgoCD') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_argocd.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_argocd.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('ArgoCD Repo') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_argocd_repo.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_argocd_repo.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
 
         stage('Keycloak SSO') {
             steps {
-                sh """
-                    cd ${ANSIBLE_REPO_PATH} && \
-                    /usr/local/bin/ansible-playbook \
-                        playbooks/linux/setup_keycloak_sso.yml \
-                        -i inventory/ \
-                        --vault-password-file ${VAULT_PASS_FILE}
-                """
+                sshagent(['root']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${ANS001} \
+                            'cd ${ANSIBLE_REPO_PATH} && \
+                            /usr/local/bin/ansible-playbook \
+                                playbooks/linux/setup_keycloak_sso.yml \
+                                -i inventory/ \
+                                --vault-password-file ${VAULT_PASS_FILE}'
+                    """
+                }
             }
         }
     }
