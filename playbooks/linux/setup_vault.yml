@@ -1,6 +1,6 @@
 ---
 - name: Deploy HashiCorp Vault
-  hosts: all
+  hosts: vault_servers
   gather_facts: true
   roles:
     - vault

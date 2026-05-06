@@ -12,7 +12,7 @@
 
 ---
 - name: Deploy static webserver
-  hosts: all
+  hosts: webservers
   gather_facts: true
 
   roles:

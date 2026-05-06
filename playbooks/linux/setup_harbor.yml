@@ -13,7 +13,7 @@
 
 ---
 - name: Deploy Harbor container registry
-  hosts: all
+  hosts: registry
   gather_facts: true
 
   roles:

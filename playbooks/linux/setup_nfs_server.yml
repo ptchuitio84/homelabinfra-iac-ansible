@@ -12,7 +12,7 @@
 
 ---
 - name: Configure NFS server
-  hosts: all
+  hosts: nfs_servers
   gather_facts: true
 
   roles:

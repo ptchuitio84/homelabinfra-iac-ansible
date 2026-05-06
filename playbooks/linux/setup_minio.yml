@@ -26,7 +26,7 @@
 
 ---
 - name: Deploy Minio object storage
-  hosts: all
+  hosts: minio_servers
   gather_facts: true
 
   vars:
