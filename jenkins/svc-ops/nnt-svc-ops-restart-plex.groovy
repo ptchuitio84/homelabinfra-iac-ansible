@@ -23,15 +23,21 @@
 //   6. Branch: */main
 //   7. Script Path: jenkins/svc-ops/nnt-svc-ops-restart-plex.groovy
 //   8. Save
+//
+// AGENT NOTE:
+//   Runs on nodes labelled 'ansible'. Apply this label in Jenkins:
+//   Manage Jenkins → Nodes → hmvlapjkn001 → Configure → Labels: ansible
 // =============================================================================
 
 pipeline {
 
-    agent any
+    agent { label 'ansible' }
 
     environment {
         ANSIBLE_HOST_KEY_CHECKING = 'False'
         ANSIBLE_FORCE_COLOR       = 'true'
+        ANSIBLE_REPO_PATH         = '/opt/homelabinfra-iac-ansible'
+        ANSIBLE_REPO_URL          = 'git@github.com:ptchuitio84/homelabinfra-iac-ansible.git'
     }
 
     parameters {
@@ -40,6 +46,12 @@ pipeline {
             defaultValue: '',
             description:  'Required — why are you restarting Plex? (e.g. "Updated library scan settings")'
         )
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+        timeout(time: 15, unit: 'MINUTES')
+        timestamps()
     }
 
     stages {
@@ -54,14 +66,37 @@ pipeline {
                     echo "Reason   : ${params.REASON}"
                     echo "Target   : hmpplxap002.nnt.com (plex_servers)"
                     echo "Service  : plexmediaserver"
+                    echo "Node     : ${env.NODE_NAME}"
+
+                    // Fail fast with a clear message if Ansible is not on this node.
+                    def rc = sh(script: 'which ansible-playbook', returnStatus: true)
+                    if (rc != 0) {
+                        error("ansible-playbook not found on node '${env.NODE_NAME}'. " +
+                              "Re-run this job or restrict the pipeline to a node with Ansible installed " +
+                              "(add label 'ansible' to hmvlapjkn001 and set agent { label 'ansible' } in this file).")
+                    }
                 }
+            }
+        }
+
+        stage('Prepare repo') {
+            steps {
+                sh """
+                    if [ ! -d "${ANSIBLE_REPO_PATH}/.git" ]; then
+                        echo "Repo not found at ${ANSIBLE_REPO_PATH} — cloning..."
+                        git clone ${ANSIBLE_REPO_URL} ${ANSIBLE_REPO_PATH}
+                    else
+                        echo "Repo found — pulling latest..."
+                        cd ${ANSIBLE_REPO_PATH} && git pull
+                    fi
+                """
             }
         }
 
         stage('Restart plexmediaserver') {
             steps {
                 sh """
-                    ansible-playbook playbooks/linux/restart_service.yml \\
+                    cd ${ANSIBLE_REPO_PATH} && ansible-playbook playbooks/linux/restart_service.yml \\
                         -i inventory/ \\
                         -l plex_servers \\
                         -e service_name=plexmediaserver \\
