@@ -25,13 +25,14 @@
 //   8. Save
 //
 // AGENT NOTE:
-//   Runs on nodes labelled 'ansible'. Apply this label in Jenkins:
-//   Manage Jenkins → Nodes → hmvlapjkn001 → Configure → Labels: ansible
+//   Locked to 'built-in' (hmvlapjkn001 — Jenkins master). Ansible and the
+//   repo at /opt/homelabinfra-iac-ansible live here. 'built-in' is an
+//   automatic label on the Jenkins master — no config change required.
 // =============================================================================
 
 pipeline {
 
-    agent { label 'ansible' }
+    agent { label 'built-in' }
 
     environment {
         ANSIBLE_HOST_KEY_CHECKING = 'False'
