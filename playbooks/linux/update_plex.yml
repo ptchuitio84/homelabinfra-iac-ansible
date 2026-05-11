@@ -53,6 +53,11 @@
   tasks:
     - name: Upgrade block
       block:
+        - name: Import Plex GPG signing key
+          ansible.builtin.rpm_key:
+            key: https://downloads.plex.tv/plex-keys/PlexSign.v2.key
+            state: present
+
         - name: Download Plex RPM {{ plex_version }}
           ansible.builtin.get_url:
             url: "{{ plex_rpm_url }}"
