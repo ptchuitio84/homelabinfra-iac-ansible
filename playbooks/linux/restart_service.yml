@@ -1,0 +1,58 @@
+---
+# =============================================================================
+# playbooks/linux/restart_service.yml
+# =============================================================================
+# Generic systemd service restart playbook.
+#
+# REQUIRED VARS (pass via -e):
+#   service_name   — name of the systemd unit (e.g. plexmediaserver)
+#
+# TARGET:
+#   Pass via -l on the ansible-playbook command line (inventory group or host).
+#
+# USAGE:
+#   ansible-playbook playbooks/linux/restart_service.yml \
+#     -i inventory/ \
+#     -l plex_servers \
+#     -e service_name=plexmediaserver
+# =============================================================================
+
+- name: Restart systemd service
+  hosts: all
+  become: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Assert service_name is defined
+      ansible.builtin.assert:
+        that: service_name is defined and service_name | length > 0
+        fail_msg: "service_name must be passed via -e service_name=<unit>"
+
+    - name: Verify service exists on host
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+      register: svc_check
+      failed_when: svc_check.status.LoadState == 'not-found'
+
+  tasks:
+    - name: Restart {{ service_name }}
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+        state: restarted
+
+    - name: Pause for service to stabilise
+      ansible.builtin.pause:
+        seconds: 5
+
+    - name: Verify {{ service_name }} is active
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+      register: svc_status
+      failed_when: svc_status.status.ActiveState != 'active'
+
+    - name: Report service status
+      ansible.builtin.debug:
+        msg: >-
+          {{ service_name }} is {{ svc_status.status.ActiveState }}
+          ({{ svc_status.status.SubState }}) —
+          started {{ svc_status.status.ExecMainStartTimestamp }}
