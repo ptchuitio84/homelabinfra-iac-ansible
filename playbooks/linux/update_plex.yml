@@ -42,7 +42,7 @@
         state: absent
 
     - name: Check currently installed version
-      ansible.builtin.shell: rpm -q plexmediaserver --queryformat '%{VERSION}-%{RELEASE}' 2>/dev/null || echo "not-installed"
+      ansible.builtin.shell: rpm -q --nosignature plexmediaserver --queryformat '%{VERSION}-%{RELEASE}' 2>/dev/null || echo "not-installed"
       register: current_version
       changed_when: false
 
@@ -84,7 +84,7 @@
           failed_when: svc_status.status.ActiveState != 'active'
 
         - name: Check installed version
-          ansible.builtin.shell: rpm -q plexmediaserver --queryformat '%{VERSION}-%{RELEASE}'
+          ansible.builtin.shell: rpm -q --nosignature plexmediaserver --queryformat '%{VERSION}-%{RELEASE}'
           register: new_version
           changed_when: false
 
