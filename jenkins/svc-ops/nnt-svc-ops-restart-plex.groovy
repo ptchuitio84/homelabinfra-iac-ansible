@@ -25,14 +25,13 @@
 //   8. Save
 //
 // AGENT NOTE:
-//   Locked to 'built-in' (hmvlapjkn001 — Jenkins master). Ansible and the
-//   repo at /opt/homelabinfra-iac-ansible live here. 'built-in' is an
-//   automatic label on the Jenkins master — no config change required.
+//   Locked to 'ans001' (hmvlapans001 — Ansible control node).
+//   Ansible and /opt/homelabinfra-iac-ansible live there.
 // =============================================================================
 
 pipeline {
 
-    agent { label 'built-in' }
+    agent { label 'ans001' }
 
     environment {
         ANSIBLE_HOST_KEY_CHECKING = 'False'
