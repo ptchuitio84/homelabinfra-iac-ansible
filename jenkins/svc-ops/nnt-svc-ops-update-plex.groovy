@@ -5,20 +5,20 @@
 // FOLDER:     nnt-svc-ops
 //
 // PURPOSE:
-//   Upgrade Plex Media Server on HMPPLXAP002 to a specified version.
-//   Downloads the RPM directly on the target host, stops the service,
-//   installs, restarts, and verifies the new version is running.
+//   Upgrade Plex Media Server on HMPPLXAP002 to the latest available version.
+//   Downloads directly from plex.tv using a stored API token — no version
+//   string needed. Reports current → new version in the build log.
 //
 // TARGET:
 //   Host:    hmpplxap002.nnt.com (10.100.7.10)
 //   Group:   plex_servers
 //   Service: plexmediaserver
 //
-// HOW TO FIND THE VERSION STRING:
-//   1. Open Plex Web → Settings → Troubleshooting → "Show release notes"
-//      OR go to plex.tv/media-server-downloads
-//   2. Copy the full version including build hash: e.g. 1.43.1.10611-abc123de
-//   3. Paste into the VERSION parameter below
+// PREREQUISITES:
+//   Add a Jenkins credential:
+//     Kind:  Secret text
+//     ID:    plex-api-token
+//     Value: your Plex token (Settings → Account → Plex Media Server token)
 //
 // JENKINS SETUP:
 //   1. Open folder: nnt-svc-ops
@@ -40,18 +40,14 @@ pipeline {
         ANSIBLE_FORCE_COLOR       = 'true'
         ANSIBLE_REPO_PATH         = '/opt/homelabinfra-iac-ansible'
         ANSIBLE_REPO_URL          = 'git@github.com:ptchuitio84/homelabinfra-iac-ansible.git'
+        PLEX_TOKEN                = credentials('plex-api-token')
     }
 
     parameters {
         string(
-            name:         'VERSION',
-            defaultValue: '',
-            description:  'Required — full Plex version string including build hash (e.g. 1.43.1.10611-abc123de). Get it from plex.tv/media-server-downloads.'
-        )
-        string(
             name:         'REASON',
             defaultValue: '',
-            description:  'Required — why are you updating Plex? (e.g. "Security fix in 1.43.1")'
+            description:  'Required — why are you updating Plex? (e.g. "1.43.1 released — library scanner fix")'
         )
     }
 
@@ -66,14 +62,10 @@ pipeline {
         stage('Validate') {
             steps {
                 script {
-                    if (!params.VERSION?.trim()) {
-                        error('VERSION is required. Provide the full Plex version string including build hash.')
-                    }
                     if (!params.REASON?.trim()) {
                         error('REASON is required. Describe why you are updating Plex.')
                     }
                     echo "Operator : ${env.BUILD_USER_ID ?: 'unknown'}"
-                    echo "Version  : ${params.VERSION}"
                     echo "Reason   : ${params.REASON}"
                     echo "Target   : hmpplxap002.nnt.com (plex_servers)"
                     echo "Node     : ${env.NODE_NAME}"
@@ -101,7 +93,7 @@ pipeline {
                     cd ${ANSIBLE_REPO_PATH} && ansible-playbook playbooks/linux/update_plex.yml \\
                         -i inventory/ \\
                         -l plex_servers \\
-                        -e plex_version=${params.VERSION} \\
+                        -e plex_token=${PLEX_TOKEN} \\
                         -v
                 """
             }
@@ -111,7 +103,7 @@ pipeline {
 
     post {
         success {
-            echo "plexmediaserver upgraded to ${params.VERSION} on HMPPLXAP002. Reason: ${params.REASON}"
+            echo "plexmediaserver upgraded successfully on HMPPLXAP002. Reason: ${params.REASON}"
         }
         failure {
             echo "Upgrade FAILED on HMPPLXAP002. Check the Ansible output above. Service may be stopped — verify manually."

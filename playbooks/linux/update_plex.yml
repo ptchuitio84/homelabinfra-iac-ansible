@@ -2,11 +2,10 @@
 # =============================================================================
 # playbooks/linux/update_plex.yml
 # =============================================================================
-# Upgrade Plex Media Server to a specific version on HMPPLXAP002.
+# Upgrade Plex Media Server to the latest version on HMPPLXAP002.
 #
 # REQUIRED VARS (pass via -e):
-#   plex_version  — full version string including build hash
-#                   e.g. 1.43.1.10611-abc123de
+#   plex_token  — Plex authentication token (from Jenkins credential plex-api-token)
 #
 # TARGET:
 #   Pass via -l on the ansible-playbook command line (plex_servers)
@@ -15,26 +14,27 @@
 #   ansible-playbook playbooks/linux/update_plex.yml \
 #     -i inventory/ \
 #     -l plex_servers \
-#     -e plex_version=1.43.1.10611-abc123de
+#     -e plex_token=<token>
 #
-# DOWNLOAD URL PATTERN:
-#   https://downloads.plex.tv/plex-media-server-new/<version>/redhat/plexmediaserver-<version>.x86_64.rpm
+# HOW TO GET YOUR PLEX TOKEN:
+#   plex.tv/claim → sign in → Settings → Account → under "Plex Media Server" copy token
+#   OR: open any Plex stream, add ?X-Plex-Token= to the URL — visible in browser inspector
 # =============================================================================
 
-- name: Upgrade Plex Media Server
+- name: Upgrade Plex Media Server to latest
   hosts: all
   become: true
   gather_facts: false
 
   vars:
-    plex_rpm_url: "https://downloads.plex.tv/plex-media-server-new/{{ plex_version }}/redhat/plexmediaserver-{{ plex_version }}.x86_64.rpm"
-    plex_rpm_dest: "/tmp/plexmediaserver-{{ plex_version }}.x86_64.rpm"
+    plex_download_url: "https://plex.tv/downloads/latest/5?channel=16&build=linux-x86_64&distro=redhat"
+    plex_rpm_dest: "/tmp/plexmediaserver-latest.x86_64.rpm"
 
   pre_tasks:
-    - name: Assert plex_version is defined
+    - name: Assert plex_token is defined
       ansible.builtin.assert:
-        that: plex_version is defined and plex_version | length > 0
-        fail_msg: "plex_version must be passed via -e plex_version=<version-buildhash>"
+        that: plex_token is defined and plex_token | length > 0
+        fail_msg: "plex_token must be passed via -e plex_token=<token>"
 
     - name: Check currently installed version
       ansible.builtin.shell: rpm -q plexmediaserver --queryformat '%{VERSION}-%{RELEASE}' 2>/dev/null || echo "not-installed"
@@ -43,24 +43,26 @@
 
     - name: Report current version
       ansible.builtin.debug:
-        msg: "Current: {{ current_version.stdout }} → Target: {{ plex_version }}"
+        msg: "Current: {{ current_version.stdout }} — downloading latest..."
 
   tasks:
-    - name: Download Plex RPM {{ plex_version }}
+    - name: Download latest Plex RPM
       ansible.builtin.get_url:
-        url: "{{ plex_rpm_url }}"
+        url: "{{ plex_download_url }}"
+        headers:
+          X-Plex-Token: "{{ plex_token }}"
         dest: "{{ plex_rpm_dest }}"
         mode: '0644'
         timeout: 120
+      no_log: true
 
     - name: Stop plexmediaserver
       ansible.builtin.systemd:
         name: plexmediaserver
         state: stopped
 
-    - name: Install Plex RPM {{ plex_version }}
+    - name: Install latest Plex RPM
       ansible.builtin.shell: yum localinstall -y {{ plex_rpm_dest }}
-      register: yum_result
 
     - name: Start plexmediaserver
       ansible.builtin.systemd:
@@ -77,24 +79,19 @@
       register: svc_status
       failed_when: svc_status.status.ActiveState != 'active'
 
-    - name: Verify installed version
+    - name: Check installed version
       ansible.builtin.shell: rpm -q plexmediaserver --queryformat '%{VERSION}-%{RELEASE}'
-      register: installed_version
+      register: new_version
       changed_when: false
-
-    - name: Assert version matches target
-      ansible.builtin.assert:
-        that: plex_version in installed_version.stdout
-        fail_msg: "Version mismatch — expected {{ plex_version }}, got {{ installed_version.stdout }}"
 
     - name: Clean up RPM
       ansible.builtin.file:
         path: "{{ plex_rpm_dest }}"
         state: absent
 
-    - name: Report final status
+    - name: Report upgrade result
       ansible.builtin.debug:
         msg: >-
-          plexmediaserver upgraded to {{ installed_version.stdout }} —
+          plexmediaserver upgraded: {{ current_version.stdout }} → {{ new_version.stdout }} —
           {{ svc_status.status.ActiveState }} ({{ svc_status.status.SubState }})
           started {{ svc_status.status.ExecMainStartTimestamp }}
