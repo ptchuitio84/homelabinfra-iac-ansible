@@ -4,8 +4,8 @@
 # =============================================================================
 # Upgrade Plex Media Server to the latest version on HMPPLXAP002.
 #
-# REQUIRED VARS (pass via -e):
-#   plex_token  — Plex authentication token (from Jenkins credential plex-api-token)
+# Uses the official Plex yum repository (public, no auth required).
+# Ensures the repo is configured before attempting the upgrade.
 #
 # TARGET:
 #   Pass via -l on the ansible-playbook command line (plex_servers)
@@ -13,12 +13,7 @@
 # USAGE:
 #   ansible-playbook playbooks/linux/update_plex.yml \
 #     -i inventory/ \
-#     -l plex_servers \
-#     -e plex_token=<token>
-#
-# HOW TO GET YOUR PLEX TOKEN:
-#   plex.tv/claim → sign in → Settings → Account → under "Plex Media Server" copy token
-#   OR: open any Plex stream, add ?X-Plex-Token= to the URL — visible in browser inspector
+#     -l plex_servers
 # =============================================================================
 
 - name: Upgrade Plex Media Server to latest
@@ -26,16 +21,7 @@
   become: true
   gather_facts: false
 
-  vars:
-    plex_download_url: "https://plex.tv/downloads/latest/5?channel=16&build=linux-x86_64&distro=redhat"
-    plex_rpm_dest: "/tmp/plexmediaserver-latest.x86_64.rpm"
-
-  pre_tasks:
-    - name: Assert plex_token is defined
-      ansible.builtin.assert:
-        that: plex_token is defined and plex_token | length > 0
-        fail_msg: "plex_token must be passed via -e plex_token=<token>"
-
+  tasks:
     - name: Check currently installed version
       ansible.builtin.shell: rpm -q plexmediaserver --queryformat '%{VERSION}-%{RELEASE}' 2>/dev/null || echo "not-installed"
       register: current_version
@@ -43,26 +29,27 @@
 
     - name: Report current version
       ansible.builtin.debug:
-        msg: "Current: {{ current_version.stdout }} — downloading latest..."
+        msg: "Current: {{ current_version.stdout }} — checking for update..."
 
-  tasks:
-    - name: Download latest Plex RPM
-      ansible.builtin.get_url:
-        url: "{{ plex_download_url }}"
-        headers:
-          X-Plex-Token: "{{ plex_token }}"
-        dest: "{{ plex_rpm_dest }}"
-        mode: '0644'
-        timeout: 120
-      no_log: true
+    - name: Ensure Plex yum repository is configured
+      ansible.builtin.yum_repository:
+        name: PlexRepo
+        description: Plex Media Server
+        baseurl: https://downloads.plex.tv/repo/rpm/$basearch/
+        gpgkey: https://downloads.plex.tv/plex-keys/PlexSign.key
+        gpgcheck: true
+        enabled: true
 
     - name: Stop plexmediaserver
       ansible.builtin.systemd:
         name: plexmediaserver
         state: stopped
 
-    - name: Install latest Plex RPM
-      ansible.builtin.shell: yum localinstall -y {{ plex_rpm_dest }}
+    - name: Upgrade plexmediaserver to latest
+      ansible.builtin.yum:
+        name: plexmediaserver
+        state: latest
+      register: yum_result
 
     - name: Start plexmediaserver
       ansible.builtin.systemd:
@@ -84,14 +71,9 @@
       register: new_version
       changed_when: false
 
-    - name: Clean up RPM
-      ansible.builtin.file:
-        path: "{{ plex_rpm_dest }}"
-        state: absent
-
     - name: Report upgrade result
       ansible.builtin.debug:
         msg: >-
-          plexmediaserver upgraded: {{ current_version.stdout }} → {{ new_version.stdout }} —
+          plexmediaserver: {{ current_version.stdout }} → {{ new_version.stdout }} —
           {{ svc_status.status.ActiveState }} ({{ svc_status.status.SubState }})
           started {{ svc_status.status.ExecMainStartTimestamp }}

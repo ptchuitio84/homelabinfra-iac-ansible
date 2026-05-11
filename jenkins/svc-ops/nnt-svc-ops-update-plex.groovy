@@ -5,20 +5,14 @@
 // FOLDER:     nnt-svc-ops
 //
 // PURPOSE:
-//   Upgrade Plex Media Server on HMPPLXAP002 to the latest available version.
-//   Downloads directly from plex.tv using a stored API token — no version
-//   string needed. Reports current → new version in the build log.
+//   Upgrade Plex Media Server on HMPPLXAP002 to the latest available version
+//   using the official Plex yum repository (public — no credentials required).
+//   Reports current → new version in the build log.
 //
 // TARGET:
 //   Host:    hmpplxap002.nnt.com (10.100.7.10)
 //   Group:   plex_servers
 //   Service: plexmediaserver
-//
-// PREREQUISITES:
-//   Add a Jenkins credential:
-//     Kind:  Secret text
-//     ID:    plex-api-token
-//     Value: your Plex token (Settings → Account → Plex Media Server token)
 //
 // JENKINS SETUP:
 //   1. Open folder: nnt-svc-ops
@@ -40,7 +34,6 @@ pipeline {
         ANSIBLE_FORCE_COLOR       = 'true'
         ANSIBLE_REPO_PATH         = '/opt/homelabinfra-iac-ansible'
         ANSIBLE_REPO_URL          = 'git@github.com:ptchuitio84/homelabinfra-iac-ansible.git'
-        PLEX_TOKEN                = credentials('plex-api-token')
     }
 
     parameters {
@@ -93,7 +86,6 @@ pipeline {
                     cd ${ANSIBLE_REPO_PATH} && ansible-playbook playbooks/linux/update_plex.yml \\
                         -i inventory/ \\
                         -l plex_servers \\
-                        -e plex_token=${PLEX_TOKEN} \\
                         -v
                 """
             }
