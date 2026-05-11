@@ -16,9 +16,6 @@
 #     -i inventory/ \
 #     -l plex_servers \
 #     -e plex_version=1.43.1.10611-1e34174b1
-#
-# DOWNLOAD URL PATTERN (public, no auth):
-#   https://downloads.plex.tv/plex-media-server-new/<version>/redhat/plexmediaserver-<version>.x86_64.rpm
 # =============================================================================
 
 - name: Upgrade Plex Media Server
@@ -38,6 +35,11 @@
           - plex_version | length > 0
           - "'-' in plex_version"
         fail_msg: "plex_version must include the build hash — e.g. 1.43.1.10611-1e34174b1"
+
+    - name: Remove duplicate Plex repo file if present
+      ansible.builtin.file:
+        path: /etc/yum.repos.d/PlexRepo.repo
+        state: absent
 
     - name: Check currently installed version
       ansible.builtin.shell: rpm -q plexmediaserver --queryformat '%{VERSION}-%{RELEASE}' 2>/dev/null || echo "not-installed"
@@ -62,7 +64,8 @@
         state: stopped
 
     - name: Install Plex RPM {{ plex_version }}
-      ansible.builtin.shell: yum localinstall -y {{ plex_rpm_dest }}
+      ansible.builtin.shell: rpm -Uvh {{ plex_rpm_dest }}
+      register: rpm_result
 
     - name: Start plexmediaserver
       ansible.builtin.systemd:
@@ -95,3 +98,14 @@
           plexmediaserver: {{ current_version.stdout }} → {{ new_version.stdout }} —
           {{ svc_status.status.ActiveState }} ({{ svc_status.status.SubState }})
           started {{ svc_status.status.ExecMainStartTimestamp }}
+
+  rescue:
+    - name: Ensure plexmediaserver is started after failed upgrade
+      ansible.builtin.systemd:
+        name: plexmediaserver
+        state: started
+      ignore_errors: true
+
+    - name: Report failure
+      ansible.builtin.fail:
+        msg: "Upgrade failed. plexmediaserver has been restarted on the previous version. Check the error above."
