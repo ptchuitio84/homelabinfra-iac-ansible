@@ -2,10 +2,11 @@
 # =============================================================================
 # playbooks/linux/update_plex.yml
 # =============================================================================
-# Upgrade Plex Media Server to the latest version on HMPPLXAP002.
+# Upgrade Plex Media Server to a specific version on HMPPLXAP002.
 #
-# Uses the official Plex yum repository (public, no auth required).
-# Ensures the repo is configured before attempting the upgrade.
+# REQUIRED VARS (pass via -e):
+#   plex_version  — full version string including build hash
+#                   e.g. 1.43.1.10611-1e34174b1
 #
 # TARGET:
 #   Pass via -l on the ansible-playbook command line (plex_servers)
@@ -13,43 +14,55 @@
 # USAGE:
 #   ansible-playbook playbooks/linux/update_plex.yml \
 #     -i inventory/ \
-#     -l plex_servers
+#     -l plex_servers \
+#     -e plex_version=1.43.1.10611-1e34174b1
+#
+# DOWNLOAD URL PATTERN (public, no auth):
+#   https://downloads.plex.tv/plex-media-server-new/<version>/redhat/plexmediaserver-<version>.x86_64.rpm
 # =============================================================================
 
-- name: Upgrade Plex Media Server to latest
+- name: Upgrade Plex Media Server
   hosts: all
   become: true
   gather_facts: false
 
-  tasks:
+  vars:
+    plex_rpm_url: "https://downloads.plex.tv/plex-media-server-new/{{ plex_version }}/redhat/plexmediaserver-{{ plex_version }}.x86_64.rpm"
+    plex_rpm_dest: "/tmp/plexmediaserver-{{ plex_version }}.x86_64.rpm"
+
+  pre_tasks:
+    - name: Assert plex_version is defined and includes build hash
+      ansible.builtin.assert:
+        that:
+          - plex_version is defined
+          - plex_version | length > 0
+          - "'-' in plex_version"
+        fail_msg: "plex_version must include the build hash — e.g. 1.43.1.10611-1e34174b1"
+
     - name: Check currently installed version
       ansible.builtin.shell: rpm -q plexmediaserver --queryformat '%{VERSION}-%{RELEASE}' 2>/dev/null || echo "not-installed"
       register: current_version
       changed_when: false
 
-    - name: Report current version
+    - name: Report current → target
       ansible.builtin.debug:
-        msg: "Current: {{ current_version.stdout }} — checking for update..."
+        msg: "Current: {{ current_version.stdout }} → Target: {{ plex_version }}"
 
-    - name: Ensure Plex yum repository is configured
-      ansible.builtin.yum_repository:
-        name: PlexRepo
-        description: Plex Media Server
-        baseurl: https://downloads.plex.tv/repo/rpm/$basearch/
-        gpgkey: https://downloads.plex.tv/plex-keys/PlexSign.key
-        gpgcheck: true
-        enabled: true
+  tasks:
+    - name: Download Plex RPM {{ plex_version }}
+      ansible.builtin.get_url:
+        url: "{{ plex_rpm_url }}"
+        dest: "{{ plex_rpm_dest }}"
+        mode: '0644'
+        timeout: 120
 
     - name: Stop plexmediaserver
       ansible.builtin.systemd:
         name: plexmediaserver
         state: stopped
 
-    - name: Upgrade plexmediaserver to latest
-      ansible.builtin.yum:
-        name: plexmediaserver
-        state: latest
-      register: yum_result
+    - name: Install Plex RPM {{ plex_version }}
+      ansible.builtin.shell: yum localinstall -y {{ plex_rpm_dest }}
 
     - name: Start plexmediaserver
       ansible.builtin.systemd:
@@ -70,6 +83,11 @@
       ansible.builtin.shell: rpm -q plexmediaserver --queryformat '%{VERSION}-%{RELEASE}'
       register: new_version
       changed_when: false
+
+    - name: Clean up RPM
+      ansible.builtin.file:
+        path: "{{ plex_rpm_dest }}"
+        state: absent
 
     - name: Report upgrade result
       ansible.builtin.debug:
