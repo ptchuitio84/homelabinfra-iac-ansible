@@ -1,0 +1,85 @@
+# =============================================================================
+# playbooks/linux/setup_dcatlas_smoke.yml — dcAtlas Smoke Test Environment
+# =============================================================================
+# Deploys the dcAtlas stack (PostgreSQL + FastAPI + Next.js) via Docker Compose
+# on a freshly provisioned VM. Seeds demo data and validates the stack before
+# exiting. Zero manual steps required.
+#
+# PRE-FLIGHT:
+#   1. Confirm GitHub PAT is in Vault:
+#        vault kv get secret/github/nnt
+#      If missing: vault kv put secret/github/nnt token=<PAT>
+#   2. Create and encrypt inventory/group_vars/dcatlas/vault.yml:
+#        ---
+#        vault_lookup_token: <vault-token>
+#      Then: ansible-vault encrypt inventory/group_vars/dcatlas/vault.yml \
+#              --vault-password-file ~/.ansible/vault_pass.txt
+#
+# USAGE (manual):
+#   ansible-playbook playbooks/linux/setup_dcatlas_smoke.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt \
+#     -i <VM_IP>,
+#
+# USAGE (via Jenkins — nnt-jkn-provision-vm):
+#   VM spec:
+#     {
+#       "vm_name":     "hmvlapdca001",
+#       "cpu":         4,
+#       "ram_mb":      8192,
+#       "os_template": "PLTMPOL0903302026",
+#       "esxi_host":   "hsplv021.nnt.com",
+#       "datastore":   "LUNPLV163001",
+#       "gateway":     "10.10.0.1",
+#       "extra_disk_gb": 0,
+#       "role":        "dcatlas_smoke"
+#     }
+# =============================================================================
+
+---
+- name: Deploy dcAtlas smoke test environment
+  hosts: all
+  gather_facts: true
+
+  vars:
+    vault_addr:        "https://10.10.0.44:8200"
+    vault_secret_path: "github/nnt"
+
+  vars_files:
+    - ../../inventory/group_vars/dcatlas/vault.yml
+
+  pre_tasks:
+
+    - name: Verify Vault is reachable
+      ansible.builtin.uri:
+        url:            "{{ vault_addr }}/v1/sys/health"
+        validate_certs: false
+        status_code:    [200, 429, 472, 473, 501, 503]
+      delegate_to: localhost
+      register: vault_health
+      failed_when: vault_health.status not in [200, 429, 472, 473, 501, 503]
+
+    - name: Confirm Vault is unsealed
+      ansible.builtin.assert:
+        that: vault_health.json.sealed == false
+        fail_msg: "Vault is sealed — unseal before running this playbook"
+
+    - name: Read GitHub PAT from Vault
+      ansible.builtin.uri:
+        url:            "{{ vault_addr }}/v1/secret/data/{{ vault_secret_path }}"
+        method:         GET
+        headers:
+          X-Vault-Token: "{{ vault_lookup_token }}"
+        validate_certs: false
+        status_code:    200
+      delegate_to: localhost
+      register: vault_secret
+      no_log: true
+
+    - name: Extract PAT from Vault response
+      ansible.builtin.set_fact:
+        github_pat: "{{ vault_secret.json.data.data.token }}"
+      no_log: true
+
+  roles:
+    - docker_engine
+    - dcatlas_smoke

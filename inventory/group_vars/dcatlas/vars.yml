@@ -1,0 +1,9 @@
+# =============================================================================
+# group_vars/dcatlas/vars.yml — dcAtlas smoke test VM group variables
+# =============================================================================
+# Sensitive values live in vault.yml (ansible-vault encrypted):
+#   vault_lookup_token: <vault-token-for-Vault-API-reads>
+# =============================================================================
+
+---
+# No plaintext vars required — all config lives in role defaults and Vault.

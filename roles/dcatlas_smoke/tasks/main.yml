@@ -1,0 +1,74 @@
+# =============================================================================
+# roles/dcatlas_smoke/tasks/main.yml — dcAtlas Smoke Test Stack
+# =============================================================================
+
+---
+# ---------------------------------------------------------------------------
+# 1. Clone repo
+# ---------------------------------------------------------------------------
+- name: Create dcAtlas working directory
+  ansible.builtin.file:
+    path: "{{ dcatlas_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Clone dcAtlas repository
+  ansible.builtin.git:
+    repo: "https://{{ dcatlas_github_user }}:{{ github_pat }}@github.com/{{ dcatlas_github_user }}/{{ dcatlas_repo_name }}.git"
+    dest: "{{ dcatlas_dir }}"
+    version: "{{ dcatlas_branch }}"
+    force: false
+  no_log: true
+
+# ---------------------------------------------------------------------------
+# 2. Build and start stack
+# ---------------------------------------------------------------------------
+- name: Build and start docker compose stack
+  ansible.builtin.command:
+    cmd: docker compose up -d --build
+    chdir: "{{ dcatlas_dir }}"
+  changed_when: true
+  async: 600
+  poll: 30
+
+# ---------------------------------------------------------------------------
+# 3. Wait for backend readiness
+# ---------------------------------------------------------------------------
+- name: Wait for backend health endpoint
+  ansible.builtin.uri:
+    url: http://localhost:8000/health
+    status_code: 200
+  register: health_check
+  retries: 60
+  delay: 10
+  until: health_check.status == 200
+
+# ---------------------------------------------------------------------------
+# 4. Seed demo data
+# ---------------------------------------------------------------------------
+- name: Run demo data seeder
+  ansible.builtin.command:
+    cmd: python3 backend/scripts/seed_demo.py --base-url http://localhost:8000 --verbose
+    chdir: "{{ dcatlas_dir }}"
+  register: seeder_result
+  changed_when: true
+
+- name: Show seeder output
+  ansible.builtin.debug:
+    msg: "{{ seeder_result.stdout_lines }}"
+
+# ---------------------------------------------------------------------------
+# 5. Final validation
+# ---------------------------------------------------------------------------
+- name: Validate halls endpoint returns data
+  ansible.builtin.uri:
+    url: http://localhost:8000/api/halls
+    status_code: 200
+  register: halls_check
+
+- name: Confirm stack is live
+  ansible.builtin.debug:
+    msg:
+      - "dcAtlas stack is live at http://{{ ansible_host }}:3000"
+      - "API: http://{{ ansible_host }}:8000/api/halls"
+      - "Halls returned: {{ (halls_check.json | length) if halls_check.json is iterable else 'unknown' }}"

@@ -1,0 +1,9 @@
+# =============================================================================
+# roles/dcatlas_smoke/defaults/main.yml
+# =============================================================================
+
+---
+dcatlas_dir:         /opt/dcatlas
+dcatlas_branch:      main
+dcatlas_github_user: ptchuitio84
+dcatlas_repo_name:   dcAtlas
