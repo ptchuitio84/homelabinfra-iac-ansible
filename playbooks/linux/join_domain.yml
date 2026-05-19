@@ -40,5 +40,8 @@
   ignore_unreachable: true
   any_errors_fatal: false
 
+  vars_files:
+    - ../../inventory/group_vars/all/vault.yml
+
   roles:
     - ad_join
