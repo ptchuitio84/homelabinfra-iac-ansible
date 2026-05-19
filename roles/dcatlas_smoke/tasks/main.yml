@@ -48,7 +48,7 @@
 # ---------------------------------------------------------------------------
 - name: Run demo data seeder
   ansible.builtin.command:
-    cmd: python3 backend/scripts/seed_demo.py --base-url http://localhost:8000 --verbose
+    cmd: python3 backend/scripts/seed_demo.py --base-url http://localhost:8000/api/v1 --verbose
     chdir: "{{ dcatlas_dir }}"
   register: seeder_result
   changed_when: true
@@ -62,7 +62,7 @@
 # ---------------------------------------------------------------------------
 - name: Validate halls endpoint returns data
   ansible.builtin.uri:
-    url: http://localhost:8000/api/halls
+    url: http://localhost:8000/api/v1/halls
     status_code: 200
   register: halls_check
 
@@ -70,5 +70,5 @@
   ansible.builtin.debug:
     msg:
       - "dcAtlas stack is live at http://{{ ansible_host }}:3000"
-      - "API: http://{{ ansible_host }}:8000/api/halls"
+      - "API: http://{{ ansible_host }}:8000/api/v1/halls"
       - "Halls returned: {{ (halls_check.json | length) if halls_check.json is iterable else 'unknown' }}"
