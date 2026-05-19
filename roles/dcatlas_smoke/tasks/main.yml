@@ -60,15 +60,15 @@
 # ---------------------------------------------------------------------------
 # 5. Final validation
 # ---------------------------------------------------------------------------
-- name: Validate halls endpoint returns data
+- name: Validate demands endpoint returns seeded data
   ansible.builtin.uri:
-    url: http://localhost:8000/api/v1/halls
+    url: http://localhost:8000/api/v1/demands
     status_code: 200
-  register: halls_check
+  register: demands_check
 
 - name: Confirm stack is live
   ansible.builtin.debug:
     msg:
       - "dcAtlas stack is live at http://{{ ansible_host }}:3000"
-      - "API: http://{{ ansible_host }}:8000/api/v1/halls"
-      - "Halls returned: {{ (halls_check.json | length) if halls_check.json is iterable else 'unknown' }}"
+      - "API: http://{{ ansible_host }}:8000/api/v1/demands"
+      - "Demands returned: {{ demands_check.json | length }}"
