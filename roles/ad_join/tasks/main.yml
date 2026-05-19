@@ -47,7 +47,7 @@
     {{ ad_domain }}
   args:
     stdin: "{{ ad_join_password }}"
-  no_log: true
+  no_log: false
   when: ad_domain not in realm_list.stdout
   notify:
     - Restart sssd
