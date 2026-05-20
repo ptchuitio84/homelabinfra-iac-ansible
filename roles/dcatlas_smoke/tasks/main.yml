@@ -28,6 +28,7 @@
     dest: "{{ dcatlas_dir }}/.env"
     content: |
       NEXT_PUBLIC_API_URL={{ dcatlas_public_api_url }}
+      ALLOWED_ORIGINS={{ dcatlas_allowed_origins }}
     owner: root
     group: root
     mode: '0644'
