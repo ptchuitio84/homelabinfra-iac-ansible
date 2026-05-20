@@ -21,8 +21,17 @@
   no_log: true
 
 # ---------------------------------------------------------------------------
-# 2. Build and start stack
+# 2. Deploy .env with the public API URL, then build and start stack
 # ---------------------------------------------------------------------------
+- name: Deploy .env with public API URL
+  ansible.builtin.copy:
+    dest: "{{ dcatlas_dir }}/.env"
+    content: |
+      NEXT_PUBLIC_API_URL={{ dcatlas_public_api_url }}
+    owner: root
+    group: root
+    mode: '0644'
+
 - name: Build and start docker compose stack
   ansible.builtin.command:
     cmd: docker compose up -d --build

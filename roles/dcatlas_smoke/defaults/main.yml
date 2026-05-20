@@ -7,3 +7,6 @@ dcatlas_dir:         /opt/dcatlas
 dcatlas_branch:      main
 dcatlas_github_user: ptchuitio84
 dcatlas_repo_name:   dcAtlas
+# Public-facing backend URL used by browsers to reach the API.
+# Override in inventory group_vars/dcatlas/vars.yml per environment.
+dcatlas_public_api_url: "http://{{ ansible_host }}:8000/api/v1"
