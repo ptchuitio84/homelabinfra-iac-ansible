@@ -1,0 +1,20 @@
+# =============================================================================
+# inventory/linux/dcatlas.yml — dcAtlas DCIM Platform
+# =============================================================================
+# dcAtlas smoke test / dev environment.
+# DNS: dcatlas.nnt.com → 10.10.0.49
+#
+# Connection settings and vault token in:
+#   inventory/group_vars/dcatlas/vars.yml
+#   inventory/group_vars/dcatlas/vault.yml
+# =============================================================================
+
+---
+dcatlas:
+  hosts:
+
+    # hmvlapdac001 — dcAtlas DCIM stack
+    # IP: 10.10.0.49 | 4vCPU / 8GB RAM
+    hmvlapdac001.nnt.com:
+      ansible_host: dcatlas.nnt.com
+      vm_role: dcatlas_smoke

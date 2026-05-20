@@ -15,15 +15,24 @@
 #      Then: ansible-vault encrypt inventory/group_vars/dcatlas/vault.yml \
 #              --vault-password-file ~/.ansible/vault_pass.txt
 #
-# USAGE (manual):
+# USAGE (from ans001 — inventory):
 #   ansible-playbook playbooks/linux/setup_dcatlas_smoke.yml \
-#     --vault-password-file ~/.ansible/vault_pass.txt \
-#     -i <VM_IP>,
+#     --vault-password-file /root/.ansible/vault_pass.txt
+#
+# USAGE (from ans001 — single host by name):
+#   ansible-playbook playbooks/linux/setup_dcatlas_smoke.yml \
+#     --vault-password-file /root/.ansible/vault_pass.txt \
+#     --limit hmvlapdac001.nnt.com
+#
+# USAGE (pipeline/dynamic IP — bypass inventory):
+#   ansible-playbook playbooks/linux/setup_dcatlas_smoke.yml \
+#     --vault-password-file /root/.ansible/vault_pass.txt \
+#     -i 10.10.0.49, --extra-vars "target_hosts=all"
 #
 # USAGE (via Jenkins — nnt-jkn-provision-vm):
 #   VM spec:
 #     {
-#       "vm_name":     "hmvlapdca001",
+#       "vm_name":     "hmvlapdac001",
 #       "cpu":         4,
 #       "ram_mb":      8192,
 #       "os_template": "PLTMPOL0903302026",
@@ -37,7 +46,7 @@
 
 ---
 - name: Deploy dcAtlas smoke test environment
-  hosts: all
+  hosts: "{{ target_hosts | default('dcatlas') }}"
   gather_facts: true
 
   vars:
