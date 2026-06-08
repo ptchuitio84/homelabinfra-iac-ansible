@@ -108,7 +108,118 @@
   changed_when: true
 
 # ---------------------------------------------------------------------------
-# 7. Nginx reverse proxy
+# 7. TLS certificate — Sub-CA signed
+# ---------------------------------------------------------------------------
+- name: Create SSL directory
+  ansible.builtin.file:
+    path: "{{ nextjs_ssl_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Check if chain cert already exists
+  ansible.builtin.stat:
+    path: "{{ nextjs_ssl_cert }}"
+  register: ssl_chain_stat
+
+- name: Generate private key
+  ansible.builtin.command:
+    cmd: openssl genrsa -out {{ nextjs_ssl_key }} 4096
+    creates: "{{ nextjs_ssl_key }}"
+
+- name: Set private key permissions
+  ansible.builtin.file:
+    path: "{{ nextjs_ssl_key }}"
+    owner: root
+    group: root
+    mode: '0640'
+
+- name: Generate CSR
+  ansible.builtin.command:
+    cmd: >
+      openssl req -new
+      -key {{ nextjs_ssl_key }}
+      -out {{ nextjs_ssl_csr }}
+      -subj "/C=US/ST=Ohio/L=Columbus/O=NNT/CN={{ nextjs_domain }}"
+    creates: "{{ nextjs_ssl_csr }}"
+
+- name: Fetch CSR to Ansible controller
+  ansible.builtin.fetch:
+    src: "{{ nextjs_ssl_csr }}"
+    dest: /tmp/{{ nextjs_app_name }}.csr
+    flat: true
+  when: not ssl_chain_stat.stat.exists
+
+- name: Create temp cert directory on CA server
+  ansible.windows.win_file:
+    path: "{{ nextjs_ca_remote_dir }}"
+    state: directory
+  delegate_to: "{{ nextjs_ca_host }}"
+  when: not ssl_chain_stat.stat.exists
+
+- name: Copy CSR to CA server
+  ansible.windows.win_copy:
+    src: /tmp/{{ nextjs_app_name }}.csr
+    dest: "{{ nextjs_ca_remote_csr }}"
+  delegate_to: "{{ nextjs_ca_host }}"
+  when: not ssl_chain_stat.stat.exists
+
+- name: Submit CSR to Sub-CA via certreq
+  ansible.windows.win_shell: >
+    certreq -submit
+    -attrib "CertificateTemplate:WebServer"
+    -config "{{ nextjs_ca_shorthost }}\{{ nextjs_ca_name }}"
+    "{{ nextjs_ca_remote_csr }}"
+    "{{ nextjs_ca_remote_cert }}"
+  delegate_to: "{{ nextjs_ca_host }}"
+  when: not ssl_chain_stat.stat.exists
+
+- name: Fetch signed cert from CA to Ansible controller
+  ansible.builtin.fetch:
+    src: "{{ nextjs_ca_remote_cert }}"
+    dest: /tmp/{{ nextjs_app_name }}.cer
+    flat: true
+  delegate_to: "{{ nextjs_ca_host }}"
+  when: not ssl_chain_stat.stat.exists
+
+- name: Copy Sub-CA cert to web server
+  ansible.builtin.copy:
+    src: "{{ nextjs_subca_pem }}"
+    dest: "{{ nextjs_ssl_dir }}/subca.pem"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Copy Root CA cert to web server
+  ansible.builtin.copy:
+    src: "{{ nextjs_root_pem }}"
+    dest: "{{ nextjs_ssl_dir }}/root_ca.pem"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Copy signed cert to web server
+  ansible.builtin.copy:
+    src: /tmp/{{ nextjs_app_name }}.cer
+    dest: "{{ nextjs_ssl_dir }}/{{ nextjs_app_name }}.cer"
+    owner: root
+    group: root
+    mode: '0644'
+  when: not ssl_chain_stat.stat.exists
+
+- name: Build certificate chain
+  ansible.builtin.shell:
+    cmd: >
+      cat {{ nextjs_ssl_dir }}/{{ nextjs_app_name }}.cer
+      {{ nextjs_ssl_dir }}/subca.pem
+      {{ nextjs_ssl_dir }}/root_ca.pem
+      > {{ nextjs_ssl_cert }}
+  when: not ssl_chain_stat.stat.exists
+  notify: Reload nginx
+
+# ---------------------------------------------------------------------------
+# 8. Nginx reverse proxy
 # ---------------------------------------------------------------------------
 - name: Deploy nginx proxy config
   ansible.builtin.template:

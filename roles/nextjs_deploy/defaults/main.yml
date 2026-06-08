@@ -8,3 +8,22 @@ nextjs_app_dir:   /opt/aigenticsolutions
 nextjs_repo:      git@github.com:ptchuitio84/aigenticsolutions.git
 nextjs_branch:    main
 nextjs_port:      3000
+
+# TLS — Sub-CA signed cert
+nextjs_domain:         aigenticsolutions.ai
+nextjs_ssl_dir:        /etc/nginx/ssl/{{ nextjs_app_name }}
+nextjs_ssl_key:        "{{ nextjs_ssl_dir }}/{{ nextjs_app_name }}.key"
+nextjs_ssl_csr:        "{{ nextjs_ssl_dir }}/{{ nextjs_app_name }}.csr"
+nextjs_ssl_cert:       "{{ nextjs_ssl_dir }}/chain.pem"
+
+# Sub-CA — HMVWAPCA002 (WinRM, ADCS issuing CA)
+nextjs_ca_host:        hmvwapca002.nanonetech.com
+nextjs_ca_shorthost:   HMVWAPCA002
+nextjs_ca_name:        NNT-NANONETECH-Sub-CA
+nextjs_ca_remote_dir:  'C:\Temp\nginx_certs'
+nextjs_ca_remote_csr:  'C:\Temp\nginx_certs\{{ nextjs_app_name }}.csr'
+nextjs_ca_remote_cert: 'C:\Temp\nginx_certs\{{ nextjs_app_name }}.cer'
+
+# Chain components — on Ansible controller (ans001 /tmp — do not delete)
+nextjs_subca_pem:  /tmp/subca_new.pem
+nextjs_root_pem:   /tmp/root_ca.pem

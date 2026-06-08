@@ -47,13 +47,19 @@
         fail_msg: "Vault at {{ vault_addr }} is sealed — unseal before running"
 
     - name: Fetch app secrets from Vault
+      ansible.builtin.uri:
+        url: "{{ vault_addr }}/v1/secret/data/aigenticsolutions/env"
+        headers:
+          X-Vault-Token: "{{ vault_lookup_token }}"
+        validate_certs: false
+        return_content: true
+      register: vault_response
+      delegate_to: localhost
+      no_log: true
+
+    - name: Set app env facts
       ansible.builtin.set_fact:
-        app_env: "{{ vault_secrets.secret }}"
-      vars:
-        vault_secrets: "{{ lookup('community.hashi_vault.vault_kv2_get', 'aigenticsolutions/env',
-          engine_mount_point='secret',
-          token=vault_lookup_token,
-          url=vault_addr) }}"
+        app_env: "{{ vault_response.json.data.data }}"
       no_log: true
 
   roles:
