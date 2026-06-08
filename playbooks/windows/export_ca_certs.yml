@@ -1,0 +1,58 @@
+# =============================================================================
+# playbooks/windows/export_ca_certs.yml — Export Sub-CA and Root CA certs
+# =============================================================================
+# Exports Sub-CA and Root CA certs from HMVWAPCA002 as PEM files,
+# then fetches them to the Ansible controller at /tmp/.
+#
+# Run when /tmp/subca_new.pem or /tmp/root_ca.pem are missing on ans001
+# (e.g., after a reboot clears /tmp).
+#
+# USAGE:
+#   ansible-playbook playbooks/windows/export_ca_certs.yml \
+#     --vault-password-file ~/.ansible/vault_pass.txt
+# =============================================================================
+
+---
+- name: Export CA certs from HMVWAPCA002
+  hosts: hmvwapca002.nanonetech.com
+  gather_facts: false
+
+  tasks:
+
+    - name: Create temp export directory
+      ansible.windows.win_file:
+        path: C:\Temp\ca_export
+        state: directory
+
+    - name: Export Sub-CA cert (DER)
+      ansible.windows.win_shell: certutil -ca.cert C:\Temp\ca_export\subca.cer
+      args:
+        creates: C:\Temp\ca_export\subca.cer
+
+    - name: Convert Sub-CA cert to PEM
+      ansible.windows.win_shell: certutil -encode C:\Temp\ca_export\subca.cer C:\Temp\ca_export\subca_new.pem
+      args:
+        creates: C:\Temp\ca_export\subca_new.pem
+
+    - name: Export Root CA cert (DER)
+      ansible.windows.win_shell: >
+        certutil -store -enterprise Root NNT-NANONETECH-Root-CA C:\Temp\ca_export\root_ca.cer
+      args:
+        creates: C:\Temp\ca_export\root_ca.cer
+
+    - name: Convert Root CA cert to PEM
+      ansible.windows.win_shell: certutil -encode C:\Temp\ca_export\root_ca.cer C:\Temp\ca_export\root_ca.pem
+      args:
+        creates: C:\Temp\ca_export\root_ca.pem
+
+    - name: Fetch Sub-CA PEM to controller
+      ansible.builtin.fetch:
+        src: C:\Temp\ca_export\subca_new.pem
+        dest: /tmp/subca_new.pem
+        flat: true
+
+    - name: Fetch Root CA PEM to controller
+      ansible.builtin.fetch:
+        src: C:\Temp\ca_export\root_ca.pem
+        dest: /tmp/root_ca.pem
+        flat: true
