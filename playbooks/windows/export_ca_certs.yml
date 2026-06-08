@@ -24,25 +24,22 @@
         path: C:\Temp\ca_export
         state: directory
 
-    - name: Export Sub-CA cert (DER)
-      ansible.windows.win_shell: certutil -ca.cert C:\Temp\ca_export\subca.cer
+    - name: Export Sub-CA cert as PEM (from Personal store)
+      ansible.windows.win_shell: |
+        $cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object {$_.Subject -like "*NANONETECH*"} | Select-Object -First 1
+        $pem = "-----BEGIN CERTIFICATE-----`n" + [Convert]::ToBase64String($cert.RawData, "InsertLineBreaks") + "`n-----END CERTIFICATE-----"
+        [IO.File]::WriteAllText("C:\Temp\ca_export\subca_new.pem", $pem)
       args:
-        creates: C:\Temp\ca_export\subca.cer
-
-    - name: Convert Sub-CA cert to PEM
-      ansible.windows.win_shell: certutil -encode C:\Temp\ca_export\subca.cer C:\Temp\ca_export\subca_new.pem
-      args:
+        executable: powershell
         creates: C:\Temp\ca_export\subca_new.pem
 
-    - name: Export Root CA cert (DER)
-      ansible.windows.win_shell: >
-        certutil -store -enterprise Root NNT-NANONETECH-Root-CA C:\Temp\ca_export\root_ca.cer
+    - name: Export Root CA cert as PEM (from Root store)
+      ansible.windows.win_shell: |
+        $cert = Get-ChildItem Cert:\LocalMachine\Root | Where-Object {$_.Subject -like "*NANONETECH*Root*"} | Select-Object -First 1
+        $pem = "-----BEGIN CERTIFICATE-----`n" + [Convert]::ToBase64String($cert.RawData, "InsertLineBreaks") + "`n-----END CERTIFICATE-----"
+        [IO.File]::WriteAllText("C:\Temp\ca_export\root_ca.pem", $pem)
       args:
-        creates: C:\Temp\ca_export\root_ca.cer
-
-    - name: Convert Root CA cert to PEM
-      ansible.windows.win_shell: certutil -encode C:\Temp\ca_export\root_ca.cer C:\Temp\ca_export\root_ca.pem
-      args:
+        executable: powershell
         creates: C:\Temp\ca_export\root_ca.pem
 
     - name: Fetch Sub-CA PEM to controller
