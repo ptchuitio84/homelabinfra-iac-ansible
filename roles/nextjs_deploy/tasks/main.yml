@@ -142,7 +142,9 @@
       -key {{ nextjs_ssl_key }}
       -out {{ nextjs_ssl_csr }}
       -subj "/C=US/ST=Ohio/L=Columbus/O=NNT/CN={{ nextjs_domain }}"
+      -addext "subjectAltName=DNS:{{ nextjs_domain }}"
     creates: "{{ nextjs_ssl_csr }}"
+  when: not ssl_chain_stat.stat.exists
 
 - name: Fetch CSR to Ansible controller
   ansible.builtin.fetch:
