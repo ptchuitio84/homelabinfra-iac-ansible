@@ -167,11 +167,13 @@
 
 - name: Submit CSR to Sub-CA via certreq
   ansible.windows.win_shell: >
-    certreq -submit
+    certreq -f -submit
     -attrib "CertificateTemplate:WebServer"
     -config "{{ nextjs_ca_shorthost }}\{{ nextjs_ca_name }}"
     "{{ nextjs_ca_remote_csr }}"
     "{{ nextjs_ca_remote_cert }}"
+  args:
+    creates: "{{ nextjs_ca_remote_cert }}"
   delegate_to: "{{ nextjs_ca_host }}"
   when: not ssl_chain_stat.stat.exists
 
