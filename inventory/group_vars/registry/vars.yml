@@ -7,3 +7,10 @@ ansible_user:                 root
 ansible_connection:           ssh
 ansible_ssh_private_key_file: ~/.ssh/id_ed25519
 ansible_python_interpreter:   /usr/bin/python3
+
+# Harbor credentials — sourced from vault.yml (ansible-vault encrypted on ans001)
+# On ans001: ansible-vault create inventory/group_vars/registry/vault.yml
+# Contents:
+#   vault_harbor_admin_password: "<new password>"
+#   vault_harbor_db_password:    "<new password>"
+# NOTE: Previous passwords were exposed publicly — rotate both on the Harbor instance.

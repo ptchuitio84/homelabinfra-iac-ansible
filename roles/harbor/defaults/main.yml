@@ -29,6 +29,9 @@ harbor_cert_country: US
 harbor_cert_state:   California
 harbor_cert_org:     NNT Homelab
 
-# Credentials — OVERRIDE via group_vars/harbor/vault.yml
-harbor_admin_password: "REDACTED"
-harbor_db_password:    "REDACTED"
+# Credentials — set via group_vars/registry/vault.yml (ansible-vault encrypted)
+# vault_harbor_admin_password and vault_harbor_db_password must be defined there.
+# No defaults here — playbook will fail fast if vault is missing rather than
+# deploying with a known-public password.
+harbor_admin_password: "{{ vault_harbor_admin_password }}"
+harbor_db_password:    "{{ vault_harbor_db_password }}"
