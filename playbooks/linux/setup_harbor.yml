@@ -3,7 +3,7 @@
 # =============================================================================
 # Deploys Harbor on a dedicated OL9 VM with Docker CE and self-signed TLS.
 # Access: https://hmvlapreg001.nnt.com
-# Default credentials: admin / REDACTED (change after first login)
+# Default credentials: admin / <see group_vars/registry/vault.yml> (change after first login)
 #
 # USAGE:
 #   ansible-playbook playbooks/linux/setup_harbor.yml \
